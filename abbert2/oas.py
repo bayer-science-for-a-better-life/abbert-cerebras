@@ -50,6 +50,8 @@ from pyarrow.lib import ArrowInvalid
 from pyarrow import parquet as pq
 
 
+# --- Paths
+
 DGX2_ANTIDOTO_PUBLIC_DATA_PATH = Path('/raid/cache/antibodies/data/public')
 if DGX2_ANTIDOTO_PUBLIC_DATA_PATH.is_dir():
     DEFAULT_OAS_PATH = DGX2_ANTIDOTO_PUBLIC_DATA_PATH / 'oas' / '20210717'
@@ -58,7 +60,11 @@ else:
     DEFAULT_OAS_PATH = ANTIDOTO_PUBLIC_DATA_PATH / 'oas' / '20210717'
 
 
+TEST_DATA_PATH = Path(__file__).parent.parent / 'data'
+OAS_TEST_DATA_PATH = TEST_DATA_PATH / 'oas'
+
 # --- Parquet conveniences
+
 
 # noinspection DuplicatedCode
 def to_parquet(df: pd.DataFrame,
