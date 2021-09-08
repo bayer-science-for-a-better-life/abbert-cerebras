@@ -1,0 +1,19 @@
+{
+  "Longitudinal": "terminal-bleed",
+  "Chain": "Heavy",
+  "Author": "Banerjee et al., (2017)",
+  "Isotype": "Bulk",
+  "Age": "no",
+  "Size_igblastn": 917338,
+  "Disease": "None",
+  "Link": "https://www.sciencedirect.com/science/article/pii/S0042682217300569?via%3Dihub",
+  "BSource": "PBMC",
+  "BType": "Unsorted-B-Cells",
+  "Size": 78594,
+  "Species": "rabbit",
+  "Vaccine": "HIV",
+  "Subject": "no",
+  "sequencing_parsing_n_jobs": 8,
+  "sequencing_parsing_batch_size": 20000,
+  "sequencing_parsing_taken_s": 23.43292212486267
+}
