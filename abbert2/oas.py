@@ -34,6 +34,7 @@ The origin of it all:
 """
 import gzip
 import json
+import os
 import time
 from ast import literal_eval
 from functools import cached_property
@@ -52,16 +53,52 @@ from pyarrow import parquet as pq
 
 # --- Paths
 
-DGX2_ANTIDOTO_PUBLIC_DATA_PATH = Path('/raid/cache/antibodies/data/public')
-if DGX2_ANTIDOTO_PUBLIC_DATA_PATH.is_dir():
-    DEFAULT_OAS_PATH = DGX2_ANTIDOTO_PUBLIC_DATA_PATH / 'oas' / '20210717'
-else:
-    from antidoto.data import ANTIDOTO_PUBLIC_DATA_PATH
-    DEFAULT_OAS_PATH = ANTIDOTO_PUBLIC_DATA_PATH / 'oas' / '20210717'
+_RELATIVE_DATA_PATH = Path(__file__).parent.parent / 'data'
+RELATIVE_OAS_TEST_DATA_PATH = _RELATIVE_DATA_PATH / 'oas'
+RELATIVE_OAS_FULL_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-full'
 
 
-TEST_DATA_PATH = Path(__file__).parent.parent / 'data'
-OAS_TEST_DATA_PATH = TEST_DATA_PATH / 'oas'
+def find_oas_path(verbose=False):
+    """Try to infer where OAS lives."""
+
+    try:
+        from antidoto.data import ANTIDOTO_PUBLIC_DATA_PATH
+    except ImportError:
+        ANTIDOTO_PUBLIC_DATA_PATH = None
+
+    candidates = (
+
+        # --- Configurable
+
+        # Environment variable first
+        os.getenv('OAS_PATH', None),
+        # Relative path to oas-full
+        RELATIVE_OAS_FULL_DATA_PATH,
+
+        # --- Bayer internal locations
+
+        # Fast local storage in the Bayer computational hosts
+        '/raid/cache/antibodies/data/public/oas/20210717',
+        # Default path in the Bayer data lake
+        ANTIDOTO_PUBLIC_DATA_PATH / 'oas' / '20210717' if ANTIDOTO_PUBLIC_DATA_PATH else None,
+
+        # Test mini-version - better do not activate this and tell out loud we need proper config
+        # OAS_TEST_DATA_PATH,
+    )
+
+    for candidate_path in candidates:
+        if candidate_path is None:
+            continue
+        candidate_path = Path(candidate_path)
+        if candidate_path.is_dir():
+            if verbose:
+                print(f'OAS data dir: {candidate_path}')
+            return candidate_path
+
+    raise FileNotFoundError(f'Could not find the OAS root.'
+                            f'\nPlease define the OAS_PATH environment variable '
+                            f'or copy / link it to {RELATIVE_OAS_FULL_DATA_PATH}')
+
 
 # --- Parquet conveniences
 
@@ -263,12 +300,14 @@ class Unit:
     def __init__(self,
                  unit_id: str,
                  study_id: str = 'Banarjee_2017',
-                 oas_path: Union[str, Path] = DEFAULT_OAS_PATH):
+                 oas_path: Union[str, Path] = None):
 
         super().__init__()
 
         self._unit_id = unit_id
         self._study_id = study_id
+        if oas_path is None:
+            oas_path = find_oas_path()
         self._oas_path = Path(oas_path)
 
         # --- Sanity checks
@@ -395,14 +434,27 @@ class Unit:
                            batch_size=batch_size,
                            continue_on_error=continue_on_error)
 
+    def smaller(self,
+                size=1024,
+                seed=42,
+                dest_dir=RELATIVE_OAS_TEST_DATA_PATH):
+        """Generate a subsample of the unit."""
+        raise NotImplemented
+        # if self.is_unpaired:
+        #     metadata, df = AN_UNPAIRED_JSON_UNIT.unpaired()
+        #     df = df.sample(n=size, random_state=seed, replace=False)
+        #     to_parquet(df, Path.home() / 'test.parquet')
+
 
 class Study:
 
     def __init__(self,
                  study_id: str = 'Banarjee_2017',
-                 oas_path: Union[str, Path] = DEFAULT_OAS_PATH):
+                 oas_path: Union[str, Path] = None):
         super().__init__()
         self._study_id = study_id
+        if oas_path is None:
+            oas_path = find_oas_path()
         self._oas_path = Path(oas_path)
 
     @property
@@ -433,20 +485,22 @@ class Study:
             yield Unit(unit_id=unit_id, study_id=self.study_id, oas_path=self.oas_path)
 
     @classmethod
-    def studies(cls, path: Union[str, Path] = DEFAULT_OAS_PATH) -> Iterator['Study']:
-        path = Path(path)
+    def studies(cls, oas_path: Union[str, Path] = None) -> Iterator['Study']:
+        if oas_path is None:
+            oas_path = find_oas_path()
+        oas_path = Path(oas_path)
         all_study_ids = sorted(set(
             study_path.stem for study_path in chain(
                 # 10x genomics studies with paired VH VL data
-                (path / 'paired' / 'csv').glob('[A-Z]*'),
+                (oas_path / 'paired' / 'csv').glob('[A-Z]*'),
                 # 10x genomics studies with unpaired VH or VL data
-                (path / 'paired' / 'csv_unpaired').glob('[A-Z]*'),
+                (oas_path / 'paired' / 'csv_unpaired').glob('[A-Z]*'),
                 # studies with unpaired processed VH or VL data
-                (path / 'unpaired' / 'json').glob('[A-Z]*'),
+                (oas_path / 'unpaired' / 'json').glob('[A-Z]*'),
                 # N.B. we ignore unprocessed nucleotide data
             )))
         for study_id in all_study_ids:
-            yield Study(study_id=study_id, oas_path=path)
+            yield Study(study_id=study_id, oas_path=oas_path)
 
 
 # --- Pre-processing numberings
@@ -947,8 +1001,6 @@ def preprocess_json_units(recompute=False,
 
     # Parallelize across units (parallel I/O)
     # Then parallelize across antibodies (parallel CPU)
-
-    _initialize_dask(dask_client_address=dask_client_address)
 
     with parallel_backend('dask'):
         Parallel(n_jobs=n_unit_jobs, verbose=100)(
