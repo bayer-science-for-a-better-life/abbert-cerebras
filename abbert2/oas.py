@@ -57,7 +57,6 @@ _RELATIVE_DATA_PATH = Path(__file__).parent.parent / 'data'
 RELATIVE_OAS_TEST_DATA_PATH = _RELATIVE_DATA_PATH / 'oas'
 RELATIVE_OAS_FULL_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-full'
 
-
 def find_oas_path(verbose=False):
     """Try to infer where OAS lives."""
 
@@ -73,7 +72,7 @@ def find_oas_path(verbose=False):
         # Environment variable first
         os.getenv('OAS_PATH', None),
         # Relative path to oas-full
-        RELATIVE_OAS_FULL_DATA_PATH,
+        RELATIVE_OAS_TEST_DATA_PATH,
 
         # --- Bayer internal locations
 
@@ -317,20 +316,20 @@ class Unit:
         has_paired_unpaired = self._paired_unpaired_data_path is not None
 
         # Check there is at least one source of data
-        if not has_unpaired and not (has_paired_unpaired or has_paired_paired):
-            raise Exception(f'UNIT {self.study_id} {self.unit_id} has no data.')
-
-        # Ensure we only have one kind (paired or unpaired).
-        # We could deal with this gracefully too, if it ever happens to exist.
-        if has_unpaired and (has_paired_unpaired or has_paired_paired):
-            raise Exception(f'UNIT {self.study_id} {self.unit_id} '
-                            f'has data in both the PAIRED and UNPAIRED OAS subsets.')
-
-        # Ensure we have both paired and unpaired data for relevant units.
-        # We could deal with this gracefully too, if it ever happens to exist.
-        if has_paired_paired ^ has_paired_unpaired:
-            raise Exception(f'UNIT {self.study_id} {self.unit_id} '
-                            f'is in the PAIRED OAS subset but does not have both paired and unpaired data.')
+        # if not has_unpaired and not (has_paired_unpaired or has_paired_paired):
+        #     raise Exception(f'UNIT {self.study_id} {self.unit_id} has no data.')
+        #
+        # # Ensure we only have one kind (paired or unpaired).
+        # # We could deal with this gracefully too, if it ever happens to exist.
+        # if has_unpaired and (has_paired_unpaired or has_paired_paired):
+        #     raise Exception(f'UNIT {self.study_id} {self.unit_id} '
+        #                     f'has data in both the PAIRED and UNPAIRED OAS subsets.')
+        #
+        # # Ensure we have both paired and unpaired data for relevant units.
+        # # We could deal with this gracefully too, if it ever happens to exist.
+        # if has_paired_paired ^ has_paired_unpaired:
+        #     raise Exception(f'UNIT {self.study_id} {self.unit_id} '
+        #                     f'is in the PAIRED OAS subset but does not have both paired and unpaired data.')
 
     @property
     def unit_id(self):
