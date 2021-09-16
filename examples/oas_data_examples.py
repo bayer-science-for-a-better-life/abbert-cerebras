@@ -14,12 +14,16 @@ sequences_df = from_parquet(EXAMPLE_UNIT_SEQUENCES_PATH)
 
 pprint(metadata)
 sequences_df.info()
-data_set_tf=DatasetConvertor(sequences_df,
-                             useless_col=["has_unexpected_insertions","domain","insertions","name","original_name",
-                                          "has_wrong_sequence_reconstruction","has_wrong_cdr3_reconstruction"],
-                             ordinal_col=["v","j","redundancy","unfit","has_mutated_conserved_cysteines",
-                                          "has_long_cdr1","has_long_cdr2","has_long_cdr3","has_insertions"])
+data_set_tf = DatasetConvertor(sequences_df,
+                               useless_col=["has_unexpected_insertions", "domain", "insertions", "name",
+                                            "original_name",
+                                            "has_wrong_sequence_reconstruction", "has_wrong_cdr3_reconstruction"],
+                               ordinal_col=["v", "j", "unfit", "has_mutated_conserved_cysteines",
+                                            "has_long_cdr1", "has_long_cdr2", "has_long_cdr3", "has_insertions"],
+                               list_based_col=["aligned_sequence","positions"]
+                               )
 data_set_tf.preprocess_dataset()
+data_set_tf.create_tf_dataset()
 print("preprocessing phase is finished ....")
 
 pprint(sequences_df.iloc[0].to_dict())
