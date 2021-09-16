@@ -23,7 +23,8 @@ data_set_tf = DatasetConvertor(sequences_df,
                                list_based_col=["aligned_sequence","positions"]
                                )
 data_set_tf.preprocess_dataset()
-data_set_tf.create_tf_dataset()
 print("preprocessing phase is finished ....")
+data_set_tf.create_tf_dataset()
+print("tf dataset created ....")
 
 pprint(sequences_df.iloc[0].to_dict())
