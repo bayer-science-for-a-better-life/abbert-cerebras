@@ -13,9 +13,13 @@ class DatasetConvertor:
 
     def create_tf_dataset(self):
         dict_data_frame=dict(self.dataframe)
-        # p=dict_data_frame["aligned_sequence"]
+        self.fix_list_tf_dataset(dict_data_frame)
         tf_dataset = tf.data.Dataset.from_tensor_slices(dict_data_frame)
         return tf_dataset
+
+    def fix_list_tf_dataset(self,dict):
+        for col in self.list_based_col:
+            dict[col]=tf.ragged.constant(list(dict[col]))
 
     def preprocess_dataset(self):
         self.drop_useless_col(self.useless_col)
