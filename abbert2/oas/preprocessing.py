@@ -479,7 +479,7 @@ def _process_oas_csv_unit(unit: Unit,
     processing_logs = {}
 
     try:
-        with unit.original_csv_path.open('rt') as reader:
+        with open(unit.original_csv_path) as reader:
 
             # Ignore metadata
             next(reader)
