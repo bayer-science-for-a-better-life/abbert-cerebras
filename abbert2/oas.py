@@ -544,7 +544,6 @@ ANARCI_IMGT_CDR_LENGTHS = {
 }
 
 
-# noinspection PyUnresolvedReferences
 def preprocess_anarci_data(numbering_data_dict, expected_sequence=None, expected_cdr3=None) -> dict:
     """
     Parses the ANARCI imgt annotations in the original OAS units into a more efficient representation.
@@ -996,8 +995,7 @@ def preprocess_json_units(recompute=False,
                           continue_on_error=False,
                           n_unit_jobs=8,
                           n_parsing_jobs=8,
-                          batch_size=20_000,
-                          dask_client_address=None):
+                          batch_size=20_000):
 
     # Parallelize across units (parallel I/O)
     # Then parallelize across antibodies (parallel CPU)
