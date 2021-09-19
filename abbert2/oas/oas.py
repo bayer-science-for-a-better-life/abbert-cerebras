@@ -41,7 +41,7 @@ UPDATE 2021/09
 """
 import json
 from builtins import IOError
-from functools import cached_property
+from functools import cached_property, total_ordering
 from itertools import chain
 from json import JSONDecodeError
 from pathlib import Path
@@ -131,6 +131,7 @@ class Study:
     ...
 
 
+@total_ordering
 class Unit:
     """Manage a single OAS unit."""
 
@@ -232,6 +233,19 @@ class Unit:
         except (IOError, FileNotFoundError, ArrowInvalid):
             return None
 
+    # --- Magics
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Unit):
+            raise ValueError(f'expecting Unit, got {type(other)}')
+        return self.id == other.id
+
+    def __lt__(self, other):
+        if not isinstance(other, Unit):
+            raise ValueError(f'expecting Unit, got {type(other)}')
+        return self.id < other.id
+
+
 # --- Entry points
 
 
@@ -262,5 +276,6 @@ if __name__ == '__main__':
 
     for unit in oas.units_in_disk():
         print(unit.path)
-        print(unit.has_original_csv())
+        print(unit.has_original_csv)
         print(unit.metadata)
+        assert unit == unit
