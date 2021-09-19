@@ -83,22 +83,36 @@ class OAS:
             raise Exception(f'Cannot find metadata for unit ({oas_subset}, {study_id}, {unit_id})')
         return df.iloc[0].to_dict()
 
+    def populate_metadata_jsons(self):
+        # TODO: force update + flagging of changed or removed units (usual missing update lifecycle everywhere)
+        for unit in self.units_in_meta():
+            _ = unit.metadata  # Side effects FTW
+
     # --- Factories
 
-    def units(self, subset: str = None) -> Iterator['Unit']:
-        if subset is None:
-            yield from chain(self.units(subset='paired'), self.units(subset='unpaired'))
+    def units_in_disk(self, oas_subset: str = None) -> Iterator['Unit']:
+        if oas_subset is None:
+            yield from chain(self.units_in_disk(oas_subset='paired'), self.units_in_disk(oas_subset='unpaired'))
         else:
-            check_oas_subset(subset)
-            for study_path in sorted((self.oas_path / subset).glob('*')):
+            check_oas_subset(oas_subset)
+            for study_path in sorted((self.oas_path / oas_subset).glob('*')):
                 if study_path.is_dir():
                     for unit_path in study_path.glob('*'):
                         if unit_path.is_dir():
-                            yield Unit(oas_subset=subset,
+                            yield Unit(oas_subset=oas_subset,
                                        study_id=study_path.stem,
                                        unit_id=unit_path.stem,
                                        oas_path=self.oas_path,
                                        oas=self)
+
+    def units_in_meta(self) -> Iterator['Unit']:
+        df = self.unit_metadata_df
+        for oas_subset, study_id, unit_id in zip(df['oas_subset'], df['study_id'], df['unit_id']):
+            yield Unit(oas_subset=oas_subset,
+                       study_id=study_id,
+                       unit_id=unit_id,
+                       oas_path=self.oas_path,
+                       oas=self)
 
 
 class Study:
@@ -187,6 +201,7 @@ class Unit:
     def persist_metadata(self, metadata=None):
         if metadata is None:
             metadata = self.metadata  # Beware infinite recursion
+        self._metadata_path.parent.mkdir(parents=True, exist_ok=True)
         with self._metadata_path.open('wt') as writer:
             json.dump(metadata, writer, indent=2)
 
@@ -212,7 +227,9 @@ if __name__ == '__main__':
     TEST_UNITS = TEST_PAIRED_UNIT, TEST_UNPAIRED_UNIT
 
     oas = OAS()
-    for unit in oas.units():
+    oas.populate_metadata_jsons()
+
+    for unit in oas.units_in_disk():
         print(unit.path)
         print(unit.has_original_csv())
         print(unit.metadata)
