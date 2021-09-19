@@ -47,7 +47,9 @@ from json import JSONDecodeError
 from pathlib import Path
 from typing import Tuple, Union, Iterator
 
-from abbert2.common import to_json_friendly
+import pandas as pd
+
+from abbert2.common import to_json_friendly, from_parquet
 from abbert2.oas.common import find_oas_path, check_oas_subset
 
 
@@ -210,6 +212,9 @@ class Unit:
     @property
     def _sequences_path(self):
         return self._metadata_path.with_suffix('.parquet')
+
+    def sequences_df(self, columns=None) -> pd.DataFrame:
+        return from_parquet(self._sequences_path, columns=columns)
 
 
 if __name__ == '__main__':
