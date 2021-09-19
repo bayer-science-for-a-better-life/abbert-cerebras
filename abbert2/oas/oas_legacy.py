@@ -50,6 +50,10 @@ import pyarrow as pa
 from pyarrow.lib import ArrowInvalid
 from pyarrow import parquet as pq
 
+import warnings
+warnings.warn('oas_legacy is deprecated, as it works with the old (pre 2021/08) version; please use oas.py',
+              DeprecationWarning,
+              stacklevel=2)
 
 # --- Paths
 
