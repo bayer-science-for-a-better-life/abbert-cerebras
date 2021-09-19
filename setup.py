@@ -22,7 +22,7 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'oas = abbert2.oas:main'
+            'oas = abbert2.oas.oas:main'
         ]
     },
 
