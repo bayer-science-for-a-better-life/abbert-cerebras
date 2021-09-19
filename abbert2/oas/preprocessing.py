@@ -991,8 +991,8 @@ def process_units(*,
     units = [unit for unit in oas.units_in_meta()
              if (recompute or not unit.has_sequences) and unit.has_original_csv]
 
+    # Balance the work of shards
     sizes_units = [(unit.original_csv_path.stat().st_size, unit) for unit in units]
-
     sizes_units = sorted(sizes_units, reverse=True)
     total_size_mb = sum([size for size, _ in sizes_units]) / 1024**2
     sizes_units = sizes_units[shard::n_shards]
