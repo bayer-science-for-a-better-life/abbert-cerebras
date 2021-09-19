@@ -497,7 +497,7 @@ def _process_oas_csv_unit(unit: Unit,
 
             def chunk_consumer():
                 # TODO: measure how much we wait here, if anything (clocking the time spent in queue.get())
-                while (batch := df_queue.get()) is not None:
+                while (batch := df_queue.get(timeout=30)) is not None:
                     if verbose:
                         print(f'I/O QUEUE SIZE {df_queue.qsize()} UNIT={unit.original_csv_path}')
                     yield batch
