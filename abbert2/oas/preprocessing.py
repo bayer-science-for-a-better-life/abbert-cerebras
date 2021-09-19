@@ -999,6 +999,10 @@ def process_units(*,
     shard_size_mb = sum([size for size, _ in sizes_units]) / 1024**2
     print(f'Processing {shard_size_mb} of {total_size_mb:.2f}MiB worth of CSVs')
 
+    # Better actually use random order per shard, for a better time estimate
+    # Even better, maybe, would be to alternate large with small units
+    sizes_units = list(np.random.RandomState(seed=42).permutation(sizes_units))
+
     n_jobs = effective_n_jobs(n_jobs)
     processed_size = 0
     with Parallel(n_jobs=n_jobs, backend='multiprocessing', pre_dispatch=n_jobs) as parallel:
