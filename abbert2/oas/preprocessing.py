@@ -989,7 +989,7 @@ def process_units(*,
 
     # Collect work to do
     units = [unit for unit in oas.units_in_meta()
-             if (recompute or not unit.has_sequences()) and unit.has_original_csv]
+             if (recompute or not unit.has_sequences) and unit.has_original_csv]
 
     sizes_units = [(unit.original_csv_path.stat().st_size, unit) for unit in units]
 
