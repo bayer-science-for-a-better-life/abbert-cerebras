@@ -186,6 +186,7 @@ class Unit:
     def original_csv_path(self) -> Path:
         return self.path / f'{self.unit_id}.csv.gz'
 
+    @property
     def has_original_csv(self) -> bool:
         return self.original_csv_path.is_file()
 
