@@ -5,6 +5,7 @@ import queue
 import threading
 import time
 from ast import literal_eval
+from itertools import chain
 from pathlib import Path, PurePosixPath
 from typing import Union, Tuple, Dict, Optional, List
 from urllib.parse import urlparse, unquote
@@ -1034,6 +1035,49 @@ def process_units(*,
                       f'(total {processed_size:.2f} of {shard_size_mb:.2f} MiB) '
                       f'in {logs["taken_s"]:.2f}s')
 
+
+def _processing_clis():
+    num_jobs = 8
+    chunk_size = 8000
+    machine_shards = {
+        # 'dgx1': 8,
+        'dgx2': 8,
+        'dgx3': 8,
+        'dgx4': 24,
+    }
+    total_shards = sum(machine_shards.values())
+    machines = list(chain(*[[machine] * num_shards for machine, num_shards in machine_shards.items()]))
+    assert len(machines) == total_shards
+    machines = np.random.RandomState(seed=37).permutation(machines)
+
+    commands = {}
+    for shard_num, machine in enumerate(machines):
+        command = (f'oas process-units '
+                   f'--shard {shard_num} '
+                   f'--n-shards {total_shards} '
+                   f'--n-jobs {num_jobs} '
+                   f'--chunk-size {chunk_size} '
+                   f'&>shard-{shard_num}-{total_shards}-{machine}.log &')
+        commands.setdefault(machine, []).append(command)
+        commands[machine].append('disown')
+
+    chores_path = Path(__file__).parent.parent.parent / 'chores'
+    chores_path.mkdir(exist_ok=True, parents=True)
+    for machine, commands in commands.items():
+        with open(chores_path / f'{machine}-process-units.sh', 'wt') as writer:
+            writer.write('\n'.join(commands))
+
+
+# --- Where there is smoke
+
+if __name__ == '__main__':
+    # Generate CLIs
+    _processing_clis()
+
+    # Smoke test local
+    process_units()
+    for unit in OAS().units_in_disk():
+        unit.sequences_df().info()
 
 # --- Brain dumps
 
