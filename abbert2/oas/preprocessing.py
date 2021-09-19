@@ -1032,7 +1032,7 @@ def process_units(*,
                 processed_size += size
                 print(f'PROCESSED unit {i + 1} ({unit.id}) of {len(sizes_units)} '
                       f'(total {processed_size:.2f} of {shard_size_mb:.2f} MiB) '
-                      f'in {logs["taken_s"]}s')
+                      f'in {logs["taken_s"]:.2f}s')
 
 
 # --- Brain dumps
