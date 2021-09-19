@@ -48,3 +48,10 @@ def find_oas_path(oas_version='20210910', verbose=False):
     raise FileNotFoundError(f'Could not find the OAS root.'
                             f'\nPlease define the OAS_PATH environment variable '
                             f'or copy / link it to {RELATIVE_OAS_FULL_DATA_PATH}')
+
+
+# --- Checks
+
+def check_oas_subset(subset: str):
+    if subset not in ('paired', 'unpaired'):
+        raise ValueError(f'subset should be one of ("paired", "unpaired"), but is {subset}')

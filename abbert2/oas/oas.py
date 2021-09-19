@@ -42,15 +42,17 @@ UPDATE 2021/09
 import json
 from builtins import IOError
 from functools import cached_property
+from itertools import chain
 from json import JSONDecodeError
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Tuple, Union, Iterator
 
 from abbert2.common import to_json_friendly
-from abbert2.oas.common import find_oas_path
+from abbert2.oas.common import find_oas_path, check_oas_subset
 
 
 # --- Convenient abstractions over the dataset
+
 
 class OAS:
     """Top level management of OAS data."""
@@ -62,13 +64,13 @@ class OAS:
         self._oas_path = Path(oas_path)
 
     @property
-    def path(self) -> Path:
+    def oas_path(self) -> Path:
         return self._oas_path
 
     @cached_property
     def unit_metadata_df(self):
         from abbert2.oas.preprocessing import oas_units_meta
-        return oas_units_meta(oas_path=self.path,
+        return oas_units_meta(oas_path=self.oas_path,
                               paired=None,
                               keep_missing=False)
 
@@ -81,9 +83,27 @@ class OAS:
             raise Exception(f'Cannot find metadata for unit ({oas_subset}, {study_id}, {unit_id})')
         return df.iloc[0].to_dict()
 
+    # --- Factories
+
+    def units(self, subset: str = None) -> Iterator['Unit']:
+        if subset is None:
+            yield from chain(self.units(subset='paired'), self.units(subset='unpaired'))
+        else:
+            check_oas_subset(subset)
+            for study_path in sorted((self.oas_path / subset).glob('*')):
+                if study_path.is_dir():
+                    for unit_path in study_path.glob('*'):
+                        if unit_path.is_dir():
+                            yield Unit(oas_subset=subset,
+                                       study_id=study_path.stem,
+                                       unit_id=unit_path.stem,
+                                       oas_path=self.oas_path,
+                                       oas=self)
+
 
 class Study:
     """Manage a single OAS study."""
+    # No use for the time being
     ...
 
 
@@ -95,7 +115,8 @@ class Unit:
                  oas_subset: str,
                  study_id: str,
                  unit_id: str,
-                 oas_path: Union[str, Path] = None):
+                 oas_path: Union[str, Path] = None,
+                 oas: OAS = None):
         super().__init__()
         self._oas_subset = oas_subset
         self._study_id = study_id
@@ -103,6 +124,7 @@ class Unit:
         if oas_path is None:
             oas_path = find_oas_path()
         self._oas_path = Path(oas_path)
+        self._oas = oas
 
     @property
     def id(self) -> Tuple[str, str, str]:
@@ -128,7 +150,13 @@ class Unit:
     def path(self) -> Path:
         return self.oas_path / self.oas_subset / self.study_id / self.unit_id
 
-    # --- Paths
+    @property
+    def oas(self) -> OAS:
+        if self._oas is None:
+            self._oas = OAS(self.oas_path)
+        return self._oas
+
+    # --- Original CSV.gz file
 
     @property
     def _original_csv_path(self) -> Path:
@@ -136,6 +164,8 @@ class Unit:
 
     def has_original_csv(self) -> bool:
         return self._original_csv_path.is_file()
+
+    # --- Unit metadata
 
     @property
     def _metadata_path(self) -> Path:
@@ -147,9 +177,9 @@ class Unit:
             with self._metadata_path.open('rt') as reader:
                 return json.load(reader)
         except (FileNotFoundError, IOError, JSONDecodeError):
-            metadata = OAS(self.oas_path).unit_metadata(oas_subset=self.oas_subset,
-                                                        study_id=self.study_id,
-                                                        unit_id=self.unit_id)
+            metadata = self.oas.unit_metadata(oas_subset=self.oas_subset,
+                                              study_id=self.study_id,
+                                              unit_id=self.unit_id)
             metadata = {k: to_json_friendly(v) for k, v in metadata.items()}
             self.persist_metadata(metadata)
             return metadata
@@ -159,6 +189,12 @@ class Unit:
             metadata = self.metadata  # Beware infinite recursion
         with self._metadata_path.open('wt') as writer:
             json.dump(metadata, writer, indent=2)
+
+    # --- Sequences
+
+    @property
+    def _sequences_path(self):
+        return self._metadata_path.with_suffix('.parquet')
 
 
 if __name__ == '__main__':
@@ -175,7 +211,8 @@ if __name__ == '__main__':
 
     TEST_UNITS = TEST_PAIRED_UNIT, TEST_UNPAIRED_UNIT
 
-    for unit in TEST_UNITS:
+    oas = OAS()
+    for unit in oas.units():
         print(unit.path)
         print(unit.has_original_csv())
         print(unit.metadata)
