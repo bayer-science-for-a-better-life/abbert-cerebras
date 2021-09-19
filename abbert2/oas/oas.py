@@ -92,6 +92,21 @@ class OAS:
 
     # --- Factories
 
+    def unit(self, oas_subset: str, study_id: str, unit_id: str) -> 'Unit':
+        return Unit(oas_subset=oas_subset,
+                    study_id=study_id,
+                    unit_id=unit_id,
+                    oas_path=self.oas_path,
+                    oas=self)
+
+    def unit_from_path(self, path: Union[str, Path]) -> 'Unit':
+        path = Path(path)
+        if path.is_file():
+            *_, oas_subset, study_id, unit_id, _ = path.parts
+        else:
+            *_, oas_subset, study_id, unit_id = path.parts
+        return self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
+
     def units_in_disk(self, oas_subset: str = None) -> Iterator['Unit']:
         if oas_subset is None:
             yield from chain(self.units_in_disk(oas_subset='paired'), self.units_in_disk(oas_subset='unpaired'))
@@ -101,20 +116,12 @@ class OAS:
                 if study_path.is_dir():
                     for unit_path in study_path.glob('*'):
                         if unit_path.is_dir():
-                            yield Unit(oas_subset=oas_subset,
-                                       study_id=study_path.stem,
-                                       unit_id=unit_path.stem,
-                                       oas_path=self.oas_path,
-                                       oas=self)
+                            yield self.unit(oas_subset, study_path.stem, unit_path.stem)
 
     def units_in_meta(self) -> Iterator['Unit']:
         df = self.unit_metadata_df
         for oas_subset, study_id, unit_id in zip(df['oas_subset'], df['study_id'], df['unit_id']):
-            yield Unit(oas_subset=oas_subset,
-                       study_id=study_id,
-                       unit_id=unit_id,
-                       oas_path=self.oas_path,
-                       oas=self)
+            yield self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
 
 
 class Study:
