@@ -58,8 +58,8 @@ warnings.warn('oas_legacy is deprecated, as it works with the old (pre 2021/08) 
 # --- Paths
 
 _RELATIVE_DATA_PATH = Path(__file__).parent.parent / 'data'
-RELATIVE_OAS_TEST_DATA_PATH = _RELATIVE_DATA_PATH / 'oas'
-RELATIVE_OAS_FULL_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-full'
+RELATIVE_OAS_TEST_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-test-legacy'
+RELATIVE_OAS_FULL_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-full-legacy'
 
 
 def find_oas_path(verbose=False):
