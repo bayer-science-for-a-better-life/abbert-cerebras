@@ -221,7 +221,7 @@ class Unit:
 
     @property
     def sequences_path(self):
-        return self.metadata_path.with_suffix('.parquet')
+        return self.path / f'{self.unit_id}.parquet'
 
     @property
     def has_sequences(self):
