@@ -45,9 +45,10 @@ from functools import cached_property
 from itertools import chain
 from json import JSONDecodeError
 from pathlib import Path
-from typing import Tuple, Union, Iterator
+from typing import Tuple, Union, Iterator, Optional
 
 import pandas as pd
+from pyarrow import ArrowInvalid
 
 from abbert2.common import to_json_friendly, from_parquet
 from abbert2.oas.common import find_oas_path, check_oas_subset
@@ -182,22 +183,22 @@ class Unit:
     # --- Original CSV.gz file
 
     @property
-    def _original_csv_path(self) -> Path:
+    def original_csv_path(self) -> Path:
         return self.path / f'{self.unit_id}.csv.gz'
 
     def has_original_csv(self) -> bool:
-        return self._original_csv_path.is_file()
+        return self.original_csv_path.is_file()
 
     # --- Unit metadata
 
     @property
-    def _metadata_path(self) -> Path:
+    def metadata_path(self) -> Path:
         return self.path / f'{self.unit_id}.metadata.json'
 
     @cached_property
     def metadata(self):
         try:
-            with self._metadata_path.open('rt') as reader:
+            with self.metadata_path.open('rt') as reader:
                 return json.load(reader)
         except (FileNotFoundError, IOError, JSONDecodeError):
             metadata = self.oas.unit_metadata(oas_subset=self.oas_subset,
@@ -210,18 +211,25 @@ class Unit:
     def persist_metadata(self, metadata=None):
         if metadata is None:
             metadata = self.metadata  # Beware infinite recursion
-        self._metadata_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._metadata_path.open('wt') as writer:
+        self.metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.metadata_path.open('wt') as writer:
             json.dump(metadata, writer, indent=2)
 
     # --- Sequences
 
     @property
-    def _sequences_path(self):
-        return self._metadata_path.with_suffix('.parquet')
+    def sequences_path(self):
+        return self.metadata_path.with_suffix('.parquet')
 
-    def sequences_df(self, columns=None) -> pd.DataFrame:
-        return from_parquet(self._sequences_path, columns=columns)
+    @property
+    def has_sequences(self):
+        return self.sequences_path.is_file()
+
+    def sequences_df(self, columns=None) -> Optional[pd.DataFrame]:
+        try:
+            return from_parquet(self.sequences_path, columns=columns)
+        except (IOError, FileNotFoundError, ArrowInvalid):
+            return None
 
 
 if __name__ == '__main__':

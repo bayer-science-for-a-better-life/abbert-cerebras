@@ -1,4 +1,5 @@
 """Processing the original OAS data files."""
+import datetime
 import json
 import queue
 import threading
@@ -17,6 +18,7 @@ from smart_open import open
 
 from abbert2.oas.common import find_oas_path
 from abbert2.common import to_parquet, from_parquet
+from abbert2.oas.oas import OAS, Unit
 
 
 def _read_unit_metadata(url_or_path, add_column_names=True):
@@ -319,10 +321,14 @@ def _per_chain_columns(columns, df=None):
     return possible_columns
 
 
-def _process_sequences_df(df, oas_unit_path, verbose=False):
+def _process_sequences_df(df, unit: Unit, verbose=False):
+
+    logs = {'num_records': len(df)}
 
     # Make sure unpaired units get the same suffix as paired ones
-    df = _rename_by_chain_type(df, oas_unit_path=oas_unit_path)
+    start = time.time()
+    df = _rename_by_chain_type(df, unit=unit)
+    logs['taken_rename_chain_type'] = time.time() - start
 
     # We will keep just a few of the many columns for the time being.
     # Note, nucleotides might be interested later on, together with some of the IgBlast gathered info.
@@ -351,14 +357,15 @@ def _process_sequences_df(df, oas_unit_path, verbose=False):
                          '|Insertion: F40A|'
                          '|Shorter than IMGT defined: fw1, fw4|'
     }
+    start = time.time()
     df = df[_per_chain_columns(list(SELECTED_UNPAIRED_RECORD_EXAMPLE), df=df)]
+    logs['taken_select_columns'] = time.time() - start
 
     # Process the numbering
     # Here we also check things like if a buggy ANARCI version was used
 
     if verbose:
         print(f'PARSING {len(df)} RECORDS')
-    start = time.time()
 
     for chain in ('heavy', 'light'):
 
@@ -372,6 +379,8 @@ def _process_sequences_df(df, oas_unit_path, verbose=False):
                       df[f'locus_{chain}'])
 
         processed_records = []
+
+        start = time.time()
 
         for index, numbering, anarci_status, cdr3_aa, locus in records:
 
@@ -398,6 +407,7 @@ def _process_sequences_df(df, oas_unit_path, verbose=False):
             #
 
             # Parse numbering
+            numbering_start = time.time()
             numbering = _preprocess_anarci_data(literal_eval(numbering),
                                                 locus=locus,
                                                 expected_sequence=None,  # bring back if needed
@@ -405,16 +415,15 @@ def _process_sequences_df(df, oas_unit_path, verbose=False):
 
             record.update(numbering)
             processed_records.append(record)
+            logs[f'numbering_{chain}_taken_s'] = time.time() - numbering_start
 
+        merging_start = time.time()
         df: pd.DataFrame = df.merge(pd.DataFrame(processed_records).set_index('index', drop=True),
                                     left_index=True,
                                     right_index=True,
                                     how='left',
                                     validate='one_to_one')
-
-    taken_s = time.time() - start
-    if verbose:
-        print(f'DONE PARSING {len(df)} RECORDS IN {taken_s:.2f} SECONDS')
+        logs[f'merging_{chain}_taken_s'] = time.time() - merging_start
 
     # Drop some more redundant columns
     df = df.drop(columns=_per_chain_columns(('cdr3_aa', 'ANARCI_numbering'), df=df))
@@ -429,22 +438,26 @@ def _process_sequences_df(df, oas_unit_path, verbose=False):
         'ANARCI_status_light': 'anarci_status_light',
     })
 
-    return df
+    logs['taken_s'] = time.time() - start
+
+    if verbose:
+        print(f'DONE PARSING {len(df)} RECORDS IN {logs["taken_s"]:.2f} SECONDS')
+
+    return df, logs
 
 
-def _rename_by_chain_type(df, oas_unit_path):
+def _rename_by_chain_type(df, unit: Unit):
     # Is this an unpaired unit? => Name as paired (clunky but works)
     if 'sequence' in df.columns:
         loci = df.locus.unique()
         if len(loci) != 1:
-            raise Exception(f'More than one locus ({loci}) in unit {oas_unit_path}')
+            raise Exception(f'More than one locus ({loci}) in unit {unit.path}')
         suffix = '_heavy' if loci[0] == 'H' else '_light'
         df = df.rename(columns=lambda colname: colname + suffix)
     return df
 
 
-def _process_oas_csv_unit(oas_unit_path: Union[str, Path],
-                          only_meta: bool = False,
+def _process_oas_csv_unit(unit: Unit,
                           parallel: Parallel = None,
                           chunk_size: int = 5_000,
                           verbose: bool = False) -> Tuple[Dict, Optional[pd.DataFrame]]:
@@ -463,46 +476,61 @@ def _process_oas_csv_unit(oas_unit_path: Union[str, Path],
     igblast and anarci output specs
     """
 
-    with open(oas_unit_path, 'rt') as reader:
+    processing_logs = {}
 
-        metadata = parse_oas_metadata_json(next(reader))
-        if only_meta:
-            return metadata, None
+    try:
+        with unit.original_csv_path.open('rt') as reader:
 
-        # Threaded manual async I/O to avoid the workers to wait for data as much as possible
-        df_queue = queue.Queue(maxsize=-1)
+            # Ignore metadata
+            next(reader)
 
-        def chunk_producer():
-            for records in pd.read_csv(reader, sep=',', low_memory=True, chunksize=chunk_size):
-                df_queue.put(records)
-            df_queue.put(None)
+            # Threaded manual async I/O to avoid the workers to wait for data as much as possible
+            df_queue = queue.Queue(maxsize=-1)
 
-        def chunk_consumer():
-            while (batch := df_queue.get()) is not None:
-                if verbose:
-                    print(f'I/O QUEUE SIZE {df_queue.qsize()} UNIT={oas_unit_path}')
-                yield batch
+            def chunk_producer():
+                start = time.time()
+                for records in pd.read_csv(reader, sep=',', low_memory=True, chunksize=chunk_size):
+                    df_queue.put(records)
+                df_queue.put(None)
+                processing_logs['taken_read_s'] = time.time() - start
 
-        threading.Thread(target=chunk_producer, daemon=True).start()
+            def chunk_consumer():
+                # TODO: measure how much we wait here, if anything (clocking the time spent in queue.get())
+                while (batch := df_queue.get()) is not None:
+                    if verbose:
+                        print(f'I/O QUEUE SIZE {df_queue.qsize()} UNIT={unit.original_csv_path}')
+                    yield batch
 
-        start = time.time()
+            threading.Thread(target=chunk_producer, daemon=True).start()
 
-        dfs = parallel(
-            delayed(_process_sequences_df)
-            (df=records, oas_unit_path=oas_unit_path)
-            for records in chunk_consumer()
-        )
-        df = pd.concat(dfs)
+            start = time.time()
 
-        # When this happens, likely we are passing wrong ground truth
-        # print(df['has_wrong_sequence_reconstruction'].unique())
+            dfs_logs = parallel(
+                delayed(_process_sequences_df)
+                (df=records, unit=unit, verbose=verbose)
+                for records in chunk_consumer()
+            )
 
-        taken_s = time.time() - start
+            # Combine dataframes
+            df = pd.concat([df for df, _ in dfs_logs])
 
-        if verbose:
-            print(f'Processed {len(df)} records in {taken_s:.2f} seconds ({len(df) / taken_s:.2f} records/s)')
+            # When this happens, likely we are passing wrong ground truth
+            # print(df['has_wrong_sequence_reconstruction'].unique())
 
-        return metadata, df
+            taken_s = time.time() - start
+
+            processing_logs['num_records'] = len(df)
+            processing_logs['taken_process_sequences_s'] = taken_s
+            processing_logs['worker_logs'] = [worker_log for _, worker_log in dfs_logs]
+
+            if verbose:
+                print(f'Processed {len(df)} records in {taken_s:.2f} seconds ({len(df) / taken_s:.2f} records/s)')
+
+            return processing_logs, df
+
+    except Exception as ex:
+        processing_logs['error'] = ex
+        return processing_logs, None
 
 
 def _parse_oas_url(url: str) -> Dict[str, str]:
@@ -952,35 +980,55 @@ def process_units(*,
                   shard=0,
                   n_shards=1,
                   n_jobs=1,
-                  chunk_size=5_000):
+                  chunk_size=5_000,
+                  verbose=False,
+                  recompute=False):
     """Processes CSV units to make them more digestible for analysis and learning."""
 
-    if oas_path is None:
-        oas_path = find_oas_path()
+    oas = OAS(oas_path)
 
-    sizes_paths = [(path.stat().st_size, path)
-                   for path in (oas_path / 'paired').glob('**/*.csv.gz')]
+    # Collect work to do
+    units = [unit for unit in oas.units_in_meta()
+             if (recompute or not unit.has_sequences()) and unit.has_original_csv]
 
-    sizes_paths += [(path.stat().st_size, path)
-                    for path in (oas_path / 'unpaired').glob('**/*.csv.gz')]
+    sizes_units = [(unit.original_csv_path.stat().st_size, unit) for unit in units]
 
-    sizes_paths = sorted(sizes_paths, reverse=True)
-    total_size_mb = sum([size for size, _ in sizes_paths]) / 1024**2
-    sizes_paths = sizes_paths[shard::n_shards]
-    shard_size_mb = sum([size for size, _ in sizes_paths]) / 1024**2
+    sizes_units = sorted(sizes_units, reverse=True)
+    total_size_mb = sum([size for size, _ in sizes_units]) / 1024**2
+    sizes_units = sizes_units[shard::n_shards]
+    shard_size_mb = sum([size for size, _ in sizes_units]) / 1024**2
     print(f'Processing {shard_size_mb} of {total_size_mb:.2f}MiB worth of CSVs')
 
     n_jobs = effective_n_jobs(n_jobs)
     processed_size = 0
     with Parallel(n_jobs=n_jobs, backend='multiprocessing', pre_dispatch=n_jobs) as parallel:
-        for i, (size, csv) in enumerate(sizes_paths):
-            size /= 1024 ** 2
-            print(f'PROCESSING unit {i+1} of {len(sizes_paths)} ({size:.2f} MiB)')
-            _process_oas_csv_unit(oas_unit_path=csv,
-                                  parallel=parallel,
-                                  chunk_size=chunk_size)
-            processed_size += size
-            print(f'PROCESSED unit {i+1} of {len(sizes_paths)} (total {processed_size:.2f} of {shard_size_mb:.2f} MiB)')
+        for i, (size, unit) in enumerate(sizes_units):
+            start = time.time()
+            logs = {'start_time': str(datetime.datetime.now())}
+            try:
+                size /= 1024 ** 2
+                print(f'PROCESSING unit {i+1} of {len(sizes_units)} ({size:.2f} MiB)')
+                process_logs, df = _process_oas_csv_unit(unit=unit,
+                                                         parallel=parallel,
+                                                         chunk_size=chunk_size,
+                                                         verbose=verbose)
+                logs.update(process_logs)
+                if df is not None:
+                    to_parquet(df, unit.sequences_path)
+                else:
+                    raise Exception('Workers error')
+            except Exception as ex:
+                logs['error'] = ex
+            finally:
+                logs['end_time'] = str(datetime.datetime.now())
+                logs['taken_s'] = time.time() - start
+                pd.to_pickle(logs, unit.sequences_path.with_suffix('.processing-logs.pickle'))
+                if logs.get('error') is not None:
+                    pd.to_pickle(logs['error'], unit.sequences_path.with_suffix('.processing-error.pickle'))
+                processed_size += size
+                print(f'PROCESSED unit {i + 1} ({unit.id}) of {len(sizes_units)} '
+                      f'(total {processed_size:.2f} of {shard_size_mb:.2f} MiB) '
+                      f'in {logs["taken_s"]}s')
 
 
 # --- Brain dumps
