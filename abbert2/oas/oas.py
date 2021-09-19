@@ -231,6 +231,16 @@ class Unit:
         except (IOError, FileNotFoundError, ArrowInvalid):
             return None
 
+# --- Entry points
+
+
+def populate_metadata_jsons(oas_path: Path = None):
+    oas = OAS(oas_path=oas_path)
+    oas.populate_metadata_jsons()
+
+
+# --- Smoke testing
+
 
 if __name__ == '__main__':
 
