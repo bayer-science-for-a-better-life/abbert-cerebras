@@ -983,16 +983,6 @@ def process_units(*,
             print(f'PROCESSED unit {i+1} of {len(sizes_paths)} (total {processed_size:.2f} of {shard_size_mb:.2f} MiB)')
 
 
-def main():
-    import argh
-    parser = argh.ArghParser()
-    parser.add_commands([
-        cache_oas_units_meta,
-        process_units,
-    ])
-    parser.dispatch()
-
-
 # --- Brain dumps
 
 # TODO: Manage incremental updates to the dataset, maybe also taking care of the downloads ourselves here
