@@ -221,7 +221,7 @@ class Unit:
 
     @property
     def sequences_path(self):
-        return self.path / f'{self.unit_id}.parquet'
+        return self.path / f'{self.unit_id}.sequences.parquet'
 
     @property
     def has_sequences(self):
