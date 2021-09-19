@@ -10,8 +10,6 @@ dependencies:
   - numpy
   - pandas
   - joblib
-  - dask
-  - distributed
   - pyarrow
   - more-itertools
   - argh
