@@ -40,6 +40,7 @@ UPDATE 2021/09
   - Old download links have died in favor of a consolidated CSV-only data format.
 """
 import json
+import shutil
 from builtins import IOError
 from functools import cached_property, total_ordering
 from itertools import chain
@@ -353,17 +354,41 @@ class Unit:
     # --- Sequences
 
     @property
+    def processing_logs_file(self) -> Path:
+        return self.path / f'{self.unit_id}.sequences.processing-logs.pickle'
+
+    @property
+    def has_processing_logs(self):
+        return self.processing_logs_file.is_file()
+
+    def processing_logs(self) -> Optional[dict]:
+        if self.has_processing_logs:
+            return pd.read_pickle(self.processing_logs_file)
+        return None
+
+    @property
+    def processing_error_logs_file(self):
+        return self.path / f'{self.unit_id}.sequences.processing-error.pickle'
+
+    @property
+    def has_processing_errors_log(self):
+        return self.processing_error_logs_file.is_file()
+
+    def processing_errors_log(self) -> Optional[dict]:
+        if self.has_processing_errors_log:
+            return pd.read_pickle(self.processing_error_logs_file)
+        return None
+
+    @property
     def sequences_path(self) -> Path:
-        return self.path / f'{self.unit_id}.parquet'
+        return self.path / f'{self.unit_id}.sequences.parquet'
 
     @property
     def has_sequences(self) -> bool:
         return self.sequences_path.is_file()
 
-    def _pq(self) -> Optional[pq.ParquetFile]:
-        if self.has_sequences:
-            return pq.ParquetFile(self.sequences_path)
-        return None
+    def should_recompute(self, force=False) -> bool:
+        return (force or not self.has_sequences) and self.has_original_csv
 
     def sequences_df(self, columns=None) -> Optional[pd.DataFrame]:
         try:
@@ -377,6 +402,11 @@ class Unit:
             return self.sequences_path.stat().st_size
         return None
 
+    def _pq(self) -> Optional[pq.ParquetFile]:
+        if self.has_sequences:
+            return pq.ParquetFile(self.sequences_path)
+        return None
+
     @property
     def sequences_num_records(self) -> Optional[int]:
         if self.has_sequences:
@@ -388,6 +418,7 @@ class Unit:
         num_records = self.sequences_num_records
         if num_records is None:
             return True
+        # we could also check sum(redundancy) == theoretical_num_sequences_total...
         return num_records < self.theoretical_num_sequences_unique
 
     def region_max_length(self, region='cdr3', chain='heavy') -> Optional[int]:
