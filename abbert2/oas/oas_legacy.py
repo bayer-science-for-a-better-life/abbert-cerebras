@@ -50,12 +50,16 @@ import pyarrow as pa
 from pyarrow.lib import ArrowInvalid
 from pyarrow import parquet as pq
 
+import warnings
+warnings.warn('oas_legacy is deprecated, as it works with the old (pre 2021/08) version; please use oas.py',
+              DeprecationWarning,
+              stacklevel=2)
 
 # --- Paths
 
 _RELATIVE_DATA_PATH = Path(__file__).parent.parent / 'data'
-RELATIVE_OAS_TEST_DATA_PATH = _RELATIVE_DATA_PATH / 'oas'
-RELATIVE_OAS_FULL_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-full'
+RELATIVE_OAS_TEST_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-test-legacy'
+RELATIVE_OAS_FULL_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-full-legacy'
 
 def find_oas_path(verbose=False):
     """Try to infer where OAS lives."""
@@ -121,31 +125,6 @@ def from_parquet(path: Union[Path, str], columns=None):
     if columns is not None:
         columns = list(columns)
     return pq.read_table(path, columns=columns).to_pandas()
-
-
-# --- Utils
-
-# noinspection PyDefaultArgument
-def _initialize_dask(dask_client_address=None, client=[]):
-
-    from dask.distributed import Client, LocalCluster
-    import dask
-
-    if dask_client_address is None:
-        dask_client_address = 'tcp://localhost:8786'
-
-    dask.config.set({'distributed.worker.daemon': False})
-
-    if not client:
-        try:
-            # noinspection PyTypeChecker
-            client.append(Client(dask_client_address, timeout='2s'))
-        except OSError:
-            cluster = LocalCluster(
-                processes=True,
-                scheduler_port=int(dask_client_address.rpartition(':')[2])
-            )
-            client.append(Client(cluster))
 
 
 # --- OAS Management
@@ -258,7 +237,7 @@ def parse_oas_json_unit(oas_unit_path: Union[str, Path],
 
         # Load sequencing data
         start = time.time()
-        with parallel_backend('dask'):
+        with parallel_backend('loky'):
             dfs = Parallel(n_jobs=n_jobs, verbose=100)(
                 delayed(_parse_antibody_jsons)(
                     json_iterator=list(jsons),
@@ -543,7 +522,6 @@ ANARCI_IMGT_CDR_LENGTHS = {
 }
 
 
-# noinspection PyUnresolvedReferences
 def preprocess_anarci_data(numbering_data_dict, expected_sequence=None, expected_cdr3=None) -> dict:
     """
     Parses the ANARCI imgt annotations in the original OAS units into a more efficient representation.
@@ -757,10 +735,8 @@ AN_UNPAIRED_CSV_UNIT = Unit(unit_id='SRR11610492_1_igblastn_anarci_Bulk', study_
 A_PAIRED_UNIT = Unit(unit_id='SRR11528761', study_id='Alsoiussi_2020')
 
 
-def show_unit_data_example(unit: Unit, recompute=True, dask_client_address=None):
+def show_unit_data_example(unit: Unit, recompute=True):
     from pprint import pprint
-
-    _initialize_dask(dask_client_address=dask_client_address)
 
     unit_id = (f'{unit.study_id} {unit.unit_id} '
                f'{"(UNPAIRED_SET)" if unit.is_unpaired else "(PAIRED_SET)"}')
@@ -783,7 +759,7 @@ def show_unit_data_example(unit: Unit, recompute=True, dask_client_address=None)
     print('-' * 80)
 
 
-def smoke_test_preprocess_anarco_data_unpaired_json(dask_client_address=None):
+def smoke_test_preprocess_anarco_data_unpaired_json():
 
     UNPAIRED_JSON_ANTIBODY_EXAMPLE = {
         'cdr3': 'ALWYNNHWV',
@@ -906,16 +882,12 @@ def smoke_test_preprocess_anarco_data_unpaired_json(dask_client_address=None):
         'v': 'IGLV1*01'
     }
 
-    _initialize_dask(dask_client_address=dask_client_address)
-
     print(preprocess_anarci_data(numbering_data_dict=UNPAIRED_JSON_ANTIBODY_EXAMPLE['data'],
                                  expected_sequence=UNPAIRED_JSON_ANTIBODY_EXAMPLE['seq'],
                                  expected_cdr3=UNPAIRED_JSON_ANTIBODY_EXAMPLE['cdr3']))
 
 
-def smoke_test_units(dask_client_address=None):
-
-    _initialize_dask(dask_client_address=dask_client_address)
+def smoke_test_units():
 
     assert AN_UNPAIRED_JSON_UNIT.is_unpaired
     show_unit_data_example(AN_UNPAIRED_JSON_UNIT)
@@ -927,9 +899,7 @@ def smoke_test_units(dask_client_address=None):
     show_unit_data_example(A_PAIRED_UNIT)
 
 
-def smoke_test_access_all(dask_client_address=None):
-
-    _initialize_dask(dask_client_address=dask_client_address)
+def smoke_test_access_all():
 
     for study in Study.studies():
         for unit in study.units():
@@ -940,10 +910,7 @@ def smoke_test_access_all(dask_client_address=None):
 
 def smoke_test_parallel_json_preprocessing(json_unit=AN_UNPAIRED_JSON_UNIT,
                                            n_jobss=(1, 2, 4, 8),
-                                           batch_sizes=(10_000, 20_000),
-                                           dask_client_address=None):
-
-    _initialize_dask(dask_client_address=dask_client_address)
+                                           batch_sizes=(10_000, 20_000)):
 
     # FIXME: beware, cheating benchmark, we need to drop file system caches before
     records = []
@@ -973,10 +940,7 @@ def _parse_json_units_for_study(*,
                                 recompute,
                                 continue_on_error,
                                 n_parsing_jobs,
-                                batch_size,
-                                dask_client_address=None):
-
-    _initialize_dask(dask_client_address=dask_client_address)
+                                batch_size):
 
     print(f'STUDY {study.study_id}')
     for unit in study.units():
@@ -995,13 +959,12 @@ def preprocess_json_units(recompute=False,
                           continue_on_error=False,
                           n_unit_jobs=8,
                           n_parsing_jobs=8,
-                          batch_size=20_000,
-                          dask_client_address=None):
+                          batch_size=20_000):
 
     # Parallelize across units (parallel I/O)
     # Then parallelize across antibodies (parallel CPU)
 
-    with parallel_backend('dask'):
+    with parallel_backend('loky'):
         Parallel(n_jobs=n_unit_jobs, verbose=100)(
             delayed(_parse_json_units_for_study)(
                 study=study,
@@ -1029,5 +992,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-# FIXME: current dask experiment has gone bad (much slower than old parallelization)
