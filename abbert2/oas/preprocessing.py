@@ -491,7 +491,8 @@ def _process_oas_csv_unit(unit: Unit,
         # Ignore metadata
         next(csv_chunk_reader)
 
-        # Threaded manual async I/O to avoid the workers to wait for data as much as possible
+        # --- Threaded manual async I/O to avoid the workers to wait for data as much as possible
+
         df_queue = queue.Queue(maxsize=-1)
 
         def queue_get():
@@ -528,26 +529,29 @@ def _process_oas_csv_unit(unit: Unit,
 
         start = time.time()
 
+        # --- Do the actual work
+
         dfs_logs = parallel(
             delayed(_process_sequences_df)
             (df=records, unit=unit, verbose=verbose)
             for records in chunk_consumer()
         )
 
-        # Combine dataframes
-        df = pd.concat([df for df, _ in dfs_logs])
-
-        # When this happens, likely we are passing wrong ground truth
-        # print(df['has_wrong_sequence_reconstruction'].unique())
-
-        taken_s = time.time() - start
-
-        processing_logs['num_records'] = len(df)
-        processing_logs['taken_process_sequences_s'] = taken_s
+        # Keep around also worker logs
         processing_logs['worker_logs'] = [worker_log for _, worker_log in dfs_logs]
 
+        # In case merging fails, give a rough estimation of these...
+        processing_logs['num_records'] = sum(len(df) for df, _ in dfs_logs if df is not None)
+        processing_logs['taken_process_sequences_s'] = time.time() - start  # In case concat fails
+
+        # Combine dataframes
+        df = pd.concat([df for df, _ in dfs_logs]).reset_index(drop=True)
+        processing_logs['num_records'] = len(df)
+        processing_logs['taken_process_sequences_s'] = time.time() - start
+
         if verbose:
-            print(f'Processed {len(df)} records in {taken_s:.2f} seconds ({len(df) / taken_s:.2f} records/s)')
+            print(f'Processed {len(df)} records in {processing_logs["taken_process_sequences_s"]:.2f} seconds '
+                  f'({len(df) / processing_logs["taken_process_sequences_s"]:.2f} records/s)')
 
         return processing_logs, df
 
@@ -1028,7 +1032,7 @@ def process_units(*,
     total_size_mb = sum([size for size, _ in sizes_units]) / 1024**2
     sizes_units = sizes_units[shard::n_shards]
     shard_size_mb = sum([size for size, _ in sizes_units]) / 1024**2
-    print(f'Processing {shard_size_mb} of {total_size_mb:.2f}MiB worth of CSVs')
+    print(f'Processing {shard_size_mb:.2f}MiB of {total_size_mb:.2f}MiB worth of CSVs')
 
     # Better actually use random order per shard, for a better time estimate
     # Even better, maybe, would be to alternate large with small units
