@@ -1,4 +1,4 @@
-from abbert2.oas.oas import populate_metadata_jsons
+from abbert2.oas.oas import populate_metadata_jsons, extract_processed_oas
 from abbert2.oas.preprocessing import cache_oas_units_meta, process_units
 
 
@@ -8,6 +8,7 @@ def main():
     parser.add_commands([
         cache_oas_units_meta,
         populate_metadata_jsons,
+        extract_processed_oas,
         process_units,
     ])
     parser.dispatch()

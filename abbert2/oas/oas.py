@@ -525,6 +525,21 @@ def populate_metadata_jsons(oas_path: Path = None):
     oas.populate_metadata_jsons()
 
 
+def extract_processed_oas(oas_path: Optional[Path] = None,
+                          dest_path: Path = Path.home() / 'oas-processed',
+                          overwrite: bool = False):
+    oas = OAS(oas_path=oas_path)
+    for unit in oas.units_in_disk():
+        if unit.has_sequences:
+            print(f'COPYING {unit.id}')
+            unit.copy_to(dest_path,
+                         include_sequences=True,
+                         max_num_sequences=None,
+                         include_original_csv=False,
+                         overwrite=overwrite)
+    print(f'Find your OAS dump in {dest_path}')
+
+
 # --- Smoke testing
 
 
