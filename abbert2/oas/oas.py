@@ -197,7 +197,10 @@ class Unit:
 
     @property
     def original_local_csv_mdate(self) -> Optional[pd.Timestamp]:
-        return mtime(self.original_csv_path)
+        try:
+            return mtime(self.original_csv_path)
+        except FileNotFoundError:
+            return None
 
     @property
     def needs_redownload(self):
