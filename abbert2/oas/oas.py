@@ -45,7 +45,7 @@ from functools import cached_property, total_ordering
 from itertools import chain
 from json import JSONDecodeError
 from pathlib import Path
-from typing import Tuple, Union, Iterator, Optional
+from typing import Tuple, Union, Iterator, Optional, List
 
 import pandas as pd
 from pyarrow import ArrowInvalid
@@ -151,9 +151,15 @@ class Unit:
         self._oas_path = Path(oas_path)
         self._oas = oas
 
+    # --- Unit coordinates
+
     @property
     def id(self) -> Tuple[str, str, str]:
         return self.oas_subset, self.study_id, self.unit_id
+
+    @property
+    def oas_subset(self) -> str:
+        return self._oas_subset
 
     @property
     def study_id(self) -> str:
@@ -162,10 +168,6 @@ class Unit:
     @property
     def unit_id(self) -> str:
         return self._unit_id
-
-    @property
-    def oas_subset(self) -> str:
-        return self._oas_subset
 
     @property
     def oas_path(self) -> Path:
@@ -210,6 +212,23 @@ class Unit:
             self.persist_metadata(metadata)
             return metadata
 
+    @cached_property
+    def nice_metadata(self):
+        fields = (
+            'oas_subset', 'study_id', 'unit_id',
+            'download_date', 'online_modified_date',
+            'online_csv_size_bytes',
+            'sequencing_run', 'publication_link', 'study_author',
+            'species', 'age',
+            'bsource', 'btype',
+            'subject', 'disease', 'vaccine',
+            'longitudinal',
+            'chain', 'isotype',
+            'theoretical_num_sequences_unique', 'theoretical_num_sequences_total',
+            'original_url', 'has_original_csv', 'download_error',
+        )
+        return {field: getattr(self, field) for field in fields}
+
     def persist_metadata(self, metadata=None):
         if metadata is None:
             metadata = self.metadata  # Beware infinite recursion
@@ -217,11 +236,105 @@ class Unit:
         with self.metadata_path.open('wt') as writer:
             json.dump(metadata, writer, indent=2)
 
+    @property
+    def original_url(self) -> Optional[str]:
+        return self.metadata.get('url')
+
+    @property
+    def download_error(self) -> Optional[str]:
+        return self.metadata.get('http_error')
+
+    @property
+    def download_date(self) -> Optional[pd.Timestamp]:
+        return pd.to_datetime(self.metadata.get('Date'))
+
+    @property
+    def online_modified_date(self) -> Optional[pd.Timestamp]:
+        return pd.to_datetime(self.metadata.get('Last-Modified'))
+
+    @property
+    def online_csv_size_bytes(self) -> Optional[int]:
+        try:
+            return int(self.metadata.get('Content-Length'))
+        except TypeError:
+            return None
+
+    @property
+    def sequencing_run(self) -> Optional[str]:
+        return self.metadata.get('Run')
+
+    @property
+    def publication_link(self) -> Optional[str]:
+        return self.metadata.get('Link')
+
+    @property
+    def study_author(self) -> Optional[str]:
+        return self.metadata.get('Author')
+
+    @property
+    def species(self) -> Optional[str]:
+        return self.metadata.get('Species')
+
+    @property
+    def age(self) -> Optional[str]:
+        # This probably we should clean and make it comparable
+        return self.metadata.get('Age')
+
+    @property
+    def bsource(self) -> Optional[str]:
+        return self.metadata.get('BSource')
+
+    @property
+    def btype(self) -> Optional[str]:
+        return self.metadata.get('BType')
+
+    @property
+    def subject(self) -> Optional[str]:
+        return self.metadata.get('Subject')
+
+    @property
+    def disease(self) -> Optional[str]:
+        return self.metadata.get('Disease')
+
+    @property
+    def vaccine(self) -> Optional[str]:
+        return self.metadata.get('Vaccine')
+
+    @property
+    def longitudinal(self) -> Optional[str]:
+        return self.metadata.get('Longitudinal')
+
+    @property
+    def chain(self) -> Optional[str]:
+        return self.metadata.get('Chain')
+
+    @property
+    def isotype(self) -> Optional[str]:
+        return self.metadata.get('Isotype')
+
+    @property
+    def theoretical_num_sequences_unique(self) -> Optional[int]:
+        try:
+            return int(self.metadata.get('Unique sequences'))
+        except TypeError:
+            return None
+
+    @property
+    def theoretical_num_sequences_total(self) -> Optional[int]:
+        try:
+            return int(self.metadata.get('Total sequences'))
+        except TypeError:
+            return None
+
+    @property
+    def original_sequences_column_names(self) -> Optional[List[str]]:
+        return self.metadata.get('column_names')
+
     # --- Sequences
 
     @property
     def sequences_path(self):
-        return self.path / f'{self.unit_id}.sequences.parquet'
+        return self.path / f'{self.unit_id}.parquet'
 
     @property
     def has_sequences(self):
@@ -278,4 +391,5 @@ if __name__ == '__main__':
         print(unit.path)
         print(unit.has_original_csv)
         print(unit.metadata)
+        print(unit.nice_metadata)
         assert unit == unit
