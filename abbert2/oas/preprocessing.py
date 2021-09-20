@@ -502,10 +502,12 @@ def _process_oas_csv_unit(unit: Unit,
                     mutex.acquire()
                     if stop_reading_flag:
                         mutex.release()
+                        processing_logs['io_early_stop'] = True
                         break
                     mutex.release()
-            except SystemExit:
+            except SystemExit as ex:
                 print(f'WARNING: the CSV READER HAS BEEN CLOSED ABRUPTLY')
+                processing_logs['io_exception'] = str(ex)
             df_queue.put(None)
             processing_logs['taken_read_s'] = time.time() - start
 
