@@ -50,7 +50,7 @@ from typing import Tuple, Union, Iterator, Optional, List
 import pandas as pd
 from pyarrow import ArrowInvalid
 
-from abbert2.common import to_json_friendly, from_parquet
+from abbert2.common import to_json_friendly, from_parquet, mtime
 from abbert2.oas.common import find_oas_path, check_oas_subset
 
 
@@ -193,6 +193,18 @@ class Unit:
     def has_original_csv(self) -> bool:
         return self.original_csv_path.is_file()
 
+    @property
+    def original_local_csv_mdate(self) -> Optional[pd.Timestamp]:
+        return mtime(self.original_csv_path)
+
+    @property
+    def needs_redownload(self):
+        if not self.has_original_csv:
+            return True
+        is_old = self.original_local_csv_mdate < self.online_modified_date
+        is_different = self.original_csv_path.stat().st_size != self.online_csv_size_bytes
+        return is_old or is_different
+
     # --- Unit metadata
 
     @property
@@ -225,7 +237,7 @@ class Unit:
             'longitudinal',
             'chain', 'isotype',
             'theoretical_num_sequences_unique', 'theoretical_num_sequences_total',
-            'original_url', 'has_original_csv', 'download_error',
+            'original_url', 'has_original_csv', 'original_local_csv_mdate', 'download_error', 'needs_redownload',
         )
         return {field: getattr(self, field) for field in fields}
 

@@ -1,4 +1,5 @@
 import re
+import datetime
 from pathlib import Path
 from typing import Union, Optional
 
@@ -36,6 +37,16 @@ def to_snake_case(name):
     name = re.sub('__([A-Z])', r'_\1', name)
     name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', name)
     return name.lower()
+
+
+# --- Path / file utils
+
+def mtime(path: Optional[Union[str, Path]]) -> Optional[pd.Timestamp]:
+    if path is None:
+        return None
+    path = Path(path)
+    # noinspection PyTypeChecker
+    return pd.to_datetime(datetime.datetime.fromtimestamp(path.stat().st_mtime, tz=datetime.timezone.utc))
 
 
 # --- Parquet conveniences
