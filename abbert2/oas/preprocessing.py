@@ -477,7 +477,7 @@ def _process_oas_csv_unit(unit: Unit,
     igblast and anarci output specs
     """
 
-    processing_logs = {}
+    processing_logs = {'io_waiting': 0}
 
     csv_chunk_reader = None
     mutex = threading.Lock()
@@ -493,6 +493,14 @@ def _process_oas_csv_unit(unit: Unit,
 
         # Threaded manual async I/O to avoid the workers to wait for data as much as possible
         df_queue = queue.Queue(maxsize=-1)
+
+        def queue_get():
+            get_start = time.time()
+            chunk = df_queue.get()
+            if verbose:
+                print(f'I/O QUEUE SIZE {df_queue.qsize()} UNIT={unit.original_csv_path}')
+            processing_logs['io_waiting'] += time.time() - get_start
+            return chunk
 
         def chunk_producer():
             start = time.time()
@@ -515,10 +523,7 @@ def _process_oas_csv_unit(unit: Unit,
         csv_reader_thread.start()
 
         def chunk_consumer():
-            # TODO: measure how much we wait here, if anything (clocking the time spent in queue.get())
-            while (batch := df_queue.get(timeout=30)) is not None:
-                if verbose:
-                    print(f'I/O QUEUE SIZE {df_queue.qsize()} UNIT={unit.original_csv_path}')
+            while (batch := queue_get()) is not None:
                 yield batch
 
         start = time.time()
