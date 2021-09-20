@@ -52,7 +52,7 @@ import pandas as pd
 from pyarrow import ArrowInvalid
 import pyarrow.parquet as pq
 
-from abbert2.common import to_json_friendly, from_parquet, mtime
+from abbert2.common import to_json_friendly, from_parquet, mtime, to_parquet
 from abbert2.oas.common import find_oas_path, check_oas_subset
 
 
@@ -467,6 +467,51 @@ class Unit:
         if not isinstance(other, Unit):
             raise ValueError(f'expecting Unit, got {type(other)}')
         return self.id < other.id
+
+    # --- More file management
+
+    def copy_to(self,
+                oas_path: Union[str, Path],
+                include_sequences: bool = True,
+                max_num_sequences: Optional[int] = None,
+                include_original_csv: bool = False,
+                overwrite: bool = False):
+
+        oas_path = Path(oas_path)
+        if oas_path == self.oas_path:
+            raise Exception('Copying a unit over itself is not supported')
+
+        dest_path = oas_path / self.oas_subset / self.study_id / self.unit_id
+
+        def copy_but_do_not_overwrite(src):
+            if not src.is_file():
+                return
+            dest = dest_path / src.name
+            if dest.is_file() and not overwrite:
+                raise Exception(f'Path already exists and will not overwrite ({dest})')
+            dest_path.mkdir(parents=True, exist_ok=True)
+            shutil.copy(src, dest)
+
+        # copy metadata
+        copy_but_do_not_overwrite(self.metadata_path)
+
+        # copy processed sequences
+        if include_sequences and self.has_sequences:
+            if max_num_sequences is None:
+                copy_but_do_not_overwrite(self.sequences_path)
+            else:
+                dest = dest_path / self.sequences_path.name
+                if dest.is_file():
+                    raise Exception(f'Path already exists and will not overwrite ({dest})')
+                df = self.sequences_df()
+                df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
+                to_parquet(df, dest)
+            copy_but_do_not_overwrite(self.processing_logs_file)
+            copy_but_do_not_overwrite(self.processing_error_logs_file)
+
+        # copy original csv
+        if include_original_csv:
+            copy_but_do_not_overwrite(self.original_csv_path)
 
 
 # --- Entry points
