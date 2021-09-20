@@ -240,6 +240,7 @@ class Unit:
             'theoretical_num_sequences_unique', 'theoretical_num_sequences_total',
             'original_url', 'has_original_csv', 'original_local_csv_mdate', 'download_error', 'needs_redownload',
             'sequences_file_size', 'sequences_num_records', 'sequences_miss_processing',
+            'heavy_cdr3_max_length'
         )
         return {field: getattr(self, field) for field in fields}
 
@@ -359,6 +360,11 @@ class Unit:
     def has_sequences(self) -> bool:
         return self.sequences_path.is_file()
 
+    def _pq(self) -> Optional[pq.ParquetFile]:
+        if self.has_sequences:
+            return pq.ParquetFile(self.sequences_path)
+        return None
+
     def sequences_df(self, columns=None) -> Optional[pd.DataFrame]:
         try:
             return from_parquet(self.sequences_path, columns=columns)
@@ -374,7 +380,7 @@ class Unit:
     @property
     def sequences_num_records(self) -> Optional[int]:
         if self.has_sequences:
-            return pq.ParquetFile(self.sequences_path).metadata.num_rows
+            return self._pq().metadata.num_rows
         return None
 
     @property
@@ -383,6 +389,41 @@ class Unit:
         if num_records is None:
             return True
         return num_records < self.theoretical_num_sequences_unique
+
+    def region_max_length(self, region='cdr3', chain='heavy') -> Optional[int]:
+        pq = self._pq()
+        if pq is not None:
+            column_index = pq.schema_arrow.get_field_index(f'{region}_length_{chain}')
+            if column_index != -1:
+                return max(pq.metadata.row_group(row_group).column(column_index).statistics.max
+                           for row_group in range(pq.metadata.num_row_groups))
+        return None
+
+    @property
+    def heavy_cdr1_max_length(self):
+        return self.region_max_length(region='cdr1', chain='heavy')
+
+    @property
+    def heavy_cdr2_max_length(self):
+        return self.region_max_length(region='cdr2', chain='heavy')
+
+    @property
+    def heavy_cdr3_max_length(self):
+        return self.region_max_length(region='cdr3', chain='heavy')
+
+    @property
+    def light_cdr1_max_length(self):
+        return self.region_max_length(region='cdr1', chain='light')
+
+    @property
+    def light_cdr2_max_length(self):
+        return self.region_max_length(region='cdr2', chain='light')
+
+    @property
+    def light_cdr3_max_length(self):
+        return self.region_max_length(region='cdr3', chain='light')
+
+    # TODO: max sequence length
 
     # --- Magics
 
