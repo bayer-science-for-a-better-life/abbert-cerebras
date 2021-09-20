@@ -1010,11 +1010,6 @@ def reorganize_downloads(oas_path=None, symlink: bool = False):
     # TODO: also check date (to see if we need to redownload)
 
 
-def select_units_to_recompute(units, recompute):
-    return [unit for unit in units
-            if (recompute or not unit.has_sequences) and unit.has_original_csv]
-
-
 def process_units(*,
                   oas_path=None,
                   shard=0,
@@ -1033,7 +1028,7 @@ def process_units(*,
     if unstable_shards:
         units = [unit for unit in units if unit.should_recompute(force=recompute)]
 
-    sizes_units = [(unit.original_csv_path.stat().st_size, unit) for unit in units]
+    sizes_units = [(unit.original_csv_path.stat().st_size if unit.has_original_csv else 0, unit) for unit in units]
     sizes_units = sorted(sizes_units, reverse=True)
     total_size_mb = sum([size for size, _ in sizes_units]) / 1024**2
     sizes_units = [(size, unit) for size, unit in sizes_units[shard::n_shards]
