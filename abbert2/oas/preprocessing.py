@@ -479,59 +479,82 @@ def _process_oas_csv_unit(unit: Unit,
 
     processing_logs = {}
 
+    csv_chunk_reader = None
+    mutex = threading.Lock()
+    stop_reading_flag = []
+
     try:
-        with open(unit.original_csv_path) as reader:
 
-            # Ignore metadata
-            next(reader)
+        # N.B. do not move this to a context manager or ensure the Thread gets properlly cleaned up
+        csv_chunk_reader = open(unit.original_csv_path)
 
-            # Threaded manual async I/O to avoid the workers to wait for data as much as possible
-            df_queue = queue.Queue(maxsize=-1)
+        # Ignore metadata
+        next(csv_chunk_reader)
 
-            def chunk_producer():
-                start = time.time()
-                for records in pd.read_csv(reader, sep=',', low_memory=True, chunksize=chunk_size):
-                    df_queue.put(records)
-                df_queue.put(None)
-                processing_logs['taken_read_s'] = time.time() - start
+        # Threaded manual async I/O to avoid the workers to wait for data as much as possible
+        df_queue = queue.Queue(maxsize=-1)
 
-            def chunk_consumer():
-                # TODO: measure how much we wait here, if anything (clocking the time spent in queue.get())
-                while (batch := df_queue.get(timeout=30)) is not None:
-                    if verbose:
-                        print(f'I/O QUEUE SIZE {df_queue.qsize()} UNIT={unit.original_csv_path}')
-                    yield batch
-
-            threading.Thread(target=chunk_producer, daemon=True).start()
-
+        def chunk_producer():
             start = time.time()
+            try:
+                for records in pd.read_csv(csv_chunk_reader, sep=',', low_memory=True, chunksize=chunk_size):
+                    df_queue.put(records)
+                    mutex.acquire()
+                    if stop_reading_flag:
+                        mutex.release()
+                        break
+                    mutex.release()
+            except SystemExit:
+                print(f'WARNING: the CSV READER HAS BEEN CLOSED ABRUPTLY')
+            df_queue.put(None)
+            processing_logs['taken_read_s'] = time.time() - start
 
-            dfs_logs = parallel(
-                delayed(_process_sequences_df)
-                (df=records, unit=unit, verbose=verbose)
-                for records in chunk_consumer()
-            )
+        csv_reader_thread = threading.Thread(target=chunk_producer, daemon=True)
+        csv_reader_thread.start()
 
-            # Combine dataframes
-            df = pd.concat([df for df, _ in dfs_logs])
+        def chunk_consumer():
+            # TODO: measure how much we wait here, if anything (clocking the time spent in queue.get())
+            while (batch := df_queue.get(timeout=30)) is not None:
+                if verbose:
+                    print(f'I/O QUEUE SIZE {df_queue.qsize()} UNIT={unit.original_csv_path}')
+                yield batch
 
-            # When this happens, likely we are passing wrong ground truth
-            # print(df['has_wrong_sequence_reconstruction'].unique())
+        start = time.time()
 
-            taken_s = time.time() - start
+        dfs_logs = parallel(
+            delayed(_process_sequences_df)
+            (df=records, unit=unit, verbose=verbose)
+            for records in chunk_consumer()
+        )
 
-            processing_logs['num_records'] = len(df)
-            processing_logs['taken_process_sequences_s'] = taken_s
-            processing_logs['worker_logs'] = [worker_log for _, worker_log in dfs_logs]
+        # Combine dataframes
+        df = pd.concat([df for df, _ in dfs_logs])
 
-            if verbose:
-                print(f'Processed {len(df)} records in {taken_s:.2f} seconds ({len(df) / taken_s:.2f} records/s)')
+        # When this happens, likely we are passing wrong ground truth
+        # print(df['has_wrong_sequence_reconstruction'].unique())
 
-            return processing_logs, df
+        taken_s = time.time() - start
+
+        processing_logs['num_records'] = len(df)
+        processing_logs['taken_process_sequences_s'] = taken_s
+        processing_logs['worker_logs'] = [worker_log for _, worker_log in dfs_logs]
+
+        if verbose:
+            print(f'Processed {len(df)} records in {taken_s:.2f} seconds ({len(df) / taken_s:.2f} records/s)')
+
+        return processing_logs, df
 
     except Exception as ex:
         processing_logs['error'] = ex
         return processing_logs, None
+    finally:
+        # First stop the reading thread
+        mutex.acquire()
+        stop_reading_flag.append(True)
+        mutex.release()
+        # Then close the input stream
+        if csv_chunk_reader is not None:
+            csv_chunk_reader.close()
 
 
 def _parse_oas_url(url: str) -> Dict[str, str]:
