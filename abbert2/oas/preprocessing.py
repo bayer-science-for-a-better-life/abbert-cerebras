@@ -1010,11 +1010,17 @@ def reorganize_downloads(oas_path=None, symlink: bool = False):
     # TODO: also check date (to see if we need to redownload)
 
 
+def select_units_to_recompute(units, recompute):
+    return [unit for unit in units
+            if (recompute or not unit.has_sequences) and unit.has_original_csv]
+
+
 def process_units(*,
                   oas_path=None,
                   shard=0,
                   n_shards=1,
                   n_jobs=1,
+                  unstable_shards=False,
                   chunk_size=5_000,
                   verbose=False,
                   recompute=False):
@@ -1022,15 +1028,16 @@ def process_units(*,
 
     oas = OAS(oas_path)
 
-    # Collect work to do
-    units = [unit for unit in oas.units_in_meta()
-             if (recompute or not unit.has_sequences) and unit.has_original_csv]
+    # Collect and balance work to do
+    units = list(oas.units_in_meta())
+    if unstable_shards:
+        units = [unit for unit in units if unit.should_recompute(force=recompute)]
 
-    # Balance the work of shards
     sizes_units = [(unit.original_csv_path.stat().st_size, unit) for unit in units]
     sizes_units = sorted(sizes_units, reverse=True)
     total_size_mb = sum([size for size, _ in sizes_units]) / 1024**2
-    sizes_units = sizes_units[shard::n_shards]
+    sizes_units = [(size, unit) for size, unit in sizes_units[shard::n_shards]
+                   if unit.should_recompute(force=recompute)]
     shard_size_mb = sum([size for size, _ in sizes_units]) / 1024**2
     print(f'Processing {shard_size_mb:.2f}MiB of {total_size_mb:.2f}MiB worth of CSVs')
 
