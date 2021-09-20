@@ -8,6 +8,37 @@ import pandas as pd
 import pyarrow as pa
 from pyarrow import parquet as pq
 
+# --- Proteins
+
+NATURAL_AMINO_ACIDS = 'ABCDEFGHIKLMNPQRSTUVWXYZ'
+
+IUPAC_CODES = (
+    ('Ala', 'A'),
+    ('Asx', 'B'),
+    ('Cys', 'C'),
+    ('Asp', 'D'),
+    ('Glu', 'E'),
+    ('Phe', 'F'),
+    ('Gly', 'G'),
+    ('His', 'H'),
+    ('Ile', 'I'),
+    ('Lys', 'K'),
+    ('Leu', 'L'),
+    ('Met', 'M'),
+    ('Asn', 'N'),
+    ('Pro', 'P'),
+    ('Gln', 'Q'),
+    ('Arg', 'R'),
+    ('Ser', 'S'),
+    ('Thr', 'T'),
+    ('Sec', 'U'),
+    ('Val', 'V'),
+    ('Trp', 'W'),
+    ('Xaa', 'X'),
+    ('Tyr', 'Y'),
+    ('Glx', 'Z')
+)
+
 
 # --- JSON utils
 
