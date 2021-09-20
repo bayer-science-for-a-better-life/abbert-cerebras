@@ -202,8 +202,8 @@ class Unit:
         if not self.has_original_csv:
             return True
         is_old = self.original_local_csv_mdate < self.online_modified_date
-        is_different = self.original_csv_path.stat().st_size != self.online_csv_size_bytes
-        return is_old or is_different
+        is_different_size = self.original_csv_path.stat().st_size != self.online_csv_size_bytes
+        return is_old or is_different_size
 
     # --- Unit metadata
 
@@ -262,7 +262,12 @@ class Unit:
 
     @property
     def online_modified_date(self) -> Optional[pd.Timestamp]:
-        return pd.to_datetime(self.metadata.get('Last-Modified'))
+        td: Optional[pd.Timestamp] = pd.to_datetime(self.metadata.get('Last-Modified'))
+        if td is not None:
+            # Workaround: on download file dates get truncated to the minute
+            # This also truncates to the minute the online modified date, so comparisons hold
+            return td.floor('min')
+        return None
 
     @property
     def online_csv_size_bytes(self) -> Optional[int]:
