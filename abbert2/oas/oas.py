@@ -547,7 +547,9 @@ if __name__ == '__main__':
 
     for unit in oas.units_in_disk():
         print(unit.path)
-        print(unit.has_original_csv)
         print(unit.metadata)
         print(unit.nice_metadata)
+        if unit.has_sequences:
+            unit.sequences_df().info()
+            unit.copy_to(Path.home() / 'small-oas-deleteme', max_num_sequences=100, overwrite=True)
         assert unit == unit
