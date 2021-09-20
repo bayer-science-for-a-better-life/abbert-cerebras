@@ -509,6 +509,7 @@ class Unit:
                 df = self.sequences_df()
                 df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
                 to_parquet(df, dest)
+        if include_sequences:
             copy_but_do_not_overwrite(self.processing_logs_file)
             copy_but_do_not_overwrite(self.processing_error_logs_file)
 
