@@ -49,6 +49,7 @@ from typing import Tuple, Union, Iterator, Optional, List
 
 import pandas as pd
 from pyarrow import ArrowInvalid
+import pyarrow.parquet as pq
 
 from abbert2.common import to_json_friendly, from_parquet, mtime
 from abbert2.oas.common import find_oas_path, check_oas_subset
@@ -238,6 +239,7 @@ class Unit:
             'chain', 'isotype',
             'theoretical_num_sequences_unique', 'theoretical_num_sequences_total',
             'original_url', 'has_original_csv', 'original_local_csv_mdate', 'download_error', 'needs_redownload',
+            'sequences_file_size', 'sequences_num_records', 'sequences_miss_processing',
         )
         return {field: getattr(self, field) for field in fields}
 
@@ -350,11 +352,11 @@ class Unit:
     # --- Sequences
 
     @property
-    def sequences_path(self):
+    def sequences_path(self) -> Path:
         return self.path / f'{self.unit_id}.parquet'
 
     @property
-    def has_sequences(self):
+    def has_sequences(self) -> bool:
         return self.sequences_path.is_file()
 
     def sequences_df(self, columns=None) -> Optional[pd.DataFrame]:
@@ -362,6 +364,25 @@ class Unit:
             return from_parquet(self.sequences_path, columns=columns)
         except (IOError, FileNotFoundError, ArrowInvalid):
             return None
+
+    @property
+    def sequences_file_size(self) -> Optional[int]:
+        if self.has_sequences:
+            return self.sequences_path.stat().st_size
+        return None
+
+    @property
+    def sequences_num_records(self) -> Optional[int]:
+        if self.has_sequences:
+            return pq.ParquetFile(self.sequences_path).metadata.num_rows
+        return None
+
+    @property
+    def sequences_miss_processing(self) -> bool:
+        num_records = self.sequences_num_records
+        if num_records is None:
+            return True
+        return num_records < self.theoretical_num_sequences_unique
 
     # --- Magics
 
