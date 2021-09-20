@@ -254,7 +254,7 @@ An antibody heavy chain: [b'E' b'V' b'Q' b'L' b'V' b'E' b'S' b'G' b'G' b'G' b'L'
  b'R' b'Q' b'G' b'S' b'A' b'S' b'Y' b'S' b'D' b'A' b'F' b'D' b'I' b'W'
  b'G' b'Q' b'G' b'T' b'M' b'V' b'T' b'V' b'S' b'S']
 --------------------------------------------------------------------------------
-\```
+```
 
 </p>
 </details>
