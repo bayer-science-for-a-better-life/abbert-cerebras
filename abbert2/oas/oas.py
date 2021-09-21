@@ -695,7 +695,7 @@ def humab_like_filtering(sequences_df: pd.DataFrame,
 
     # Filter out sequences with mutations in conserved cysteines
     has_mutated_conserved_cysteines = sequences_df[f'has_mutated_conserved_cysteines_{chain}'].apply(
-        lambda x: not x  # account for both False and missing (but need to revisit the missing case)
+        lambda x: x is not None and x  # account for both False and missing (but need to revisit the missing case)
     )
     sequences_df = sequences_df[~has_mutated_conserved_cysteines]
 
