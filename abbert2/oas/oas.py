@@ -740,6 +740,8 @@ def train_validation_test_iterator(
             unit: Unit
             for unit in partition[chain][ml_subset]['unit']:
                 unit_sequences_df = unit.sequences_df(columns=used_ml_columns + used_qa_columns)
+                if unit_sequences_df is None:
+                    continue  # FIXME: this happens when the parquet file is broken beyond the schema
                 if filtering is not None:
                     unit_sequences_df = filtering(unit_sequences_df, chain)
                 # Drop QA columns
