@@ -304,7 +304,7 @@ class Unit:
             'chain', 'isotype',
             'theoretical_num_sequences_unique', 'theoretical_num_sequences_total',
             'original_url', 'has_original_csv', 'original_local_csv_mdate', 'download_error', 'needs_redownload',
-            'sequences_file_size', 'sequences_num_records', 'sequences_miss_processing',
+            'sequences_file_size', 'has_broken_sequences_file', 'sequences_num_records', 'sequences_miss_processing',
             'has_heavy_sequences', 'has_light_sequences', 'heavy_cdr3_max_length'
         )
         return {field: getattr(self, field) for field in fields}
@@ -460,7 +460,11 @@ class Unit:
 
     @property
     def has_sequences(self) -> bool:
-        return self.sequences_path.is_file()
+        return self.sequences_path.is_file() and self._pq() is not None
+
+    @property
+    def has_broken_sequences_file(self) -> bool:
+        return self.sequences_path.is_file() and self._pq() is None
 
     def should_recompute(self, force=False) -> bool:
         return (force or not self.has_sequences) and self.has_original_csv
@@ -478,9 +482,10 @@ class Unit:
         return None
 
     def _pq(self) -> Optional[pq.ParquetFile]:
-        if self.has_sequences:
+        try:
             return pq.ParquetFile(self.sequences_path)
-        return None
+        except (FileNotFoundError, IOError, ArrowInvalid):
+            return None
 
     @property
     def has_heavy_sequences(self) -> bool:
