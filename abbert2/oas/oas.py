@@ -689,12 +689,17 @@ def humab_like_filtering(sequences_df: pd.DataFrame,
     with missing framework 1 residues (residues preceding CDR1) were removed.
     The total dataset included over 65 million non-redundant sequences (SI section 1A).
     """
-    return sequences_df.query(
-            # Filter out sequences without fw1
-            f'fw1_length_{chain} > 0 and '
-            # Filter out sequences with mutations in conserved cysteines
-            f'(has_mutated_conserved_cysteines_{chain} != has_mutated_conserved_cysteines_{chain} or '
-            f'not has_mutated_conserved_cysteines_{chain})')
+
+    # Filter out sequences without fw1
+    sequences_df = sequences_df.query(f'fw1_length_{chain} > 0')
+
+    # Filter out sequences with mutations in conserved cysteines
+    has_mutated_conserved_cysteines = sequences_df[f'has_mutated_conserved_cysteines_{chain}'].apply(
+        lambda x: not x  # account for both False and missing (but need to revisit the missing case)
+    )
+    sequences_df = sequences_df[~has_mutated_conserved_cysteines]
+
+    return sequences_df
 
 
 def train_validation_test_iterator(
