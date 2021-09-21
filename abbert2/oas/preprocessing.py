@@ -1042,7 +1042,7 @@ def process_units(*,
 
     n_jobs = effective_n_jobs(n_jobs)
     processed_size = 0
-    with Parallel(n_jobs=n_jobs, backend='multiprocessing', pre_dispatch=n_jobs) as parallel:
+    with Parallel(n_jobs=n_jobs, backend='loky', pre_dispatch=n_jobs) as parallel:
         for i, (size, unit) in enumerate(sizes_units):
             start = time.time()
             logs = {'start_time': str(datetime.datetime.now())}

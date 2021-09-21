@@ -46,7 +46,7 @@ from functools import cached_property, total_ordering
 from itertools import chain
 from json import JSONDecodeError
 from pathlib import Path
-from typing import Tuple, Union, Iterator, Optional, List
+from typing import Tuple, Union, Iterator, Optional, List, Callable
 
 import pandas as pd
 from pyarrow import ArrowInvalid
@@ -54,6 +54,30 @@ import pyarrow.parquet as pq
 
 from abbert2.common import to_json_friendly, from_parquet, mtime, to_parquet
 from abbert2.oas.common import find_oas_path, check_oas_subset
+
+
+# --- Some field normalization code
+
+def _normalize_oas_species(species):
+    return {
+        'camel': 'camel',
+
+        'mouse': 'mouse',
+        'mouse_C57BL/6': 'mouse',
+        'mouse_BALB/c': 'mouse',
+        'HIS-Mouse': 'mouse',
+        'mouse_RAG2-GFP/129Sve': 'mouse',
+        'mouse_Swiss-Webster': 'mouse',
+
+        'human': 'human',
+
+        'rabbit': 'rabbit',
+
+        'rat_SD': 'rat',
+        'rat': 'rat',
+
+        'rhesus': 'rhesus',
+    }.get(species, species)
 
 
 # --- Convenient abstractions over the dataset
@@ -126,11 +150,47 @@ class OAS:
         for oas_subset, study_id, unit_id in zip(df['oas_subset'], df['study_id'], df['unit_id']):
             yield self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
 
+    # --- Caches
 
-class Study:
-    """Manage a single OAS study."""
-    # No use for the time being
-    ...
+    def _add_units_to_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        if 'unit' in df.columns:
+            raise Exception('Dataframe already has a unit column')
+        df['unit'] = [self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
+                      for oas_subset, study_id, unit_id in
+                      zip(df['oas_subset'], df['study_id'], df['unit_id'])]
+        return df
+
+    def nice_unit_meta_df(self,
+                          recompute: bool = False,
+                          normalize_species: bool = True) -> pd.DataFrame:
+
+        cache_path = self.oas_path / 'nice_unit_meta_df.parquet'
+
+        df = None
+
+        if not recompute:
+            try:
+                df = from_parquet(cache_path)
+            except (IOError, FileNotFoundError):
+                ...
+
+        if df is None:
+            df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_disk()])
+            to_parquet(df, cache_path)
+
+        if normalize_species:
+            df['species'] = df['species'].apply(_normalize_oas_species)
+
+        for int_column in ('online_csv_size_bytes',
+                           'study_year',
+                           'theoretical_num_sequences_unique',
+                           'theoretical_num_sequences_total',
+                           'sequences_file_size',
+                           'sequences_num_records',
+                           'heavy_cdr3_max_length'):
+            df[int_column] = df[int_column].astype(pd.Int64Dtype())
+
+        return self._add_units_to_df(df)
 
 
 @total_ordering
@@ -235,7 +295,8 @@ class Unit:
             'oas_subset', 'study_id', 'unit_id',
             'download_date', 'online_modified_date',
             'online_csv_size_bytes',
-            'sequencing_run', 'publication_link', 'study_author',
+            'sequencing_run',
+            'publication_link', 'study_author', 'study_year',
             'species', 'age',
             'bsource', 'btype',
             'subject', 'disease', 'vaccine',
@@ -243,8 +304,8 @@ class Unit:
             'chain', 'isotype',
             'theoretical_num_sequences_unique', 'theoretical_num_sequences_total',
             'original_url', 'has_original_csv', 'original_local_csv_mdate', 'download_error', 'needs_redownload',
-            'sequences_file_size', 'sequences_num_records', 'sequences_miss_processing',
-            'heavy_cdr3_max_length'
+            'sequences_file_size', 'has_broken_sequences_file', 'sequences_num_records', 'sequences_miss_processing',
+            'has_heavy_sequences', 'has_light_sequences', 'heavy_cdr3_max_length'
         )
         return {field: getattr(self, field) for field in fields}
 
@@ -296,8 +357,19 @@ class Unit:
         return self.metadata.get('Author')
 
     @property
+    def study_year(self) -> int:
+        year_string = self.study_id.rpartition('_')[2]
+        if len(year_string) > 4:
+            year_string = year_string[:-1]  # support for year 10_000 FTW
+        return int(year_string)
+
+    @property
     def species(self) -> Optional[str]:
         return self.metadata.get('Species')
+
+    @property
+    def normalized_species(self) -> Optional[str]:
+        return _normalize_oas_species(self.species)
 
     @property
     def age(self) -> Optional[str]:
@@ -388,7 +460,11 @@ class Unit:
 
     @property
     def has_sequences(self) -> bool:
-        return self.sequences_path.is_file()
+        return self.sequences_path.is_file() and self._pq() is not None
+
+    @property
+    def has_broken_sequences_file(self) -> bool:
+        return self.sequences_path.is_file() and self._pq() is None
 
     def should_recompute(self, force=False) -> bool:
         return (force or not self.has_sequences) and self.has_original_csv
@@ -406,9 +482,24 @@ class Unit:
         return None
 
     def _pq(self) -> Optional[pq.ParquetFile]:
-        if self.has_sequences:
+        try:
             return pq.ParquetFile(self.sequences_path)
-        return None
+        except (FileNotFoundError, IOError, ArrowInvalid):
+            return None
+
+    @property
+    def has_heavy_sequences(self) -> bool:
+        pq = self._pq()
+        if pq is not None:
+            return -1 != self._pq().schema_arrow.get_field_index('aligned_sequence_heavy')
+        return False
+
+    @property
+    def has_light_sequences(self) -> bool:
+        pq = self._pq()
+        if pq is not None:
+            return -1 != self._pq().schema_arrow.get_field_index('aligned_sequence_light')
+        return False
 
     @property
     def sequences_num_records(self) -> Optional[int]:
@@ -509,6 +600,7 @@ class Unit:
                 df = self.sequences_df()
                 df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
                 to_parquet(df, dest)
+        if include_sequences:
             copy_but_do_not_overwrite(self.processing_logs_file)
             copy_but_do_not_overwrite(self.processing_error_logs_file)
 
@@ -524,6 +616,131 @@ def populate_metadata_jsons(oas_path: Path = None):
     oas = OAS(oas_path=oas_path)
     oas.populate_metadata_jsons()
 
+
+def extract_processed_oas(oas_path: Optional[Union[str, Path]] = None,
+                          dest_path: Path = Path.home() / 'oas-processed',
+                          overwrite: bool = False):
+    oas = OAS(oas_path=oas_path)
+    for unit in oas.units_in_disk():
+        if unit.has_sequences:
+            print(f'COPYING {unit.id}')
+            unit.copy_to(dest_path,
+                         include_sequences=True,
+                         max_num_sequences=None,
+                         include_original_csv=False,
+                         overwrite=overwrite)
+    print(f'Find your OAS dump in {dest_path}')
+
+
+# --- Data partitioning and filtering examples
+
+def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
+    """
+    From: https://www.biorxiv.org/content/10.1101/2021.08.08.455394v1.full
+
+    Unaligned variable region amino acid sequences were downloaded from OAS database (accessed Nov 2019).
+    A heavy chain training set was extracted by sampling 20 million unaligned redundant amino acid
+    sequences from all 38 human heavy chain OAS studies from 2011-2017. The training sequences
+    originated from 24% unsorted, 10% IGHA, 1% IGHD, 1% IGHE, 35% IGHG and 30% IGHM isotypes.
+    A validation set was extracted by sampling 20 million sequences from all 5 human heavy chain studies
+    from 2018. The validation sequences originated from 33% unsorted, 16% IGHA, 1% IGHD, 1% IGHE,
+    20% IGHG and 28% IGHM isotypes. A light chain training set was extracted
+    by taking all 19,054,615 sequences from all 14 human light chain OAS studies from 2011-2017.
+    A validation set was extracted by taking all 33,133,386 sequences from both 2 human light
+    chain OAS studies from 2018. Studies from 2019 were left out to enable future comparison
+    with new methods on an independent test set.
+    """
+
+    # Let's maybe select using a dataframe, instead of looping through the units
+    units_df = OAS(oas_path).nice_unit_meta_df(normalize_species=True)
+
+    #
+    # Sapiens sought humanization, so they built their model against human antibodies only
+    # For us, it is not clear if this would be beneficial, but for the sake of reproduction
+    # we filter out any non-human sequence.
+    #
+    # Would it make sense to add an auxiliary task to classify the sequence organism?
+    #
+
+    train_test_validation_dfs = {}
+
+    for chain in ('heavy', 'light'):
+        human_units_df = units_df.query(f'species == "human" and has_{chain}_sequences')
+        train_test_validation_dfs[chain] = {
+            'train': human_units_df.query('study_year <= 2017'),
+            'validation': human_units_df.query('study_year == 2018'),
+            'test': human_units_df.query('study_year >= 2019'),
+        }
+
+    return train_test_validation_dfs
+
+
+def humab_like_filtering(sequences_df: pd.DataFrame,
+                         chain: str = 'heavy') -> pd.DataFrame:
+    """
+    Filtering example ala Hu-mAb
+    From:
+     https://www.biorxiv.org/content/10.1101/2021.01.08.425894v2.full
+
+    All IgG VH and VL sequences were downloaded from the OAS database (August 2020),
+    totaling over 500 million sequences in the IMGT format. Human sequences were
+    split by their V gene type - for example, V1 to V7 for VH sequences.
+    Redundant sequences, sequences with cysteine errors (18) and sequences
+    with missing framework 1 residues (residues preceding CDR1) were removed.
+    The total dataset included over 65 million non-redundant sequences (SI section 1A).
+    """
+
+    # Filter out sequences without fw1
+    sequences_df = sequences_df.query(f'fw1_length_{chain} > 0')
+
+    # Filter out sequences with mutations in conserved cysteines
+    has_mutated_conserved_cysteines = sequences_df[f'has_mutated_conserved_cysteines_{chain}'].apply(
+        lambda x: not x  # account for both False and missing (but need to revisit the missing case)
+    )
+    sequences_df = sequences_df[~has_mutated_conserved_cysteines]
+
+    return sequences_df
+
+
+def train_validation_test_iterator(
+        partitioner: Callable[[], dict] = sapiens_like_train_val_test,
+        filtering: Optional[Callable[[pd.DataFrame, str], pd.DataFrame]] = humab_like_filtering
+) -> Iterator[Tuple[Unit, str, str, pd.DataFrame]]:
+
+    partition = partitioner()
+
+    for chain in ('heavy', 'light'):
+        used_qa_columns = [
+            # Quality control
+            f'has_mutated_conserved_cysteines_{chain}',
+        ]
+        used_ml_columns = [
+            # To learn over
+            f'fw1_start_{chain}',
+            f'fw1_length_{chain}',
+            f'cdr1_start_{chain}',
+            f'cdr1_length_{chain}',
+            f'fw2_start_{chain}',
+            f'fw2_length_{chain}',
+            f'cdr2_start_{chain}',
+            f'cdr2_length_{chain}',
+            f'fw3_start_{chain}',
+            f'fw3_length_{chain}',
+            f'cdr3_start_{chain}',
+            f'cdr3_length_{chain}',
+            f'fw4_start_{chain}',
+            f'fw4_length_{chain}',
+            f'aligned_sequence_{chain}',
+        ]
+        for ml_subset in ('train', 'validation', 'test'):
+            unit: Unit
+            for unit in partition[chain][ml_subset]['unit']:
+                unit_sequences_df = unit.sequences_df(columns=used_ml_columns + used_qa_columns)
+                if filtering is not None:
+                    unit_sequences_df = filtering(unit_sequences_df, chain)
+                # Drop QA columns
+                unit_sequences_df = unit_sequences_df.drop(columns=used_qa_columns)
+                yield unit, chain, ml_subset, unit_sequences_df
 
 # --- Smoke testing
 
