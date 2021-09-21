@@ -178,8 +178,15 @@ class OAS:
             df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_disk()])
             to_parquet(df, cache_path)
 
+        # add units for full access to the data
+        self._add_units_to_df(df)
+
         if normalize_species:
             df['species'] = df['species'].apply(_normalize_oas_species)
+
+        # TODO: ask everyone to update the cache and remove this
+        #       study_year was buggy...
+        df['study_year'] = df['unit'].apply(lambda unit: unit.study_year)
 
         for int_column in ('online_csv_size_bytes',
                            'study_year',
@@ -190,7 +197,7 @@ class OAS:
                            'heavy_cdr3_max_length'):
             df[int_column] = df[int_column].astype(pd.Int64Dtype())
 
-        return self._add_units_to_df(df)
+        return df
 
 
 @total_ordering
@@ -358,10 +365,7 @@ class Unit:
 
     @property
     def study_year(self) -> int:
-        year_string = self.study_id.rpartition('_')[2]
-        if len(year_string) > 4:
-            year_string = year_string[:-1]  # support for year 10_000 FTW
-        return int(year_string)
+        return int(self.study_author.strip()[-4:])
 
     @property
     def species(self) -> Optional[str]:
@@ -762,8 +766,9 @@ if __name__ == '__main__':
     oas = OAS()
     oas.populate_metadata_jsons()
 
+    oas.nice_unit_meta_df(recompute=False, normalize_species=True).info()
+
     for unit in oas.units_in_disk():
-        print(unit.path)
         print(unit.metadata)
         print(unit.nice_metadata)
         if unit.has_sequences:
