@@ -599,7 +599,7 @@ class Unit:
                 copy_but_do_not_overwrite(self.sequences_path)
             else:
                 dest = dest_path / self.sequences_path.name
-                if dest.is_file():
+                if dest.is_file() and not overwrite:
                     raise Exception(f'Path already exists and will not overwrite ({dest})')
                 df = self.sequences_df()
                 df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
