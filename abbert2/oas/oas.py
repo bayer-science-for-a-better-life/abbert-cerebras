@@ -677,6 +677,18 @@ def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
 
 def humab_like_filtering(sequences_df: pd.DataFrame,
                          chain: str = 'heavy') -> pd.DataFrame:
+    """
+    Filtering example ala Hu-mAb
+    From:
+     https://www.biorxiv.org/content/10.1101/2021.01.08.425894v2.full
+
+    All IgG VH and VL sequences were downloaded from the OAS database (August 2020),
+    totaling over 500 million sequences in the IMGT format. Human sequences were
+    split by their V gene type - for example, V1 to V7 for VH sequences.
+    Redundant sequences, sequences with cysteine errors (18) and sequences
+    with missing framework 1 residues (residues preceding CDR1) were removed.
+    The total dataset included over 65 million non-redundant sequences (SI section 1A).
+    """
     return sequences_df.query(
         # Filter out sequences without fw1
         f'fw1_length_{chain} > 0 and '
