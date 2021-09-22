@@ -708,12 +708,14 @@ def humab_like_filtering(sequences_df: pd.DataFrame,
 
 def train_validation_test_iterator(
         partitioner: Callable[[], dict] = sapiens_like_train_val_test,
-        filtering: Optional[Callable[[pd.DataFrame, str], pd.DataFrame]] = humab_like_filtering
+        filtering: Optional[Callable[[pd.DataFrame, str], pd.DataFrame]] = humab_like_filtering,
+        chains: Tuple[str, ...] = ('heavy', 'light'),
+        ml_subsets: Tuple[str, ...] = ('train', 'validation', 'test'),
 ) -> Iterator[Tuple[Unit, str, str, pd.DataFrame]]:
 
     partition = partitioner()
 
-    for chain in ('heavy', 'light'):
+    for chain in chains:
         used_qa_columns = [
             # Quality control
             f'has_mutated_conserved_cysteines_{chain}',
@@ -736,7 +738,7 @@ def train_validation_test_iterator(
             f'fw4_length_{chain}',
             f'aligned_sequence_{chain}',
         ]
-        for ml_subset in ('train', 'validation', 'test'):
+        for ml_subset in ml_subsets:
             unit: Unit
             for unit in partition[chain][ml_subset]['unit']:
                 unit_sequences_df = unit.sequences_df(columns=used_ml_columns + used_qa_columns)
