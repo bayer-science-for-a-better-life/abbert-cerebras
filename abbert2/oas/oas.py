@@ -742,16 +742,16 @@ def train_validation_test_iterator(
                 unit_sequences_df = unit.sequences_df(columns=used_ml_columns + used_qa_columns)
                 if unit_sequences_df is None:
                     continue  # FIXME: this happens when the parquet file is broken beyond the schema
-                if filtering is not None:
-                    try:
+                try:
+                    if filtering is not None:
                         unit_sequences_df = filtering(unit_sequences_df, chain)
-                    except KeyError:
-                        # FIXME: this happens when "has_mutated_conserved_cysteines_light" does not exist
-                        #        observed in one unit, to troubleshoot
-                        continue
-                # Drop QA columns
-                unit_sequences_df = unit_sequences_df.drop(columns=used_qa_columns)
-                yield unit, chain, ml_subset, unit_sequences_df
+                    # Drop QA columns
+                    unit_sequences_df = unit_sequences_df.drop(columns=used_qa_columns)
+                    yield unit, chain, ml_subset, unit_sequences_df
+                except KeyError:
+                    # FIXME: this happens when "has_mutated_conserved_cysteines_light" does not exist
+                    #        observed in one unit, to troubleshoot
+                    ...
 
 # --- Smoke testing
 
