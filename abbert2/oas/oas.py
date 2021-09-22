@@ -698,10 +698,13 @@ def humab_like_filtering(sequences_df: pd.DataFrame,
     sequences_df = sequences_df.query(f'fw1_length_{chain} > 0')
 
     # Filter out sequences with mutations in conserved cysteines
-    has_mutated_conserved_cysteines = sequences_df[f'has_mutated_conserved_cysteines_{chain}'].apply(
-        lambda x: x is not None and x  # account for both False and missing (but need to revisit the missing case)
-    )
-    sequences_df = sequences_df[~has_mutated_conserved_cysteines]
+    if chain == 'heavy':
+        has_mutated_conserved_cysteines = sequences_df[f'has_mutated_conserved_cysteines_{chain}'].apply(
+            lambda x: x is not None and x  # account for both False and missing (but need to revisit the missing case)
+        )
+        sequences_df = sequences_df[~has_mutated_conserved_cysteines]
+    # TODO: check aboss / anarci annotations and original paper to make sure this is correct
+    # https://www.jimmunol.org/content/201/12/3694?ijkey=24817c8d879730cb4a170e371cfadd768703b0ed&keytype2=tf_ipsecsha
 
     return sequences_df
 
