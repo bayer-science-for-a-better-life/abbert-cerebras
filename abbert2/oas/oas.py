@@ -671,9 +671,13 @@ def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
     for chain in ('heavy', 'light'):
         human_units_df = units_df.query(f'species == "human" and has_{chain}_sequences')
         train_test_validation_dfs[chain] = {
-            'train': human_units_df.query('study_year <= 2017'),
-            'validation': human_units_df.query('study_year == 2018'),
-            'test': human_units_df.query('study_year >= 2019'),
+            # 'train': human_units_df.query('study_year <= 2017'),
+            # 'validation': human_units_df.query('study_year == 2018'),
+            # 'test': human_units_df.query('study_year >= 2019'),
+
+            'train': human_units_df[human_units_df['study_year'] <= 2017],
+            'validation': human_units_df[human_units_df['study_year'] == 2018],
+            'test': human_units_df[human_units_df['study_year'] >= 2019],
         }
 
     return train_test_validation_dfs
