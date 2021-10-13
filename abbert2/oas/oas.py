@@ -91,10 +91,35 @@ class OAS:
         if oas_path is None:
             oas_path = find_oas_path()
         self._oas_path = Path(oas_path)
+        # Added by aarti-cerebras
+        if self._oas_path.is_file():
+            *oas_path_dir, oas_subset, study_id, unit_id, _ = self._oas_path.parts
+        else:
+            *oas_path_dir, oas_subset, study_id, unit_id = self._oas_path.parts
+
+        self._oas_path = Path(*oas_path_dir)
+        self._oas_subset = oas_subset
+        self._study_id = study_id
+        self._unit_id = unit_id
 
     @property
     def oas_path(self) -> Path:
         return self._oas_path
+
+    @property
+    def oas_subset(self) -> str:
+        # Added by aarti-cerebras
+        return self._oas_subset
+
+    @property
+    def study_id(self) -> str:
+        # Added by aarti-cerebras
+        return self._study_id
+
+    @property
+    def unit_id(self) -> str:
+        # Added by aarti-cerebras
+        return self._unit_id
 
     @cached_property
     def unit_metadata_df(self):
@@ -145,6 +170,18 @@ class OAS:
                         if unit_path.is_dir():
                             yield self.unit(oas_subset, study_path.stem, unit_path.stem)
 
+
+    def units_in_path(self):
+        # Added by aarti-cerebras
+        check_oas_subset(self.oas_subset)
+        for study_path in sorted((self.oas_path / self.oas_subset ).glob('*')):
+            print(f"-----units_in_path study_path {study_path}")
+            if study_path.is_dir():
+                for unit_path in study_path.glob('*'):
+                    if unit_path.is_dir():
+                        print(f"---- units_in_disk: study_path.stem: {study_path.stem},unit_path.stem: {unit_path.stem}")
+                        yield self.unit(self.oas_subset, study_path.stem, unit_path.stem)
+
     def units_in_meta(self) -> Iterator['Unit']:
         df = self.unit_metadata_df
         for oas_subset, study_id, unit_id in zip(df['oas_subset'], df['study_id'], df['unit_id']):
@@ -175,7 +212,9 @@ class OAS:
                 ...
 
         if df is None:
-            df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_disk()])
+            # Added by aarti-cerebras
+            # df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_disk()])
+            df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_path()])
             to_parquet(df, cache_path)
 
         # add units for full access to the data
@@ -656,7 +695,7 @@ def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
     """
 
     # Let's maybe select using a dataframe, instead of looping through the units
-    units_df = OAS(oas_path).nice_unit_meta_df(normalize_species=True)
+    units_df = OAS(oas_path).nice_unit_meta_df(normalize_species=True, recompute=True)
 
     #
     # Sapiens sought humanization, so they built their model against human antibodies only
