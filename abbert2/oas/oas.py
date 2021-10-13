@@ -178,8 +178,15 @@ class OAS:
             df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_disk()])
             to_parquet(df, cache_path)
 
+        # add units for full access to the data
+        self._add_units_to_df(df)
+
         if normalize_species:
             df['species'] = df['species'].apply(_normalize_oas_species)
+
+        # TODO: ask everyone to update the cache and remove this
+        #       study_year was buggy...
+        df['study_year'] = df['unit'].apply(lambda unit: unit.study_year)
 
         for int_column in ('online_csv_size_bytes',
                            'study_year',
@@ -190,7 +197,7 @@ class OAS:
                            'heavy_cdr3_max_length'):
             df[int_column] = df[int_column].astype(pd.Int64Dtype())
 
-        return self._add_units_to_df(df)
+        return df
 
 
 @total_ordering
@@ -358,10 +365,7 @@ class Unit:
 
     @property
     def study_year(self) -> int:
-        year_string = self.study_id.rpartition('_')[2]
-        if len(year_string) > 4:
-            year_string = year_string[:-1]  # support for year 10_000 FTW
-        return int(year_string)
+        return int(self.study_author.strip()[-4:])
 
     @property
     def species(self) -> Optional[str]:
@@ -595,7 +599,7 @@ class Unit:
                 copy_but_do_not_overwrite(self.sequences_path)
             else:
                 dest = dest_path / self.sequences_path.name
-                if dest.is_file():
+                if dest.is_file() and not overwrite:
                     raise Exception(f'Path already exists and will not overwrite ({dest})')
                 df = self.sequences_df()
                 df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
@@ -694,22 +698,27 @@ def humab_like_filtering(sequences_df: pd.DataFrame,
     sequences_df = sequences_df.query(f'fw1_length_{chain} > 0')
 
     # Filter out sequences with mutations in conserved cysteines
-    has_mutated_conserved_cysteines = sequences_df[f'has_mutated_conserved_cysteines_{chain}'].apply(
-        lambda x: not x  # account for both False and missing (but need to revisit the missing case)
-    )
-    sequences_df = sequences_df[~has_mutated_conserved_cysteines]
+    if chain == 'heavy':
+        has_mutated_conserved_cysteines = sequences_df[f'has_mutated_conserved_cysteines_{chain}'].apply(
+            lambda x: x is not None and x  # account for both False and missing (but need to revisit the missing case)
+        )
+        sequences_df = sequences_df[~has_mutated_conserved_cysteines]
+    # TODO: check aboss / anarci annotations and original paper to make sure this is correct
+    # https://www.jimmunol.org/content/201/12/3694?ijkey=24817c8d879730cb4a170e371cfadd768703b0ed&keytype2=tf_ipsecsha
 
     return sequences_df
 
 
 def train_validation_test_iterator(
         partitioner: Callable[[], dict] = sapiens_like_train_val_test,
-        filtering: Optional[Callable[[pd.DataFrame, str], pd.DataFrame]] = humab_like_filtering
+        filtering: Optional[Callable[[pd.DataFrame, str], pd.DataFrame]] = humab_like_filtering,
+        chains: Tuple[str, ...] = ('heavy', 'light'),
+        ml_subsets: Tuple[str, ...] = ('train', 'validation', 'test'),
 ) -> Iterator[Tuple[Unit, str, str, pd.DataFrame]]:
 
     partition = partitioner()
 
-    for chain in ('heavy', 'light'):
+    for chain in chains:
         used_qa_columns = [
             # Quality control
             f'has_mutated_conserved_cysteines_{chain}',
@@ -732,15 +741,22 @@ def train_validation_test_iterator(
             f'fw4_length_{chain}',
             f'aligned_sequence_{chain}',
         ]
-        for ml_subset in ('train', 'validation', 'test'):
+        for ml_subset in ml_subsets:
             unit: Unit
             for unit in partition[chain][ml_subset]['unit']:
                 unit_sequences_df = unit.sequences_df(columns=used_ml_columns + used_qa_columns)
-                if filtering is not None:
-                    unit_sequences_df = filtering(unit_sequences_df, chain)
-                # Drop QA columns
-                unit_sequences_df = unit_sequences_df.drop(columns=used_qa_columns)
-                yield unit, chain, ml_subset, unit_sequences_df
+                if unit_sequences_df is None:
+                    continue  # FIXME: this happens when the parquet file is broken beyond the schema
+                try:
+                    if filtering is not None:
+                        unit_sequences_df = filtering(unit_sequences_df, chain)
+                    # Drop QA columns
+                    unit_sequences_df = unit_sequences_df.drop(columns=used_qa_columns)
+                    yield unit, chain, ml_subset, unit_sequences_df
+                except KeyError:
+                    # FIXME: this happens when "has_mutated_conserved_cysteines_light" does not exist
+                    #        observed in one unit, to troubleshoot
+                    ...
 
 # --- Smoke testing
 
@@ -762,8 +778,9 @@ if __name__ == '__main__':
     oas = OAS()
     oas.populate_metadata_jsons()
 
+    oas.nice_unit_meta_df(recompute=False, normalize_species=True).info()
+
     for unit in oas.units_in_disk():
-        print(unit.path)
         print(unit.metadata)
         print(unit.nice_metadata)
         if unit.has_sequences:
