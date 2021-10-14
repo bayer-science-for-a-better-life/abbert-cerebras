@@ -89,7 +89,8 @@ class OAS:
     def __init__(self, oas_path: Union[str, Path] = None):
         super().__init__()
         if oas_path is None:
-            oas_path = find_oas_path()
+            # oas_path = find_oas_path()
+            raise Exception("File not found exception. Please specify path!")
         self._oas_path = Path(oas_path)
 
     @property
@@ -134,16 +135,13 @@ class OAS:
             *_, oas_subset, study_id, unit_id = path.parts
         return self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
 
-    def units_in_disk(self, oas_subset: str = None) -> Iterator['Unit']:
-        if oas_subset is None:
-            yield from chain(self.units_in_disk(oas_subset='paired'), self.units_in_disk(oas_subset='unpaired'))
-        else:
-            check_oas_subset(oas_subset)
-            for study_path in sorted((self.oas_path / oas_subset).glob('*')):
-                if study_path.is_dir():
-                    for unit_path in study_path.glob('*'):
-                        if unit_path.is_dir():
-                            yield self.unit(oas_subset, study_path.stem, unit_path.stem)
+    def units_in_disk(self, oas_subset) -> Iterator['Unit']:
+        for file_path in oas_subset:
+            study_path_stem=None
+            unit_path_stem=None
+            oas_subset=None
+            save_path_parquet=None
+            yield [self.unit(oas_subset, study_path_stem, unit_path_stem).nice_metadata,save_path_parquet]
 
     def units_in_meta(self) -> Iterator['Unit']:
         df = self.unit_metadata_df
@@ -160,23 +158,12 @@ class OAS:
                       zip(df['oas_subset'], df['study_id'], df['unit_id'])]
         return df
 
-    def nice_unit_meta_df(self,
+    def nice_unit_meta_df(self,oas_subset,
                           recompute: bool = False,
                           normalize_species: bool = True) -> pd.DataFrame:
 
-        cache_path = self.oas_path / 'nice_unit_meta_df.parquet'
 
-        df = None
-
-        if not recompute:
-            try:
-                df = from_parquet(cache_path)
-            except (IOError, FileNotFoundError):
-                ...
-
-        if df is None:
-            df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_disk()])
-            to_parquet(df, cache_path)
+        results = [to_parquet(pd.DataFrame(unit[0]),unit[1]) for unit in self.units_in_disk(oas_subset)]
 
         # add units for full access to the data
         self._add_units_to_df(df)
@@ -710,13 +697,14 @@ def humab_like_filtering(sequences_df: pd.DataFrame,
 
 
 def train_validation_test_iterator(
+        source_folder: str = None,
         partitioner: Callable[[], dict] = sapiens_like_train_val_test,
         filtering: Optional[Callable[[pd.DataFrame, str], pd.DataFrame]] = humab_like_filtering,
         chains: Tuple[str, ...] = ('heavy', 'light'),
         ml_subsets: Tuple[str, ...] = ('train', 'validation', 'test'),
 ) -> Iterator[Tuple[Unit, str, str, pd.DataFrame]]:
 
-    partition = partitioner()
+    partition = partitioner(source_folder)
 
     for chain in chains:
         used_qa_columns = [
