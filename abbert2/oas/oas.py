@@ -135,38 +135,8 @@ class OAS:
             *_, oas_subset, study_id, unit_id = path.parts
         return self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
 
-    def units_in_disk(self, oas_subset) -> Iterator['Unit']:
-        for file_path in oas_subset:
-            study_path_stem=None
-            unit_path_stem=None
-            oas_subset=None
-            save_path_parquet=None
-            yield [self.unit(oas_subset, study_path_stem, unit_path_stem).nice_metadata,save_path_parquet]
-
-    def units_in_meta(self) -> Iterator['Unit']:
-        df = self.unit_metadata_df
-        for oas_subset, study_id, unit_id in zip(df['oas_subset'], df['study_id'], df['unit_id']):
-            yield self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
-
-    # --- Caches
-
-    def _add_units_to_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        if 'unit' in df.columns:
-            raise Exception('Dataframe already has a unit column')
-        df['unit'] = [self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
-                      for oas_subset, study_id, unit_id in
-                      zip(df['oas_subset'], df['study_id'], df['unit_id'])]
-        return df
-
-    def nice_unit_meta_df(self,oas_subset,
-                          recompute: bool = False,
-                          normalize_species: bool = True) -> pd.DataFrame:
-
-
-        results = [to_parquet(pd.DataFrame(unit[0]),unit[1]) for unit in self.units_in_disk(oas_subset)]
-
-        # add units for full access to the data
-        self._add_units_to_df(df)
+    def transform_dataframe(self,df,normalize_species):
+        df=self._add_units_to_df(df)
 
         if normalize_species:
             df['species'] = df['species'].apply(_normalize_oas_species)
@@ -183,8 +153,50 @@ class OAS:
                            'sequences_num_records',
                            'heavy_cdr3_max_length'):
             df[int_column] = df[int_column].astype(pd.Int64Dtype())
-
         return df
+
+    def units_in_disk(self, oas_subset, normalize_species) -> Iterator['Unit']:
+        for file_path in oas_subset:
+            study_path_stem=None
+            unit_path_stem=None
+            oas_subset=None
+            save_path_parquet=None
+            unit_parquet=self.unit(oas_subset, study_path_stem, unit_path_stem).nice_metadata
+            df=pd.DataFrame(unit_parquet)
+            units_df=self.transform_dataframe(df,normalize_species)
+            train_test_validation_dfs = {}
+            for chain in ('heavy', 'light'):
+                human_units_df = units_df.query(f'species == "human" and has_{chain}_sequences')
+                train_test_validation_dfs[chain] = {
+                    'train': human_units_df.query('study_year <= 2017'),
+                    'validation': human_units_df.query('study_year == 2018'),
+                    'test': human_units_df.query('study_year >= 2019'),
+                }
+            yield train_validation_test_iterator(train_test_validation_dfs,save_path_parquet)
+            # yield [self.unit(oas_subset, study_path_stem, unit_path_stem).nice_metadata,save_path_parquet]
+
+    def units_in_meta(self) -> Iterator['Unit']:
+        df = self.unit_metadata_df
+        for oas_subset, study_id, unit_id in zip(df['oas_subset'], df['study_id'], df['unit_id']):
+
+            yield self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
+
+    # --- Caches
+
+    def _add_units_to_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        if 'unit' in df.columns:
+            raise Exception('Dataframe already has a unit column')
+        df['unit'] = [self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
+                      for oas_subset, study_id, unit_id in
+                      zip(df['oas_subset'], df['study_id'], df['unit_id'])]
+        return df
+
+    def nice_unit_meta_df(self,
+                          recompute: bool = False,
+                          normalize_species: bool = True) -> pd.DataFrame:
+
+
+        results = [unit for unit in self.units_in_disk(self._oas_path,normalize_species)]
 
 
 @total_ordering
@@ -653,18 +665,6 @@ def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
     # Would it make sense to add an auxiliary task to classify the sequence organism?
     #
 
-    train_test_validation_dfs = {}
-
-    for chain in ('heavy', 'light'):
-        human_units_df = units_df.query(f'species == "human" and has_{chain}_sequences')
-        train_test_validation_dfs[chain] = {
-            'train': human_units_df.query('study_year <= 2017'),
-            'validation': human_units_df.query('study_year == 2018'),
-            'test': human_units_df.query('study_year >= 2019'),
-        }
-
-    return train_test_validation_dfs
-
 
 def humab_like_filtering(sequences_df: pd.DataFrame,
                          chain: str = 'heavy') -> pd.DataFrame:
@@ -697,14 +697,12 @@ def humab_like_filtering(sequences_df: pd.DataFrame,
 
 
 def train_validation_test_iterator(
-        source_folder: str = None,
-        partitioner: Callable[[], dict] = sapiens_like_train_val_test,
+        partition,
+        save_path,
         filtering: Optional[Callable[[pd.DataFrame, str], pd.DataFrame]] = humab_like_filtering,
         chains: Tuple[str, ...] = ('heavy', 'light'),
         ml_subsets: Tuple[str, ...] = ('train', 'validation', 'test'),
 ) -> Iterator[Tuple[Unit, str, str, pd.DataFrame]]:
-
-    partition = partitioner(source_folder)
 
     for chain in chains:
         used_qa_columns = [
