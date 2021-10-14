@@ -5,7 +5,7 @@ from pathlib import Path
 
 _RELATIVE_DATA_PATH = Path(__file__).parent.parent.parent / 'data'
 RELATIVE_OAS_TEST_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-test'
-RELATIVE_OAS_FULL_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-full'
+RELATIVE_OAS_FULL_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-test'
 
 
 def find_oas_path(oas_version='20210910', verbose=False):
