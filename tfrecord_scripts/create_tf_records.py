@@ -48,27 +48,27 @@ def create_examples(df, chain, unit):
     oas_subset, study_id, unit_id = unit.id
 
     for _, row in df.iterrows():
-        # try:
-        feature["tokens"] = row[f"aligned_sequence_{chain}"]
-        feature["cdr_start"] = [int(row[f"cdr1_start_{chain}"]), int(row[f"cdr2_start_{chain}"]), int(row[f"cdr3_start_{chain}"])]
-        feature["cdr_length"] = [int(row[f"cdr1_length_{chain}"]), int(row[f"cdr2_length_{chain}"]), int(row[f"cdr3_length_{chain}"])]
-        feature["fw_start"] = [int(row[f"fw1_start_{chain}"]), int(row[f"fw2_start_{chain}"]), int(row[f"fw3_start_{chain}"]), int(row[f"fw4_start_{chain}"])]
-        feature["fw_length"] = [int(row[f"fw1_length_{chain}"]), int(row[f"fw2_length_{chain}"]), int(row[f"fw3_length_{chain}"]), int(row[f"fw4_length_{chain}"])]
+        try:
+            feature["tokens"] = row[f"aligned_sequence_{chain}"]
+            feature["cdr_start"] = [int(row[f"cdr1_start_{chain}"]), int(row[f"cdr2_start_{chain}"]), int(row[f"cdr3_start_{chain}"])]
+            feature["cdr_length"] = [int(row[f"cdr1_length_{chain}"]), int(row[f"cdr2_length_{chain}"]), int(row[f"cdr3_length_{chain}"])]
+            feature["fw_start"] = [int(row[f"fw1_start_{chain}"]), int(row[f"fw2_start_{chain}"]), int(row[f"fw3_start_{chain}"]), int(row[f"fw4_start_{chain}"])]
+            feature["fw_length"] = [int(row[f"fw1_length_{chain}"]), int(row[f"fw2_length_{chain}"]), int(row[f"fw3_length_{chain}"]), int(row[f"fw4_length_{chain}"])]
 
-        
-        feature["study_year"] = study_year
-        feature["oas_subset"] = oas_subset
-        feature["normalized_species"] = normalized_species
-        feature["unit_id"] = unit_id
-        feature["study_id"] = study_id
+            
+            feature["study_year"] = study_year
+            feature["oas_subset"] = oas_subset
+            feature["normalized_species"] = normalized_species
+            feature["unit_id"] = unit_id
+            feature["study_id"] = study_id
 
-        tf_example = create_unmasked_tokens_example(feature)
+            tf_example = create_unmasked_tokens_example(feature)
 
-        yield (tf_example, len(feature["tokens"]))
+            yield (tf_example, len(feature["tokens"]))
 
-        # except Exception as e:
-        #     print(e)
-        #     yield None, None
+        except Exception as e:
+            print(e)
+            yield None, None
 
 
 def create_unmasked_tokens_example(feature):
@@ -138,14 +138,14 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
         if all([chain, ml_subset, not df.empty]):
             #write to tf
             df = _preprocess_df(df)
-            writer = tf.io.TFRecordWriter(out_tfrecord_name)
-
+        
             if df.empty:
                 print(f"--- dataframe empty after preprocess")
                 continue
 
             print(f"---dataframe rows after preprocess : {len(df)}, {chain}, {ml_subset}")
-                
+
+            writer = tf.io.TFRecordWriter(out_tfrecord_name)
             for tf_example, len_tokens in create_examples(df, chain, unit):
 
                 if tf_example is not None and len_tokens is not None:
@@ -153,10 +153,10 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
                     num_examples += 1
                     max_length = max(max_length, len_tokens)
 
-                # if num_examples % 100 == 0:
-                #     print(f"---{out_tfrecord_name} -  Wrote {num_examples} so far...")
-
+                if num_examples % 500 == 0:
+                    print(f"---{out_tfrecord_name} -  Wrote {num_examples} examples so far ...")
             
+            print(f"----DONE: {out_tfrecord_name} -  Wrote {num_examples} examples")
             writer.close()
 
             with open(out_stats_file_name, "w") as stats_fh:
@@ -169,7 +169,6 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
 
         else:
             # File corrupted
-
             with open(out_stats_file_name, "w") as stats_fh:
                 json_dict = {
                     "tfrec_filename": out_tfrecord_name, 
@@ -177,8 +176,6 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
                     "max_aligned_sequence_length": "file_corrupted"
                     }
                 json.dump(json_dict, stats_fh)
-
-            pass
 
 
 if __name__ == "__main__":
