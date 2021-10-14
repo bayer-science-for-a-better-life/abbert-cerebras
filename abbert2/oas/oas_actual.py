@@ -90,40 +90,11 @@ class OAS:
         super().__init__()
         if oas_path is None:
             oas_path = find_oas_path()
-            self._oas_path = Path(oas_path)
-
-        else:
-            # Added by aarti-cerebras
-            # print("IN ELSE")
-            oas_path = Path(oas_path)
-            if oas_path.is_file():
-                *oas_path_dir, oas_subset, study_id, unit_id, _ = oas_path.parts
-            else:
-                *oas_path_dir, oas_subset, study_id, unit_id = oas_path.parts
-
-            self._oas_path = Path(*oas_path_dir)
-            self._oas_subset = oas_subset
-            self._study_id = study_id
-            self._unit_id = unit_id
+        self._oas_path = Path(oas_path)
 
     @property
     def oas_path(self) -> Path:
         return self._oas_path
-
-    @property
-    def oas_subset(self) -> str:
-        # Added by aarti-cerebras
-        return self._oas_subset
-
-    @property
-    def study_id(self) -> str:
-        # Added by aarti-cerebras
-        return self._study_id
-
-    @property
-    def unit_id(self) -> str:
-        # Added by aarti-cerebras
-        return self._unit_id
 
     @cached_property
     def unit_metadata_df(self):
@@ -174,16 +145,6 @@ class OAS:
                         if unit_path.is_dir():
                             yield self.unit(oas_subset, study_path.stem, unit_path.stem)
 
-
-    def units_in_path(self):
-        # Added by aarti-cerebras
-        check_oas_subset(self.oas_subset)
-
-        unit_path = (self.oas_path / self.oas_subset / self.study_id / self.unit_id)
-        if unit_path.is_dir():
-            # print(f"-----units_in_new study_path {self.oas_subset}, {self.study_id}, {unit_path.stem}")
-            yield self.unit(self.oas_subset, self.study_id, unit_path.stem)
-
     def units_in_meta(self) -> Iterator['Unit']:
         df = self.unit_metadata_df
         for oas_subset, study_id, unit_id in zip(df['oas_subset'], df['study_id'], df['unit_id']):
@@ -203,7 +164,7 @@ class OAS:
                           recompute: bool = False,
                           normalize_species: bool = True) -> pd.DataFrame:
 
-        cache_path = self.oas_path / self.oas_subset / self.study_id / self.unit_id / 'nice_unit_meta_df.parquet'
+        cache_path = self.oas_path / 'nice_unit_meta_df.parquet'
 
         df = None
 
@@ -214,9 +175,7 @@ class OAS:
                 ...
 
         if df is None:
-            # Added by aarti-cerebras
-            # df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_disk()])
-            df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_path()])
+            df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_disk()])
             to_parquet(df, cache_path)
 
         # add units for full access to the data
@@ -697,7 +656,7 @@ def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
     """
 
     # Let's maybe select using a dataframe, instead of looping through the units
-    units_df = OAS(oas_path).nice_unit_meta_df(normalize_species=True, recompute=True)
+    units_df = OAS(oas_path).nice_unit_meta_df(normalize_species=True)
 
     #
     # Sapiens sought humanization, so they built their model against human antibodies only
@@ -710,10 +669,7 @@ def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
     train_test_validation_dfs = {}
 
     for chain in ('heavy', 'light'):
-        # print(f"---- human_units_df_species: {units_df.species}")
-        # print(f"----- human_units_df_has_chain: , {units_df[f'has_{chain}_sequences']}")
         human_units_df = units_df.query(f'species == "human" and has_{chain}_sequences')
-        
         train_test_validation_dfs[chain] = {
             # 'train': human_units_df.query('study_year <= 2017'),
             # 'validation': human_units_df.query('study_year == 2018'),
@@ -723,6 +679,8 @@ def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
             'validation': human_units_df[human_units_df['study_year'] == 2018],
             'test': human_units_df[human_units_df['study_year'] >= 2019],
         }
+
+    # print(f"---- sapiens like train_test: {train_test_validation_dfs}")
 
     return train_test_validation_dfs
 
@@ -789,14 +747,11 @@ def train_validation_test_iterator(
             f'fw4_length_{chain}',
             f'aligned_sequence_{chain}',
         ]
-
         for ml_subset in ml_subsets:
             unit: Unit
             for unit in partition[chain][ml_subset]['unit']:
                 unit_sequences_df = unit.sequences_df(columns=used_ml_columns + used_qa_columns)
-                
                 if unit_sequences_df is None:
-                    yield unit, None, None, pd.DataFrame()
                     continue  # FIXME: this happens when the parquet file is broken beyond the schema
                 try:
                     if filtering is not None:
@@ -838,3 +793,4 @@ if __name__ == '__main__':
             unit.sequences_df().info()
             unit.copy_to(Path.home() / 'small-oas-deleteme', max_num_sequences=100, overwrite=True)
         assert unit == unit
+

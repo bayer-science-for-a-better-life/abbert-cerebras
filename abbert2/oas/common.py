@@ -22,6 +22,8 @@ def find_oas_path(oas_version='20210910', verbose=False):
 
         # Environment variable first
         os.getenv('OAS_PATH', None),
+        # "/cb/ml/aarti/bayer_smaller_sample",
+        # "/cb/ml/aarti/bayer_sample",
         # Relative path to oas-full
         RELATIVE_OAS_FULL_DATA_PATH,
         RELATIVE_OAS_TEST_DATA_PATH,

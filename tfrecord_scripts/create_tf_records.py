@@ -121,7 +121,7 @@ def get_output_file_names(dest_tfrecs_fldr, unit_id, chain, ml_subset):
 
     ml_subset_dict = {
         "train": "lte2017",
-        "val": "eq2018",
+        "validation": "eq2018",
         "test": "gte2019"
     }
 
@@ -138,7 +138,8 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
     """
     src_input_folder: ex: /cb/ml/aarti/bayer_sample/paired/Eccles_2020/SRR10358525_paired
     """
-
+    print(f"-- src_input_folder={src_input_folder}")
+    print(f"--- out_tf_records_fldr : {out_tf_records_fldr}")
     iterator = get_iterator(oas_path=src_input_folder)
 
     src_input_folder = Path(src_input_folder)
@@ -173,7 +174,7 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
                     num_examples += 1
                     max_length = max(max_length, len_tokens)
 
-                if num_examples % 500 == 0:
+                if num_examples % 5000 == 0:
                     print(f"---{out_tfrecord_name} -  Wrote {num_examples} examples so far ...")
             
             print(f"----DONE: {out_tfrecord_name} -  Wrote {num_examples} examples")
@@ -202,10 +203,8 @@ def main():
     """
     Main function
     """
-    
     parser = create_arg_parser()
     args = parser.parse_args(sys.argv[1:])
-
     create_tfrecords(args.src_input_folder, args.out_tf_records_fldr)
 
 
