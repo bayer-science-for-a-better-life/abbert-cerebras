@@ -1,23 +1,27 @@
-# from abbert2.oas.oas import train_validation_test_iterator
-#
-# for unit, chain, ml_subset, df in train_validation_test_iterator():
-#     # Do whatever you want here... save to a consolidated dataset?
-#     dframe = unit.sequences_df()
-#     print(list(df.columns))
-#     print(f'unit={unit.id} chain={chain} ml_subset={ml_subset} num_sequences={len(df)} num_columns={len(df.columns)}')
+import pickle
+import matplotlib.pyplot as plt
 
-from concurrent.futures import ProcessPoolExecutor
-from time import sleep
-def task(message):
-   sleep(2)
-   return message
+class memory:
+    def __init__(self):
+        self.distribution_len = {"heavy": {}, "light": {}}
+        self.max_seq = {"heavy": 0, "light": 0}
+        self.num_rows = 0
+        self.corrupted_files = []
+        self.normal_files = []
 
-def main():
-   executor = ProcessPoolExecutor(5)
-   future = executor.submit(task, ("Completed"))
-   print(future.done())
-   sleep(2)
-   print(future.done())
-   print(future.result())
-if __name__ == '__main__':
-    main()
+    @staticmethod
+    def merge_distribution(x, y):
+        z = {k: x.get(k, 0) + y.get(k, 0) for k in set(x) | set(y)}
+        return z
+
+dest_folder_path = "/Users/hossein/Desktop/log.pkl"
+with open(dest_folder_path, 'rb') as inp:
+    tech_companies = pickle.load(inp)
+    chain_type="light"
+    my_dict=tech_companies.distribution_len[chain_type]
+    plt.bar(list(my_dict.keys()), my_dict.values(), color='g')
+    plt.xlabel("chain length")
+    plt.ylabel("Count")
+    plt.title("Distribution of {} chains".format(chain_type))
+    plt.show()
+    print("yes")
