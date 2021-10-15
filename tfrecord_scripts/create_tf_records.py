@@ -169,6 +169,9 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
             len_df = len(df)
             num_tfrecs = int(len_df // 100000)
 
+            if num_tfrecs == 0:
+                num_tfrecs += 1
+
             print(f"---dataframe rows after preprocess : {len(df)}, {chain}, {ml_subset}")
 
             dir_name, tf_fname = os.path.split(out_tfrecord_name)
@@ -213,8 +216,8 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
             with open(out_stats_file_name, "w") as stats_fh:
                 json_dict = {
                     "tfrec_filename": out_tfrecord_name, 
-                    "num_examples": "file_corrupted", 
-                    "max_aligned_sequence_length": "file_corrupted"
+                    "num_examples": "file_corrupted or empty dataframe after filtering", 
+                    "max_aligned_sequence_length": "file_corrupted or empty dataframe after filtering"
                     }
                 json.dump(json_dict, stats_fh)
 
