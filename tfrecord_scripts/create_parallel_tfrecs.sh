@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-folder_path=${1}
+file_path=${1}
 
-echo ${folder_path}
+echo ${file_path}
 
 cpus=$( ls -d /sys/devices/system/cpu/cpu[[:digit:]]* | wc -w )
-cpus=$((cpus - 1))
+cpus=$((cpus - 2))
 echo "Using $cpus CPU cores"
 
-find ${folder_path} -name '*.parquet' ! -name 'nice_unit_meta*.parquet' ! -name 'bulk_download*.parquet' -exec dirname '{}' \; | xargs --max-args=1 --max-procs=$cpus  ./create_pretraining_data_wrapper.sh 
+
+xargs -a ${file_path} --max-procs=$cpus --max-args=1 ./create_pretraining_data_wrapper.sh 

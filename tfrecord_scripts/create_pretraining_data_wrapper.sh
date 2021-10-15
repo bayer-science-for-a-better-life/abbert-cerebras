@@ -13,16 +13,11 @@
 # limitations under the License.
 
 input_folder=${1}
-output_folder="/cb/ml/language/datasets/bayer_tfrecs"
+output_folder="/cb/ml/language/datasets/bayer_tfrecords"
 
-echo "input_folder"
-echo ${input_folder}
-echo "output_folder"
-echo ${output_folder}
+echo "input_folder: " ${input_folder}
+echo "output_folder: " ${output_folder}
 
-# input_file=$(basename $input_path)
-
-mkdir -p ${output_folder}
 
 /cb/home/aarti/miniconda3/envs/bayer/bin/python /cb/home/aarti/ws/code/bayer_tfrecs/tfrecord_scripts/create_tf_records.py \
    --src_input_folder=${input_folder} \
