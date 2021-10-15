@@ -47,6 +47,9 @@ def _preprocess_df(df):
 
     df = df.query(query)
 
+    # shuffle dataframe rows
+    df = df.sample(frac=1)
+
     return df
 
 
@@ -152,33 +155,50 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
 
     for unit, chain, ml_subset, df in iterator:
         
-        num_examples = 0
-        max_length = float("-inf")
+        
         out_tfrecord_name, out_stats_file_name = get_output_file_names(dest_tfrecs_fldr, unit_id, chain, ml_subset)
 
         if all([chain, ml_subset, not df.empty]):
             #write to tf
             df = _preprocess_df(df)
-        
+
             if df.empty:
                 print(f"--- dataframe empty after preprocess")
                 continue
 
+            len_df = len(df)
+            num_tfrecs = int(len_df // 100000)
+
             print(f"---dataframe rows after preprocess : {len(df)}, {chain}, {ml_subset}")
 
-            writer = tf.io.TFRecordWriter(out_tfrecord_name)
+            dir_name, tf_fname = os.path.split(out_tfrecord_name)
+            prefix = tf_fname.split(".tfrecord")[0]
+
+            writers = []
+
+            for i in range(num_tfrecs):
+                output_file_name = prefix + f"_{i}.tfrecord"
+                output_file_name = os.path.join(dir_name, output_file_name)
+                writers.append(tf.io.TFRecordWriter(output_file_name))
+
+            writer_index = 0
+            num_examples = 0
+            max_length = float("-inf")
+
             for tf_example, len_tokens in create_examples(df, chain, unit):
 
                 if tf_example is not None and len_tokens is not None:
-                    writer.write(tf_example.SerializeToString())
+                    writers[writer_index].write(tf_example.SerializeToString())
+                    writer_index = (writer_index + 1) % len(writers)
                     num_examples += 1
                     max_length = max(max_length, len_tokens)
 
-                if num_examples % 5000 == 0:
-                    print(f"---{out_tfrecord_name} -  Wrote {num_examples} examples so far ...")
+                if num_examples % 10000 == 0:
+                    print(f"--- Wrote {num_examples} examples so far ...")
             
             print(f"----DONE: {out_tfrecord_name} -  Wrote {num_examples} examples")
-            writer.close()
+            for writer in writers:
+                writer.close()
 
             with open(out_stats_file_name, "w") as stats_fh:
                 json_dict = {
