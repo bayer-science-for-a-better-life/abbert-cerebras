@@ -13,8 +13,8 @@
 # limitations under the License.
 
 input_folder=${1}
-# output_folder="/cb/ml/language/datasets/bayer_tfrecords"
-output_folder="/cb/ml/aarti/bayer_multi_sample"
+output_folder="/cb/ml/language/datasets/bayer_tfrecords"
+# output_folder="/cb/ml/aarti/datasets/bayer_tfrecords"
 
 echo "input_folder: " ${input_folder}
 echo "output_folder: " ${output_folder}
