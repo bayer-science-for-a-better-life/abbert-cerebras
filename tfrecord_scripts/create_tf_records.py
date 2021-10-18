@@ -1,3 +1,4 @@
+import os
 from abbert2.oas.oas import train_validation_test_iterator
 from abbert2.oas.oas import sapiens_like_train_val_test
 from tfrecord_scripts.utils import (
@@ -6,7 +7,6 @@ from tfrecord_scripts.utils import (
 )
 
 from pathlib import Path
-import os
 import tensorflow as tf
 
 import json
@@ -167,11 +167,8 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
                 continue
 
             len_df = len(df)
-            num_tfrecs = int(len_df // 100000)
-
-            if num_tfrecs == 0:
-                num_tfrecs += 1
-
+            num_tfrecs = int(len_df // 100000) + 1
+            
             print(f"---dataframe rows after preprocess : {len(df)}, {chain}, {ml_subset}")
 
             dir_name, tf_fname = os.path.split(out_tfrecord_name)

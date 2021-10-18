@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export OPENBLAS_NUM_THREADS=1
+export GOTO_NUM_THREADS=2
+export OMP_NUM_THREADS=2
+
 file_path=${1}
 
 echo ${file_path}
-
 cpus=$( ls -d /sys/devices/system/cpu/cpu[[:digit:]]* | wc -w )
-cpus=$((cpus - 2))
+cpus=$((cpus / 2))
 echo "Using $cpus CPU cores"
 
 
