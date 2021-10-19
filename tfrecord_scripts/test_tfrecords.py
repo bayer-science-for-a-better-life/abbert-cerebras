@@ -38,21 +38,4 @@ for i, item in enumerate(samples):
 
 
 
-fldr = "/cb/ml/aarti/bayer_sample/unpaired/Setliff_2018/SRR6206375_Light_Bulk"
-iterator_tf = get_iterator(oas_path=str(fldr))
-
-for unit_new, chain_new, ml_subset_new, df_new in iterator_tf:
-    print(f"unit={unit_new.id} chain={chain_new} ml_subset={ml_subset_new} num_sequences={len(df_new)} num_columns={len(df_new.columns)}, {unit_new.sequences_path}")
-    print(unit_new.normalized_species)
-    print(unit_new.has_light_sequences)
-    print(unit_new.study_year)
-
-
-
-df = from_parquet("/cb/ml/aarti/bayer_sample/unpaired/Setliff_2018/SRR6206375_Light_Bulk/SRR6206375_Light_Bulk.sequences.parquet")
-
-
-print(df)
-
-
 
