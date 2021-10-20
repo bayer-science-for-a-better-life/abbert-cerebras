@@ -3,7 +3,8 @@ from tfrecord_scripts.create_tf_records import get_iterator
 from abbert2.oas.oas_actual import train_validation_test_iterator
 from abbert2.common import to_json_friendly, from_parquet
 
-file_path = "/cb/ml/aarti/bayer_sample"
+# file_path = "/cb/ml/aarti/bayer_sample"
+# file_path = "/cb/home/aarti/ws/code/bayer_tfrecs/data/oas-test"
 
 
 samples = list(train_validation_test_iterator())
