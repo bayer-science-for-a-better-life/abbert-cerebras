@@ -845,6 +845,8 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
             histogram_series: Optional[pd.Series] = chain_stats[histogram]
             if histogram_series is not None:
                 chain_stats[histogram] = histogram_series.sort_index().astype(pd.Int64Dtype())
+                # noinspection PyUnresolvedReferences
+                chain_stats[histogram].index = chain_stats[histogram].index.map(int)
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     pd.to_pickle(summarized_stats, cache_path)
