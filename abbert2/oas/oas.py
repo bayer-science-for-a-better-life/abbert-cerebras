@@ -827,6 +827,8 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
             apc_df = apc_df.sort_index(axis='columns')
             # Positions numbered-sorted
             apc_df = apc_df.loc[sorted(apc_df.index, key=parse_position_insertion)]
+            # Use int type
+            apc_df = apc_df.astype(pd.Int64Dtype())
             # Add a small indicator of the region
             from abnumber.common import SCHEME_POSITION_TO_REGION
             apc_df['region'] = apc_df.index.map(
@@ -842,7 +844,7 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
         for histogram in histograms:
             histogram_series: Optional[pd.Series] = chain_stats[histogram]
             if histogram_series is not None:
-                chain_stats[histogram] = histogram_series.sort_index()
+                chain_stats[histogram] = histogram_series.sort_index().astype(pd.Int64Dtype())
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     pd.to_pickle(summarized_stats, cache_path)
