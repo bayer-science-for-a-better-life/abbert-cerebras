@@ -588,7 +588,8 @@ class Unit:
 
         df = self.sequences_df()
         if df is None:
-            raise NotImplementedError
+            return None
+
         stats = {}
         for chain in self.present_chains:
             aligned_position_counts = defaultdict(int)
