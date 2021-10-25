@@ -782,6 +782,7 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
 
     # Aggregate stats
     for unit in oas.units_in_disk():
+        print(f'Aggregating counts for unit: {unit.unit_id}')
         stats = unit.consolidated_stats()
         if stats is not None:
             for chain, chain_stats in stats.items():
