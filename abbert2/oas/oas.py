@@ -594,7 +594,7 @@ class Unit:
             for sequence, positions, insertions in zip(df[f'aligned_sequence_{chain}'],
                                                        df[f'positions_{chain}'],
                                                        df[f'insertions_{chain}']):
-                if pd.isnull(sequence) or pd.isnull(positions):
+                if pd.isnull(sequence):
                     continue
                 # TODO this is a really tight loop we should move out python...
                 for aa, position, insertion in zip_longest(sequence,
