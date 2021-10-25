@@ -834,7 +834,7 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
             apc_df['region'] = apc_df.index.map(
                 lambda x: SCHEME_POSITION_TO_REGION['imgt'][parse_position_insertion(x)[0]].lower()
             )
-            apc_df = apc_df[['region'] + [column for column in apc_df.columns if column != 'retion']]
+            apc_df = apc_df[['region'] + [column for column in apc_df.columns if column != 'region']]
             # Done
             chain_stats['aligned_position_counts'] = apc_df
         # Histograms sorted in ascending order
