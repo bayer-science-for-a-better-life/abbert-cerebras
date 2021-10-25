@@ -597,10 +597,11 @@ class Unit:
                                                        df[f'insertions_{chain}']):
                 if not isinstance(sequence, np.ndarray):
                     continue
+                insertions = () if not isinstance(insertions, np.ndarray) else insertions
                 # TODO this is a really tight loop we should move out python...
                 for aa, position, insertion in zip_longest(sequence,
                                                            positions,
-                                                           () if pd.isnull(insertions) else insertions,
+                                                           insertions,
                                                            fillvalue=b''):
                     position = f'{position}{insertion.decode("utf-8").strip()}'
                     aa = aa.decode("utf-8")
