@@ -719,6 +719,136 @@ def consolidate_all_units_stats(oas_path: Optional[Union[str, Path]] = None,
     )
 
 
+def parse_position_insertion(position_insertion: str):
+    try:
+        position, insertion = int(position_insertion), 0
+    except ValueError:
+        position, insertion = int(position_insertion[:-1]), ord(position_insertion[-1])
+    # assume IMGT, and then insertions are sorted in reverse for position 112
+    # make the trick
+    if position == 112:
+        insertion = -insertion
+    return position, insertion
+
+
+def parse_position_aa(position_aa):
+    position, aa = position_aa.split('=')
+    position, insertion = parse_position_insertion(position)
+    return position, insertion, aa
+
+
+def code2letter(code):
+    if not code:
+        return ''
+    return chr(abs(code))
+
+
+def aligned_positions_to_df(aps):
+
+    records = []
+    for position_aa, count in aps.items():
+        position, insertion, aa = parse_position_aa(position_aa)
+        records.append({
+            'position': str(position) + code2letter(insertion),
+            'aa': aa,
+            'count': count
+        })
+    df = pd.DataFrame(records)  # .pivot(index='position', columns='aa')['count']
+    df = df.groupby(['position', 'aa'])['count'].sum().unstack()
+
+    return df
+
+
+def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute=False):
+
+    oas = OAS(oas_path=oas_path)
+    cache_path = oas.oas_path / 'summaries' / 'count_stats.pickle'
+
+    if not recompute:
+        try:
+            return pd.read_pickle(cache_path)
+        except IOError:
+            ...
+
+    # Initialize stats
+    summarized_stats = {}
+    for chain in ('heavy', 'light'):
+        summarized_stats[chain] = {
+            'aligned_position_counts': None,
+            'sequence_length_counts': None,
+        }
+        for region in ('fw1', 'cdr1', 'fw2', 'cdr2', 'fw3', 'cdr3', 'fw4'):
+            summarized_stats[chain][f'{region}_length_counts'] = None
+
+    # Aggregate stats
+    for unit in oas.units_in_disk():
+        stats = unit.consolidated_stats()
+        if stats is not None:
+            for chain, chain_stats in stats.items():
+                # --- Aligned position amino acid count distribution
+                aligned_position_counts = aligned_positions_to_df(chain_stats['aligned_position_counts'])
+                if summarized_stats[chain]['aligned_position_counts'] is None:
+                    summarized_stats[chain]['aligned_position_counts'] = aligned_position_counts
+                else:
+                    summarized_stats[chain]['aligned_position_counts'] = (
+                        aligned_position_counts.add(summarized_stats[chain]['aligned_position_counts'], fill_value=0)
+                    )
+
+                # --- Length histograms: full sequences
+                sequence_length_counts = pd.Series(chain_stats['sequence_length_counts'])
+                if summarized_stats[chain]['sequence_length_counts'] is None:
+                    # noinspection PyTypeChecker
+                    summarized_stats[chain]['sequence_length_counts'] = sequence_length_counts
+                else:
+                    summarized_stats[chain]['sequence_length_counts'] = (
+                        sequence_length_counts.add(summarized_stats[chain]['sequence_length_counts'], fill_value=0)
+                    )
+                # --- Length histograms: regions
+                for region in ('fw1', 'cdr1', 'fw2', 'cdr2', 'fw3', 'cdr3', 'fw4'):
+                    region_length_counts = pd.Series(chain_stats[f'{region}_length_counts'])
+                    if summarized_stats[chain][f'{region}_length_counts'] is None:
+                        # noinspection PyTypeChecker
+                        summarized_stats[chain][f'{region}_length_counts'] = region_length_counts
+                    else:
+                        summarized_stats[chain][f'{region}_length_counts'] = (
+                            region_length_counts.add(summarized_stats[chain][f'{region}_length_counts'], fill_value=0)
+                        )
+
+    # Nice to have:
+    #   - aligned aminoacid counts in the right order
+    #   - a small indicator of the region (fw1...)
+    for chain in ('heavy', 'light'):
+        # The chain aggregated stats
+        chain_stats = summarized_stats[chain]
+        # Amino acids alpha-sorted
+        apc_df: Optional[pd.DataFrame] = chain_stats['aligned_position_counts']
+        if apc_df is not None:
+            apc_df = apc_df.sort_index(axis='columns')
+            # Positions numbered-sorted
+            apc_df = apc_df.loc[sorted(apc_df.index, key=parse_position_insertion)]
+            # Add a small indicator of the region
+            from abnumber.common import SCHEME_POSITION_TO_REGION
+            apc_df['region'] = apc_df.index.map(
+                lambda x: SCHEME_POSITION_TO_REGION['imgt'][parse_position_insertion(x)[0]].lower()
+            )
+            apc_df = apc_df[['region'] + [column for column in apc_df.columns if column != 'retion']]
+            # Done
+            chain_stats['aligned_position_counts'] = apc_df
+        # Histograms sorted in ascending order
+        histograms = ['sequence_length_counts']
+        histograms += [f'{region}_length_counts'
+                       for region in ('fw1', 'cdr1', 'fw2', 'cdr2', 'fw3', 'cdr3', 'fw4')]
+        for histogram in histograms:
+            histogram_series: Optional[pd.Series] = chain_stats[histogram]
+            if histogram_series is not None:
+                chain_stats[histogram] = histogram_series.sort_index()
+
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.to_pickle(summarized_stats, cache_path)
+
+    return summarized_stats
+
+
 # --- Data partitioning and filtering examples
 
 def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
