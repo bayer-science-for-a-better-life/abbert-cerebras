@@ -49,6 +49,7 @@ from json import JSONDecodeError
 from pathlib import Path
 from typing import Tuple, Union, Iterator, Optional, List, Callable
 
+import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from pyarrow import ArrowInvalid
@@ -594,7 +595,7 @@ class Unit:
             for sequence, positions, insertions in zip(df[f'aligned_sequence_{chain}'],
                                                        df[f'positions_{chain}'],
                                                        df[f'insertions_{chain}']):
-                if pd.isnull(sequence):
+                if not isinstance(sequence, np.ndarray):
                     continue
                 # TODO this is a really tight loop we should move out python...
                 for aa, position, insertion in zip_longest(sequence,
