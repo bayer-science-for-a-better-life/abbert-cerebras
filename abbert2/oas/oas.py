@@ -42,13 +42,15 @@ UPDATE 2021/09
 import json
 import shutil
 from builtins import IOError
+from collections import defaultdict
 from functools import cached_property, total_ordering
-from itertools import chain
+from itertools import chain, zip_longest
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Tuple, Union, Iterator, Optional, List, Callable
 
 import pandas as pd
+from joblib import Parallel, delayed
 from pyarrow import ArrowInvalid
 import pyarrow.parquet as pq
 
@@ -215,8 +217,18 @@ class Unit:
         self._oas_subset = oas_subset
         self._study_id = study_id
         self._unit_id = unit_id
+
+        # A little complicated logic to ensure consistent definition of parent dataset
+        # See also Aarti proposed changes allowing to take a path as input
+        # (likely put it in a factory method)
+        if oas_path is not None and oas is not None:
+            if oas_path != oas.oas_path:
+                raise Exception(f'OAS path inconsistency ({oas.oas_path} != {oas_path})')
         if oas_path is None:
-            oas_path = find_oas_path()
+            if oas is not None:
+                oas_path = oas.oas_path
+            else:
+                oas_path = find_oas_path()
         self._oas_path = Path(oas_path)
         self._oas = oas
 
@@ -492,6 +504,15 @@ class Unit:
             return None
 
     @property
+    def present_chains(self) -> Tuple[str, ...]:
+        chains = ()
+        if self.has_heavy_sequences:
+            chains = chains + ('heavy',)
+        if self.has_light_sequences:
+            chains = chains + ('light',)
+        return chains
+
+    @property
     def has_heavy_sequences(self) -> bool:
         pq = self._pq()
         if pq is not None:
@@ -552,7 +573,45 @@ class Unit:
     def light_cdr3_max_length(self):
         return self.region_max_length(region='cdr3', chain='light')
 
-    # TODO: max sequence length
+    # --- Consolidated stats
+
+    def consolidated_stats(self, recompute: bool = False):
+
+        cache_path = self.path / 'stats.pickle'
+
+        if not recompute:
+            try:
+                return pd.read_pickle(cache_path)
+            except IOError:
+                pass
+
+        df = self.sequences_df()
+        if df is None:
+            raise NotImplementedError
+        stats = {}
+        for chain in self.present_chains:
+            aligned_position_counts = defaultdict(int)
+            for sequence, positions, insertions in zip(df[f'aligned_sequence_{chain}'],
+                                                       df[f'positions_{chain}'],
+                                                       df[f'insertions_{chain}']):
+                # TODO this is a really tight loop we should move out python...
+                for aa, position, insertion in zip_longest(sequence,
+                                                           positions,
+                                                           () if insertions is None else insertions,
+                                                           fillvalue=b''):
+                    position = f'{position}{insertion.decode("utf-8").strip()}'
+                    aa = aa.decode("utf-8")
+                    counts_key = f'{position}={aa}'
+                    aligned_position_counts[counts_key] += 1
+            stats[chain] = {
+                'aligned_position_counts': dict(aligned_position_counts),
+                'sequence_length_counts': df[f'aligned_sequence_{chain}'].str.len().value_counts().to_dict(),
+            }
+            for region in ('fw1', 'cdr1', 'fw2', 'cdr2', 'fw3', 'cdr3', 'fw4'):
+                stats[chain][f'{region}_length_counts'] = df[f'{region}_length_{chain}'].value_counts().to_dict()
+            # TODO: collect other stats for things like QA, germlines...
+        pd.to_pickle(stats, cache_path)
+        return stats
 
     # --- Magics
 
@@ -636,6 +695,25 @@ def extract_processed_oas(oas_path: Optional[Union[str, Path]] = None,
     print(f'Find your OAS dump in {dest_path}')
 
 
+def _consolidate_unit_stats(unit: Unit, overwrite=False):
+    if unit.has_sequences:
+        print(f'Consolidating stats for {unit.id}')
+        unit.consolidated_stats(recompute=overwrite)
+
+
+def consolidate_all_units_stats(oas_path: Optional[Union[str, Path]] = None,
+                                overwrite: bool = False,
+                                n_jobs=-1):
+    oas = OAS(oas_path=oas_path)
+    Parallel(n_jobs=n_jobs)(
+        delayed(_consolidate_unit_stats)(
+            unit=unit,
+            overwrite=overwrite,
+        )
+        for unit in oas.units_in_disk()
+    )
+
+
 # --- Data partitioning and filtering examples
 
 def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
@@ -705,6 +783,8 @@ def humab_like_filtering(sequences_df: pd.DataFrame,
         sequences_df = sequences_df[~has_mutated_conserved_cysteines]
     # TODO: check aboss / anarci annotations and original paper to make sure this is correct
     # https://www.jimmunol.org/content/201/12/3694?ijkey=24817c8d879730cb4a170e371cfadd768703b0ed&keytype2=tf_ipsecsha
+    # SANTI COME HERE AND REACTIVATE THE FILTER FOR LIGHT?
+    # SANTI COME HERE AND ACTIVATE NUMBER OF READS FILTER ALA SANOFI (>3)
 
     return sequences_df
 
