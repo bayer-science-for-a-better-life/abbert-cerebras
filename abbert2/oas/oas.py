@@ -835,6 +835,10 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
                 lambda x: SCHEME_POSITION_TO_REGION['imgt'][parse_position_insertion(x)[0]].lower()
             )
             apc_df = apc_df[['region'] + [column for column in apc_df.columns if column != 'region']]
+            # Generate marginals
+            apc_df['total'] = apc_df.sum(numeric_only=True, axis='columns').astype(pd.Int64Dtype())
+            apc_df.loc['total'] = apc_df.sum(numeric_only=True, axis='index').astype(pd.Int64Dtype())
+            apc_df.loc['total', 'region'] = 'sequence'
             # Done
             chain_stats['aligned_position_counts'] = apc_df
         # Histograms sorted in ascending order
