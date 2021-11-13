@@ -60,7 +60,7 @@ Please edit the files `predict_input/data_dir` part of config yamls located [her
 The config files provided are for the various runs that were performed on CS-1
 
 ### 5. Download trained model checkpoints
-The trained model checkpoint folders are uploaded to the S3 bucket and their corresponding yaml config files are present here [here](./configs/feature_extract)
+The trained model checkpoint folders are uploaded to the S3 bucket and their corresponding yaml config files are present [here](./configs/feature_extract)
 
 
 ### 6. Launch feature extraction
