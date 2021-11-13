@@ -106,17 +106,8 @@ optimizer:
           initial_learning_rate: 0.0006
           end_learning_rate: 0.0
           steps: 1058
-    # learning_rate:
-    #     # Paper says heavy is 166 epochs with 1e-4 and remaining 534 epochs at 1e-3
-    #     - steps: 21432567
-    #       scheduler: "Constant"
-    #       learning_rate: 0.0001
-    #     - scheduler: "Constant"
-    #       learning_rate: 0.001
-    #       steps: 68945727
     loss_scaling_factor: "tf_dynamic"
     log_summaries: True
-    # grad_accum_steps: 16
 
 ### Cerebras parameters
 runconfig:

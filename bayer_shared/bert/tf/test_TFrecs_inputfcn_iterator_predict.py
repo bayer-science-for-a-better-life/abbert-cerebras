@@ -17,7 +17,7 @@ import json
 # number of batches to iterate over
 NUM_BATCHES = 1
 
-yaml_path = "/cb/home/aarti/ws/code/bayer_modelzoo/bayer_shared/bert/tf/configs/gpu_params_roberta_base_heavy_sequence_small_dataset_predict.yaml"
+yaml_path = "/cb/home/aarti/ws/code/bayer_for_santi/abbert-cerebras/bayer_shared/bert/tf/configs/gpu_params_roberta_base_heavy_sequence_small_dataset_predict.yaml"
 params = get_params(yaml_path)
 print(params)
 
