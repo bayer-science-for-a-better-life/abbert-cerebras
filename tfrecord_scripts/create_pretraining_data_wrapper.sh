@@ -20,6 +20,6 @@ echo "input_folder: " ${input_folder}
 echo "output_folder: " ${output_folder}
 
 
-/cb/home/aarti/miniconda3/envs/bayer/bin/python /cb/home/aarti/ws/code/bayer_tfrecs/tfrecord_scripts/create_tf_records.py \
+python /cb/home/aarti/ws/code/bayer_tfrecs/tfrecord_scripts/create_tf_records.py \
    --src_input_folder=${input_folder} \
    --out_tf_records_fldr=${output_folder} \
