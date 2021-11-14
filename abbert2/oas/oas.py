@@ -1044,7 +1044,7 @@ def diagnose():
     oas.populate_metadata_jsons()
     df = oas.nice_unit_meta_df(recompute=False, normalize_species=True)
 
-    units_to_redownload = sorted('/'.join(unit.id) for unit in df.query('needs_redownload').unit)
+    units_to_redownload = sorted(unit.original_url for unit in df.query('needs_redownload').unit)
     print(f'{len(units_to_redownload)} units to redownload')
     print('\n'.join(units_to_redownload))
     print('-' * 80)
