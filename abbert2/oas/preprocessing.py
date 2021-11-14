@@ -1115,7 +1115,16 @@ def _processing_clis():
             writer.write('\n'.join(commands))
 
 
-# --- Where there is smoke
+# --- Some things that should become proper tests
+
+def check_parsing_corner_cases():
+    # Very long CDR3s with insertions, codes at and beyond "AA"
+    oas = OAS()
+    unit = oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_Heavy_IGHA')
+    _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
+
+
+# --- Where there is smoke...
 
 if __name__ == '__main__':
     # Generate CLIs
