@@ -865,7 +865,7 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
 
 # --- Entry points
 
-def cache_oas_units_meta(recompute: bool = False, paired: bool = None):
+def cache_units_meta(recompute: bool = False, paired: bool = None):
     """
     Caches the OAS units metadata from the web and shows some information about them.
 
