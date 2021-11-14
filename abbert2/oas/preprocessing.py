@@ -4,6 +4,7 @@ import json
 import queue
 import threading
 import time
+import traceback
 from ast import literal_eval
 from itertools import chain
 from pathlib import Path, PurePosixPath
@@ -460,7 +461,9 @@ def _rename_by_chain_type(df, unit: Unit):
 def _process_oas_csv_unit(unit: Unit,
                           parallel: Parallel = None,
                           chunk_size: int = 5_000,
-                          verbose: bool = False) -> Tuple[Dict, Optional[pd.DataFrame]]:
+                          async_io: bool = True,
+                          verbose: bool = False,
+                          reraise: bool = False) -> Tuple[Dict, Optional[pd.DataFrame]]:
     """
     Parses an OAS unit in the new CSV format.
 
@@ -528,13 +531,20 @@ def _process_oas_csv_unit(unit: Unit,
 
         start = time.time()
 
+        chunks = chunk_consumer()
+        if not async_io:
+            chunks = list(chunk_consumer())
+
         # --- Do the actual work
 
-        dfs_logs = parallel(
-            delayed(_process_sequences_df)
-            (df=records, unit=unit, verbose=verbose)
-            for records in chunk_consumer()
-        )
+        if parallel is None:
+            dfs_logs = [_process_sequences_df(df=df, unit=unit, verbose=verbose) for df in chunks]
+        else:
+            dfs_logs = parallel(
+                delayed(_process_sequences_df)
+                (df=records, unit=unit, verbose=verbose)
+                for records in chunks
+            )
 
         # Keep around also worker logs
         processing_logs['worker_logs'] = [worker_log for _, worker_log in dfs_logs]
@@ -555,6 +565,10 @@ def _process_oas_csv_unit(unit: Unit,
         return processing_logs, df
 
     except Exception as ex:
+        if reraise:
+            raise
+        print(f'ERROR PROCESSING UNIT {unit.id}')
+        traceback.print_exc()
         processing_logs['error'] = ex
         return processing_logs, None
     finally:
