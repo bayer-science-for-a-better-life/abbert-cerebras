@@ -956,65 +956,49 @@ def cache_units_meta(recompute: bool = False, paired: bool = None):
         print(columns_df.groupby(['subset', 'column']).size())
 
 
-def reorganize_downloads(oas_path=None, symlink: bool = False):
-    """One-off script to reorganize flat downloads into a per-study per-unit directory hierarchy."""
+def download_units(oas_path=None,
+                   clean_not_in_meta: bool = False,
+                   ignore_with_caches: bool = False,
+                   n_jobs: int = 1,
+                   update: bool = False,
+                   dry_run: bool = False,
+                   no_drop_caches: bool = False,
+                   no_resume: bool = False):
+    """
+    Download OAS units.
 
-    import warnings
-    warnings.warn('reorganize_downloads is deprecated, please implement and use a unit-aware downloader',
-                  DeprecationWarning,
-                  stacklevel=2)
+    This should be run after `cache_units_meta`.
+    """
 
+    # Once we have downloaded the metadata from the web we can use our OAS abstraction
     if oas_path is None:
         oas_path = find_oas_path()
+    oas = OAS(oas_path=oas_path)
 
-    # Load all expected metadata
-    df = oas_units_meta(oas_path=oas_path, recompute=False, paired=None, keep_missing=False)
+    # Remove from disk units that do not appear in metadata
+    if clean_not_in_meta:
+        oas.remove_units_not_in_meta(dry_run=False)
 
-    def organized_path(row):
-        fn = row['url'].rpartition('/')[2]
-        return oas_path / 'organized' / row['oas_subset'] / row['study_id'] / fn.replace('.csv.gz', '') / fn
+    # Collect the units to download
+    units_to_download: List[Unit] = []
+    for unit in oas.units_in_meta():
+        if ignore_with_caches and unit.has_sequences:
+            continue
+        if update or unit.needs_redownload:
+            units_to_download.append(unit)
 
-    def unorganized_path(row):
-        fn = row['url'].rpartition('/')[2]
-        candidates = [
-            candidate
-            for candidate in (oas_path / row['oas_subset']).glob(f'{fn}*')
-            if candidate.stat().st_size == int(row['Content-Length'])
-        ]
-        if len(candidates) == 1:
-            return candidates[0]
+    size_to_download = sum(unit.online_csv_size_bytes for unit in units_to_download)
+    print(f'Downloading {len(units_to_download)} units ({size_to_download / 1024**2:.2f}MiB)')
 
-        if len(candidates) > 2:
-            raise Exception(f'Ambiguous download: {sorted(candidates)}')
-
-        return None
-
-    df['organized_path'] = df.apply(organized_path, axis=1)
-    df['unorganized_path'] = df.apply(unorganized_path, axis=1)
-
-    # TODO: also check and delete for organized_paths not anymore in the dataset
-    #       (glob, check not in "organized_path")
-    present_organized = set((oas_path / 'organized').glob('**/*.csv'))
-    spurious_organized = present_organized - set(df['organized_path'])
-    if spurious_organized:
-        print(f'Moving {sorted(spurious_organized)} to spurious')
-
-    # Make sure there are not file name clashes possible
-    assert df['organized_path'].nunique() == len(df)
-
-    # Organize
-    for _, row in df.query('unorganized_path == unorganized_path').iterrows():
-        print(f'START Moving {row["unorganized_path"]} to {row["organized_path"]}')
-        row['organized_path'].unlink(missing_ok=True)
-        row['organized_path'].parent.mkdir(parents=True, exist_ok=True)
-        if symlink:
-            row['organized_path'].symlink_to(row['unorganized_path'])
-        else:
-            row['unorganized_path'].rename(row['organized_path'])
-        print(f'DONE Moving {row["unorganized_path"]} to {row["organized_path"]}')
-
-    # TODO: make relative, ensure on existance that it is the same
-    # TODO: also check date (to see if we need to redownload)
+    # Do the download
+    Parallel(n_jobs=n_jobs, backend='threading')(
+        delayed(lambda unit: unit.download(force=update,
+                                           dry_run=dry_run,
+                                           drop_caches=not no_drop_caches,
+                                           resume=not no_resume))
+        (unit=unit)
+        for unit in sorted(units_to_download)
+    )
 
 
 def process_units(*,
