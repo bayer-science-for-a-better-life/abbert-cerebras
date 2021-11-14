@@ -1063,3 +1063,15 @@ if __name__ == '__main__':
             unit.sequences_df().info()
             unit.copy_to(Path.home() / 'small-oas-deleteme', max_num_sequences=100, overwrite=True)
         assert unit == unit
+
+#
+# BLOSUM FOR ANTIBODIES? Gabi:
+# Hiya! So - short answer: I don't think so.
+#
+# Long answer: The hypervariability of the CDRs is facilitated by these stretches containing
+# sequence motifs on DNA level that are recognized by some enzyme which then introduced base
+# changes that cause mutations. Because these exchanges have a certain probability to convert
+# one given base into a specific other base, there must be a bias for certain amino acid exchanges.
+# There's probably literature about these sequence motifs, but I to the best of my knowledge,
+# that has never been made into an exchange matrix...
+#
