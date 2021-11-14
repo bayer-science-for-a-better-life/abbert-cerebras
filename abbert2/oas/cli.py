@@ -1,6 +1,6 @@
 from abbert2.oas.oas import populate_metadata_jsons, extract_processed_oas, consolidate_all_units_stats, \
     summarize_count_stats, diagnose
-from abbert2.oas.preprocessing import cache_units_meta, process_units
+from abbert2.oas.preprocessing import cache_units_meta, process_units, download_units
 
 
 def main():
@@ -13,7 +13,9 @@ def main():
         cache_units_meta,
         # Step 2: Run this to populate individual unit metadata
         populate_metadata_jsons,
-        # Step 3: This will convert the CSVs to more efficient representations
+        # Step 3: Download the units (will take quite a while)
+        download_units,
+        # Step 4: Convert the CSVs to more efficient representations (will take a lot of time)
         process_units,
 
         # --- Maintenance commands
