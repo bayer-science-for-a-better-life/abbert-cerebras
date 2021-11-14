@@ -1034,6 +1034,31 @@ def train_validation_test_iterator(
                     #        observed in one unit, to troubleshoot
                     ...
 
+# --- Maintenance
+
+
+def diagnose():
+    """Shows some diagnose information, for example, what units have failed processing."""
+    from pprint import pprint
+
+    oas = OAS()
+    # oas.populate_metadata_jsons()
+    df = oas.nice_unit_meta_df(recompute=False, normalize_species=True)
+    df.info()
+
+    units_to_redownload = sorted(unit.id for unit in df.query('needs_redownload').unit)
+    print('UNITS to redownload')
+    pprint(units_to_redownload)
+    print('-' * 80)
+
+    units_missing_processing = sorted(unit.id for unit in df.query('sequences_miss_processing').unit)
+    print('UNITS missing processing')
+    pprint(units_missing_processing)
+    print('-' * 80)
+
+    return units_to_redownload, units_missing_processing
+
+
 # --- Smoke testing
 
 

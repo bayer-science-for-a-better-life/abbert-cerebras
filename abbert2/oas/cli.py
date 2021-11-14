@@ -1,5 +1,5 @@
 from abbert2.oas.oas import populate_metadata_jsons, extract_processed_oas, consolidate_all_units_stats, \
-    summarize_count_stats
+    summarize_count_stats, diagnose
 from abbert2.oas.preprocessing import cache_oas_units_meta, process_units
 
 
@@ -13,6 +13,7 @@ def main():
         extract_processed_oas,
         consolidate_all_units_stats,
         summarize_count_stats,
+        diagnose,
     ])
     parser.dispatch()
 
