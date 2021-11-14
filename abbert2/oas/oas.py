@@ -858,6 +858,58 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
     return summarized_stats
 
 
+def print_count_stats():
+    counts = summarize_count_stats(recompute=False)
+    for chain in ('heavy', 'light'):
+        # noinspection PyTypeChecker
+        df: pd.DataFrame = counts[chain]['aligned_position_counts']
+        # What did we get?
+        df.info()
+        print(f'Number of amino acids ({chain}): {df.loc["total", "total"]}')
+        print(f'Number of sequences   ({chain}): {df.loc["105", "total"]}')
+        #
+        # Number of amino acids (heavy): 151_036_497_653
+        # Number of sequences   (heavy):   1_375_745_760
+        # Number of amino acids (light):   3_956_316_690
+        # Number of sequences   (light):      36_803_062
+        #
+
+        # noinspection PyTypeChecker
+        counts[chain]['aligned_position_counts'] = df
+
+        print(f'Number of positions: {df.shape[0]}')
+        # 1240 different
+        for region, region_df in df.groupby('region'):
+            print(f'{region}:\tnum_positions={region_df.shape[0]:03d} num_tokens={region_df.shape[1]}')
+        #
+        # HEAVY:
+        # cdr1:	num_positions=030 num_tokens=24
+        # cdr2:	num_positions=034 num_tokens=24
+        # cdr3:	num_positions=065 num_tokens=24
+        # fr1:	num_positions=186 num_tokens=24
+        # fr2:	num_positions=233 num_tokens=24
+        # fr3:	num_positions=623 num_tokens=24
+        # fr4:	num_positions=068 num_tokens=24
+        # sequence:	num_positions=001 num_tokens=24
+        #
+        # LIGHT:
+        # cdr1:	num_positions=028 num_tokens=23
+        # cdr2:	num_positions=029 num_tokens=23
+        # cdr3:	num_positions=026 num_tokens=23
+        # fr1:	num_positions=169 num_tokens=23
+        # fr2:	num_positions=219 num_tokens=23
+        # fr3:	num_positions=405 num_tokens=23
+        # fr4:	num_positions=027 num_tokens=23
+        #
+
+        # Build a logo plot and a stacked plot for different regions
+        # Perhaps, collapse small tail positions
+        # Do histogram, nice normalized plus marginals
+
+        # TODO What is the story with '*'? => stop codon, remove
+        # TODO What is the story with 'X'?
+
+
 # --- Data partitioning and filtering examples
 
 def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
