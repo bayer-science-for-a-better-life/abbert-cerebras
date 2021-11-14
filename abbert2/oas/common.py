@@ -8,7 +8,7 @@ RELATIVE_OAS_TEST_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-test'
 RELATIVE_OAS_FULL_DATA_PATH = _RELATIVE_DATA_PATH / 'oas-full'
 
 
-def find_oas_path(oas_version='20210910', verbose=False):
+def find_oas_path(oas_version='20211114', verbose=False):
     """Try to infer where OAS lives."""
 
     try:
