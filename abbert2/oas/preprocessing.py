@@ -1003,6 +1003,9 @@ def download_units(oas_path=None,
         for unit in sorted(units_to_download)
     )
 
+    # Done!
+    print(f'DONE downloading {len(units_to_download)} units')
+
 
 def process_units(*,
                   oas_path=None,
