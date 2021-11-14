@@ -52,9 +52,11 @@ from typing import Tuple, Union, Iterator, Optional, List, Callable
 
 import numpy as np
 import pandas as pd
+import requests
 from joblib import Parallel, delayed
 from pyarrow import ArrowInvalid
 import pyarrow.parquet as pq
+from tqdm import tqdm
 
 from abbert2.common import to_json_friendly, from_parquet, mtime, to_parquet
 from abbert2.oas.common import find_oas_path, check_oas_subset
@@ -98,10 +100,16 @@ class OAS:
 
     @property
     def oas_path(self) -> Path:
+        """Returns the path to the OAS dataset."""
         return self._oas_path
 
     @cached_property
-    def unit_metadata_df(self):
+    def unit_metadata_df(self) -> pd.DataFrame:
+        """
+        Returns the metadata collected for all the units collected from the internet.
+
+        This is a wrapper over `preprocessing.oas_units_meta`.
+        """
         from abbert2.oas.preprocessing import oas_units_meta
         return oas_units_meta(oas_path=self.oas_path,
                               paired=None,
@@ -116,14 +124,17 @@ class OAS:
             raise Exception(f'Cannot find metadata for unit ({oas_subset}, {study_id}, {unit_id})')
         return df.iloc[0].to_dict()
 
-    def populate_metadata_jsons(self):
-        # TODO: force update + flagging of changed or removed units (usual missing update lifecycle everywhere)
+    def populate_metadata_jsons(self, update: bool = False):
         for unit in self.units_in_meta():
-            _ = unit.metadata  # Side effects FTW
+            if update:
+                unit.update_metadata()
+            else:
+                _ = unit.metadata  # side effects FTW
 
     # --- Factories
 
     def unit(self, oas_subset: str, study_id: str, unit_id: str) -> 'Unit':
+        """Returns a unit for the given coordinates."""
         return Unit(oas_subset=oas_subset,
                     study_id=study_id,
                     unit_id=unit_id,
@@ -131,6 +142,7 @@ class OAS:
                     oas=self)
 
     def unit_from_path(self, path: Union[str, Path]) -> 'Unit':
+        """Makes a best effort to return a Unit given a path."""
         path = Path(path)
         if path.is_file():
             *_, oas_subset, study_id, unit_id, _ = path.parts
@@ -139,6 +151,18 @@ class OAS:
         return self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
 
     def units_in_disk(self, oas_subset: str = None) -> Iterator['Unit']:
+        """
+        Returns an iterator of units in disk.
+
+         A unit in disk is defined by the existence of a directory
+           oas_path/oas_subset/study_path/unit_path
+         No further checks are carried.
+
+        Parameters
+        ----------
+        oas_subset : "paired", "unpaired" or None
+          Which OAS subset to iterate. If None, iterate in order "paired" and "unpaired" subsets
+        """
         if oas_subset is None:
             yield from chain(self.units_in_disk(oas_subset='paired'), self.units_in_disk(oas_subset='unpaired'))
         else:
@@ -150,9 +174,22 @@ class OAS:
                             yield self.unit(oas_subset, study_path.stem, unit_path.stem)
 
     def units_in_meta(self) -> Iterator['Unit']:
+        """Returns an iterator of units in the collected OAS metadata."""
         df = self.unit_metadata_df
         for oas_subset, study_id, unit_id in zip(df['oas_subset'], df['study_id'], df['unit_id']):
             yield self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
+
+    def remove_units_not_in_meta(self, dry_run: bool = True):
+        """Removes all the units in disk that are not in meta."""
+        paths_in_disk = set(unit.path for unit in self.units_in_disk())
+        paths_in_meta = set(unit.path for unit in self.units_in_meta())
+        paths_to_remove = paths_in_disk - paths_in_meta
+        if paths_to_remove:
+            print(f'Removing {len(paths_to_remove)} units not present in meta')
+            for path in sorted(paths_to_remove):
+                print(f'Removing {path}')
+                if not dry_run:
+                    shutil.rmtree(path, ignore_errors=False)
 
     # --- Caches
 
@@ -291,11 +328,71 @@ class Unit:
         is_different_size = self.original_csv_path.stat().st_size != self.online_csv_size_bytes
         return is_old or is_different_size
 
+    def download(self,
+                 force: bool = False,
+                 dry_run: bool = True,
+                 drop_caches: bool = True,
+                 resume: bool = False):
+
+        print(f'Downloading {self.id}')
+
+        if not force and not self.needs_redownload:
+            print(f'\tNo need to redownload {self.id}')
+            return
+
+        if drop_caches:
+            print(f'\tRemove {self.id}: {self.path}')
+            if not dry_run:
+                shutil.rmtree(self.path, ignore_errors=False)
+
+        if dry_run:
+            print(f'\tDRY-RUN Not downloading {self.id}')
+            return
+
+        # Check that remote sizes coincide
+        remote_size = self.online_csv_size_bytes
+        remote_size_checked = int(requests.head(self.original_url).headers.get('content-length', 0))
+        if remote_size != remote_size_checked:
+            raise Exception(f'Remote size must coincide with metadata size '
+                            f'({remote_size_checked} != {remote_size})')
+
+        # Configure resuming appropriately
+        download_start_byte = 0
+        if resume and self.has_original_csv:
+            local_size = self.original_csv_path.stat().st_size
+            if local_size < remote_size:
+                download_start_byte = local_size
+
+        with requests.get(self.original_url,
+                          stream=True,
+                          headers={'Range': f'bytes={download_start_byte}-'}) as request:
+            self.path.mkdir(parents=True, exist_ok=True)
+            open_mode = 'wb' if 0 == download_start_byte else 'ab'
+            with self.original_csv_path.open(open_mode) as writer:
+                with tqdm(total=remote_size,
+                          unit='B',
+                          unit_scale=True,
+                          unit_divisor=1024,
+                          desc=str(self.id),
+                          initial=download_start_byte,
+                          ascii=True, miniters=1) as pbar:
+                    for chunk in request.iter_content(32 * 1024):
+                        writer.write(chunk)
+                        pbar.update(len(chunk))
+
     # --- Unit metadata
 
     @property
     def metadata_path(self) -> Path:
         return self.path / f'{self.unit_id}.metadata.json'
+
+    def update_metadata(self):
+        metadata = self.oas.unit_metadata(oas_subset=self.oas_subset,
+                                          study_id=self.study_id,
+                                          unit_id=self.unit_id)
+        metadata = {k: to_json_friendly(v) for k, v in metadata.items()}
+        self.persist_metadata(metadata)
+        return metadata
 
     @cached_property
     def metadata(self):
@@ -303,12 +400,7 @@ class Unit:
             with self.metadata_path.open('rt') as reader:
                 return json.load(reader)
         except (FileNotFoundError, IOError, JSONDecodeError):
-            metadata = self.oas.unit_metadata(oas_subset=self.oas_subset,
-                                              study_id=self.study_id,
-                                              unit_id=self.unit_id)
-            metadata = {k: to_json_friendly(v) for k, v in metadata.items()}
-            self.persist_metadata(metadata)
-            return metadata
+            return self.update_metadata()
 
     @cached_property
     def nice_metadata(self):
