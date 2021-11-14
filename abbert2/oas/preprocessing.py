@@ -791,6 +791,8 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
             )
         return pd.concat(subset_dfs).reset_index(drop=True)
 
+    if oas_path is None:
+        oas_path = find_oas_path()
     path = Path(oas_path) / ('paired' if paired else 'unpaired')
 
     # check the download script exists
