@@ -167,7 +167,7 @@ class OAS:
                           recompute: bool = False,
                           normalize_species: bool = True) -> pd.DataFrame:
 
-        cache_path = self.oas_path / 'nice_unit_meta_df.parquet'
+        cache_path = self.oas_path / 'summaries' / 'nice_unit_meta_df.parquet'
 
         df = None
 
