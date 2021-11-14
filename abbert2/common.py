@@ -8,6 +8,8 @@ import pandas as pd
 import pyarrow as pa
 from pyarrow import parquet as pq
 
+from anarci.schemes import alphabet as anarci_insertion_alphabet
+
 # --- Proteins
 
 NATURAL_AMINO_ACIDS = 'ABCDEFGHIKLMNPQRSTUVWXYZ'
@@ -38,6 +40,26 @@ IUPAC_CODES = (
     ('Tyr', 'Y'),
     ('Glx', 'Z')
 )
+
+# --- Antibodies - ANARCI
+
+ANARCI_POSITION_REGEXP = re.compile(r'([0-1]+)([A-Z]*)')
+ANARCI_CODE2INSERTION = list(anarci_insertion_alphabet)
+ANARCI_INSERTION2CODE = {code: i + 1 for i, code in enumerate(anarci_insertion_alphabet[:-1])}
+ANARCI_INSERTION2CODE[''] = ANARCI_INSERTION2CODE[' '] = -1
+
+
+def parse_anarci_position(position):
+    match = ANARCI_POSITION_REGEXP.match(position)
+    return match.group(0), match.group(1)
+
+
+def anarci_code_to_insertion(code: int):
+    return ANARCI_CODE2INSERTION[code]
+
+
+def anarci_insertion_to_code(insertion: str):
+    return ANARCI_INSERTION2CODE[insertion.strip()]
 
 
 # --- JSON utils
