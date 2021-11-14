@@ -43,15 +43,15 @@ IUPAC_CODES = (
 
 # --- Antibodies - ANARCI
 
-ANARCI_POSITION_REGEXP = re.compile(r'([0-1]+)([A-Z]*)')
+ANARCI_POSITION_REGEXP = re.compile(r'([0-9]+)([A-Z]*)')
 ANARCI_CODE2INSERTION = list(anarci_insertion_alphabet)
 ANARCI_INSERTION2CODE = {code: i + 1 for i, code in enumerate(anarci_insertion_alphabet[:-1])}
 ANARCI_INSERTION2CODE[''] = ANARCI_INSERTION2CODE[' '] = -1
 
 
 def parse_anarci_position(position):
-    match = ANARCI_POSITION_REGEXP.match(position)
-    return match.group(0), match.group(1)
+    position, insertion = ANARCI_POSITION_REGEXP.match(position).groups()
+    return int(position), insertion
 
 
 def anarci_code_to_insertion(code: int):
