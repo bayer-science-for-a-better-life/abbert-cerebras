@@ -860,7 +860,9 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
     columns += [column for column in units_download_info_df.columns if column not in columns]
 
     # Make column_names play well with the likes of json
-    units_download_info_df['column_names'] = units_download_info_df['column_names'].apply(list)
+    units_download_info_df['column_names'] = units_download_info_df['column_names'].apply(
+        lambda x: x if pd.isnull(x) else list(x)
+    )
 
     return units_download_info_df[columns]
 
