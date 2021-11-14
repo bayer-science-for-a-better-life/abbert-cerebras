@@ -8,8 +8,9 @@ OAS home:
   http://opig.stats.ox.ac.uk/webapps/oas/
   (equivalently see antibodymap.org)
 
-OAS paper:
+OAS papers:
   https://www.jimmunol.org/content/201/8/2502
+  https://doi.org/10.1002/pro.4205
 
 OAS OPIG Blogposts:
   - https://www.blopig.com/blog/2018/06/how-to-parse-oas-data/
