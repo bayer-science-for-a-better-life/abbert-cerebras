@@ -18,7 +18,7 @@ from requests import HTTPError
 from smart_open import open
 
 from abbert2.oas.common import find_oas_path
-from abbert2.common import to_parquet, from_parquet
+from abbert2.common import to_parquet, from_parquet, parse_anarci_position, anarci_insertion_to_code
 from abbert2.oas.oas import OAS, Unit
 
 
@@ -244,12 +244,11 @@ def _preprocess_anarci_data(numbering_data_dict, locus, *, expected_sequence=Non
         # Sort the region AAs
         region_positions = []
         for position, aa in aas_in_region:
-            try:
-                position, insertion_code = int(position), ' '
-            except ValueError:
-                position, insertion_code = int(position[:-1]), position[-1]
-                # Got insertions
-                alignment_data[f'has_insertions_{heavy_or_light}'] = True
+            position, insertion = parse_anarci_position(position)
+            insertion_code = anarci_insertion_to_code(insertion)
+            # Got insertions
+            alignment_data[f'has_insertions_{heavy_or_light}'] = insertion_code != -1
+            if alignment_data[f'has_insertions_{heavy_or_light}']:
                 if position not in (111, 112):
                     alignment_data[f'has_unexpected_insertions_{heavy_or_light}'] = True
             if position in (23, 104) and aa != 'C':
@@ -257,8 +256,8 @@ def _preprocess_anarci_data(numbering_data_dict, locus, *, expected_sequence=Non
             if locus == 'K' and position == 21 and aa == '-':
                 alignment_data[f'has_kappa_gap_21_{heavy_or_light}'] = True
             # Mirroring of inserted residues
-            insertion_code_order = ord(insertion_code) if position not in (112, 62) else -ord(insertion_code)
-            region_positions.append((position, insertion_code_order, insertion_code, aa))
+            insertion_code_order = insertion_code if position not in (112, 62) else -insertion_code
+            region_positions.append((position, insertion_code_order, insertion, aa))
         region_positions = sorted(region_positions)
 
         alignment_data[f'aligned_sequence_{heavy_or_light}'] += [aa for *_, aa in region_positions]
