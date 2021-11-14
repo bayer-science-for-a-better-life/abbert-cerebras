@@ -776,7 +776,10 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
                    paired: bool = None,
                    keep_missing: bool = False,
                    recompute: bool = False,
-                   n_jobs: int = -1):
+                   n_jobs: int = -1) -> pd.DataFrame:
+    """
+    Returns a pandas dataframe with the metadata collected online from the units CSVs.
+    """
 
     if paired is None:
         # merge both paired and unpaired subsets
