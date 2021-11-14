@@ -1088,6 +1088,7 @@ def _processing_clis():
         command = (f'oas process-units '
                    f'--shard {shard_num} '
                    f'--n-shards {total_shards} '
+                   f'--unstable-shards '
                    f'--n-jobs {num_jobs} '
                    f'--chunk-size {chunk_size} '
                    f'&>shard-{shard_num}-{total_shards}-{machine}.log &')
