@@ -1190,7 +1190,7 @@ def parse_all_anarci_status():
                             parse_anarci_status(status)
                         except ValueError as ex:
                             print(ex)
-                except KeyError:
+                except AttributeError:
                     ...
 
 
