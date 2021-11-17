@@ -388,26 +388,6 @@ def _process_sequences_df(df, unit: Unit, verbose=False):
 
             record = {'index': index}
 
-            #
-            # TODO: Parse ANARCI status
-            # Maybe a link from here?
-            #   https://github.com/oxpig/saab_plus/blob/2cfbf90db8aba7da8ca900feae3ae3b250c6bf08/lib/python/saab_plus/aboss_utils/species_viability.py
-            # Hoping to come up with some documentation
-            #
-            # for message in anarci_status.split('|'):
-            #     if 1 < len(message):
-            #         name, value = message.split(':')
-            #         name = _to_snake_case(name)
-            #         if name == 'deletions':
-            #             ...
-            #         elif name == 'insertion':
-            #             ...
-            #         elif name == 'shorter_than_imgt_defined':
-            #             ...
-            #         else:
-            #             print(f'ANARCI_MESSAGE {message}')
-            #
-
             # Parse numbering
             numbering_start = time.time()
             numbering = _preprocess_anarci_data(literal_eval(numbering),
@@ -1123,6 +1103,89 @@ def check_parsing_corner_cases():
     oas = OAS()
     unit = oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_Heavy_IGHA')
     _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
+
+
+def parse_anarci_status(status: Optional[str]) -> Dict:
+    """
+    Parses the ANARCI status string in OAS and returns a dictionary with all violated QA tests.
+
+    From https://onlinelibrary.wiley.com/doi/10.1002/pro.4205
+    ---
+    For each sequence, the IMGT numbering scheme was added using
+    antibody numbering and antigen receptor classification (ANARCI) April 23, 2020.
+    Any sequence that ANARCI could not process was removed.
+    This step predominantly removes sequences that contain a stop codon.
+    An ANARCI status highlighting potential problems for each sequence is retained in the database.
+    This status contains comments regarding unusual residues, lack of conserved cysteines,
+    deletions and insertions outside of the CDRs, truncation of frameworks 1 or 4,
+    and if the CDR3 is longer than 37 residues.
+    Finally, sequences were grouped into units sharing the same metadata,
+    the same chain (e.g., heavy, light, or paired), and isotype.
+    ---
+
+    See also SAAB:
+    https://github.com/oxpig/saab_plus/blob/2cfbf90db8aba7da8ca900feae3ae3b250c6bf08/lib/python/saab_plus/aboss_utils/species_viability.py
+
+    Parameters
+    ----------
+    status : string or None
+      The status string as
+
+    Examples
+    --------
+    >>> parse_anarci_status(None)
+    {}
+    >>> parse_anarci_status('|Deletions: 1, 2||Missing Conserved Cysteine: 23|')
+    {'deletions': array([1, 2], dtype=uint8), 'missing_conserved_cysteine': array([23], dtype=uint8)}
+    """
+
+    if pd.isnull(status):
+        return {}
+
+    qas = {}
+
+    for qa_type, qa_details in (qa.split(':') for qa in status.split('|') if qa):
+        # Pattern Matching to come in py 3.10...
+        qa_type = qa_type.strip()
+        qa_details = qa_details.strip()
+        if qa_type == 'Deletions':
+            if 'deletions' in qas:
+                raise ValueError(f'Duplicated QA "Deletions" in ANARCI status "{status}"')
+            qas['deletions'] = np.array([int(position) for position in qa_details.split(',')], dtype=np.uint8)
+        elif qa_type == 'Missing Conserved Cysteine':
+            if 'missing_conserved_cysteine' in qas:
+                raise ValueError(f'Duplicated QA "Missing Conserved Cysteine" in ANARCI status "{status}"')
+            qas['missing_conserved_cysteine'] = np.array([int(position) for position in qa_details.split(',')],
+                                                         dtype=np.uint8)
+        elif qa_type == 'Shorter than IMGT defined':
+            if 'shorter_than_imgt_defined' in qas:
+                raise ValueError(f'Duplicated QA "Shorter than IMGT defined" in ANARCI status "{status}"')
+            qas['shorter_than_imgt_defined'] = qa_details
+        elif qa_type == 'Insertion':
+            if 'insertion' in qas:
+                raise ValueError(f'Duplicated QA "Insertion" in ANARCI status "{status}"')
+            qas['insertion'] = qa_details.replace(' ', '')
+        elif qa_type == 'Unusual residue':
+            if 'unusual_residue' in qas:
+                raise ValueError(f'Duplicated QA "Unusual residue" in ANARCI status "{status}"')
+            qas['unusual_residue'] = np.array(sorted(set(residue.strip() for residue in qa_details.split(','))),
+                                              dtype='S1')
+        else:
+            raise ValueError(f'Unknown QA type "{qa_type}" in ANARCI status "{status}"')
+
+    return qas
+
+
+def parse_all_anarci_status():
+    """Iterate over all anarci status and parse them."""
+    oas = OAS()
+    for unit in oas.units_in_meta():
+        print(unit.id)
+        if unit.has_sequences:
+            df = unit.sequences_df()
+            for status in df.anarci_status_heavy:
+                print(status)
+                parse_anarci_status(status)
 
 
 # --- Where there is smoke...
