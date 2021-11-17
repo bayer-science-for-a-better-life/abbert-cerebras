@@ -1184,8 +1184,10 @@ def parse_all_anarci_status():
         if unit.has_sequences:
             df = unit.sequences_df()
             for status in df.anarci_status_heavy:
-                print(status)
-                parse_anarci_status(status)
+                try:
+                    parse_anarci_status(status)
+                except ValueError as ex:
+                    print(ex)
 
 
 # --- Where there is smoke...
