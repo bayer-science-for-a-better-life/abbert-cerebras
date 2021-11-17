@@ -1183,11 +1183,15 @@ def parse_all_anarci_status():
         print(unit.id)
         if unit.has_sequences:
             df = unit.sequences_df()
-            for status in df.anarci_status_heavy:
+            for chain in ('heavy', 'light'):
                 try:
-                    parse_anarci_status(status)
-                except ValueError as ex:
-                    print(ex)
+                    for status in getattr(df, f'anarci_status_{chain}'):
+                        try:
+                            parse_anarci_status(status)
+                        except ValueError as ex:
+                            print(ex)
+                except KeyError:
+                    ...
 
 
 # --- Where there is smoke...
