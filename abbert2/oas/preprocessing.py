@@ -1201,9 +1201,6 @@ if __name__ == '__main__':
 
 # --- Brain dumps
 
-# TODO: Manage incremental updates to the dataset, maybe also taking care of the downloads ourselves here
-# TODO: even with the heavy and light complecity, still we are capturing only symmetryc dimers
-# TODO: play with arrow / parquet nested structures for vh/vl (although library conveniences are best here)
 # TODO: remove most HTTP headers from metadata (you lazy)
 
 #
