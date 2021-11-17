@@ -1189,7 +1189,10 @@ def parse_all_anarci_status():
                         try:
                             parse_anarci_status(status)
                         except ValueError as ex:
-                            print(ex)
+                            if 'QA' in str(ex):
+                                print(str(ex))
+                            else:
+                                print(f'Exception for {status}: {str(ex)}')
                 except AttributeError:
                     ...
 
