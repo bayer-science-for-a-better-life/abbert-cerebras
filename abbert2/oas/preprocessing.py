@@ -248,7 +248,8 @@ def _preprocess_anarci_data(numbering_data_dict, locus, *, expected_sequence=Non
             position, insertion = parse_anarci_position(position)
             insertion_code = anarci_insertion_to_code(insertion)
             # Got insertions
-            alignment_data[f'has_insertions_{heavy_or_light}'] = insertion_code != -1
+            if insertion_code != -1:
+                alignment_data[f'has_insertions_{heavy_or_light}'] = True
             if alignment_data[f'has_insertions_{heavy_or_light}']:
                 if position not in (111, 112):
                     alignment_data[f'has_unexpected_insertions_{heavy_or_light}'] = True
