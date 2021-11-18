@@ -1114,6 +1114,7 @@ def _new_to_old_rule(new_rule: str) -> Tuple[str, str]:
         return 'Shorter than IMGT defined', new_rule.partition(' ')[0].strip()
     if new_rule.startswith('Unusual amino acid'):
         return 'Unusual residue', new_rule.split(':')[-1].strip()
+    raise ValueError(f'Do not know how to parse rule: "{new_rule}"')
 
 
 def parse_anarci_status(status: Optional[str]) -> Dict:
