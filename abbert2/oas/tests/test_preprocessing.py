@@ -13,6 +13,15 @@ ANARCI_STATUS_EXPECTATIONS = [
         }
     ),
 
+    (
+        '|Deletions: 1, 2|||Shorter than IMGT defined: fw1|CDR3 is over 37 aa long',
+        {
+            'deletions': np.array([1, 2], dtype=np.uint8),
+            'shorter_than_imgt_defined': 'fw1',
+            'cdr3_is_over_37_aa_long': True,
+        }
+    ),
+
     (None, {}),
 ]
 

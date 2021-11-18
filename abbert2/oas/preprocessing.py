@@ -1144,8 +1144,7 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
 
     qas = {}
 
-    for qa_type, qa_details in (qa.split(':') for qa in status.split('|') if qa):
-        # Pattern Matching to come in py 3.10...
+    for qa_type, qa_details in (qa.split(':') if ':' in qa else (qa, '') for qa in status.split('|') if qa):
         qa_type = qa_type.strip()
         qa_details = qa_details.strip()
         if qa_type == 'Deletions':
@@ -1170,6 +1169,8 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
                 raise ValueError(f'Duplicated QA "Unusual residue" in ANARCI status "{status}"')
             qas['unusual_residue'] = np.array(sorted(set(residue.strip() for residue in qa_details.split(','))),
                                               dtype='S1')
+        elif qa_type == 'CDR3 is over 37 aa long':
+            qas['cdr3_is_over_37_aa_long'] = True
         else:
             raise ValueError(f'Unknown QA type "{qa_type}" in ANARCI status "{status}"')
 
