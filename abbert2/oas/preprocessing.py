@@ -1105,6 +1105,17 @@ def check_parsing_corner_cases():
     _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
 
 
+# --- Parsing ANARCI status
+
+def _new_to_old_rule(new_rule: str) -> Tuple[str, str]:
+    if new_rule == 'Missing Conserved Cysteine 23 or 104':
+        return 'Missing Conserved Cysteine', ''
+    if new_rule.endswith('is shorter than IMGT defined'):
+        return 'Shorter than IMGT defined', new_rule.partition(' ')[0].strip()
+    if new_rule.startswith('Unusual amino acid'):
+        return 'Unusual residue', new_rule.split(':')[-1].strip()
+
+
 def parse_anarci_status(status: Optional[str]) -> Dict:
     """
     Parses the ANARCI status string in OAS and returns a dictionary with all violated QA tests.
@@ -1144,7 +1155,14 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
 
     qas = {}
 
-    for qa_type, qa_details in (qa.split(':') if ':' in qa else (qa, '') for qa in status.split('|') if qa):
+    if status.startswith('['):
+        # Like "['Missing Conserved Cysteine 23 or 104', 'fw1 is shorter than IMGT defined']"
+        qas_iterator = (_new_to_old_rule(qa) for qa in literal_eval(status))
+    else:
+        # Like "|Deletions: 1, 2||Missing Conserved Cysteine: 23|"
+        qas_iterator = (qa.split(':') if ':' in qa else (qa, '') for qa in status.split('|') if qa)
+
+    for qa_type, qa_details in qas_iterator:
         qa_type = qa_type.strip()
         qa_details = qa_details.strip()
         if qa_type == 'Deletions':
@@ -1152,24 +1170,19 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
                 raise ValueError(f'Duplicated QA "Deletions" in ANARCI status "{status}"')
             qas['deletions'] = np.array([int(position) for position in qa_details.split(',')], dtype=np.uint8)
         elif qa_type == 'Missing Conserved Cysteine':
-            if 'missing_conserved_cysteine' in qas:
-                raise ValueError(f'Duplicated QA "Missing Conserved Cysteine" in ANARCI status "{status}"')
-            qas['missing_conserved_cysteine'] = np.array([int(position) for position in qa_details.split(',')],
-                                                         dtype=np.uint8)
+            qas['missing_conserved_cysteine'] = True
         elif qa_type == 'Shorter than IMGT defined':
-            if 'shorter_than_imgt_defined' in qas:
-                raise ValueError(f'Duplicated QA "Shorter than IMGT defined" in ANARCI status "{status}"')
-            qas['shorter_than_imgt_defined'] = qa_details
+            for region in qa_details.split(','):
+                qas[f'{region}_shorter_than_imgt_defined'] = True
         elif qa_type == 'Insertion':
             if 'insertion' in qas:
                 raise ValueError(f'Duplicated QA "Insertion" in ANARCI status "{status}"')
             qas['insertion'] = qa_details.replace(' ', '')
         elif qa_type == 'Unusual residue':
-            if 'unusual_residue' in qas:
-                raise ValueError(f'Duplicated QA "Unusual residue" in ANARCI status "{status}"')
-            qas['unusual_residue'] = np.array(sorted(set(residue.strip() for residue in qa_details.split(','))),
-                                              dtype='S1')
+            qas['unusual_residue'] = True
         elif qa_type == 'CDR3 is over 37 aa long':
+            if 'cdr3_is_over_37_aa_long' in qas:
+                raise ValueError(f'Duplicated QA "CDR3 is over 37 aa long" in ANARCI status "{status}"')
             qas['cdr3_is_over_37_aa_long'] = True
         else:
             raise ValueError(f'Unknown QA type "{qa_type}" in ANARCI status "{status}"')
