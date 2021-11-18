@@ -1,4 +1,6 @@
-"""Processing the original OAS data files."""
+"""
+Processing the original OAS data files into more convenient formats.
+"""
 import datetime
 import json
 import queue
@@ -22,6 +24,417 @@ from abbert2.oas.common import find_oas_path
 from abbert2.common import to_parquet, from_parquet, parse_anarci_position, anarci_insertion_to_code
 from abbert2.oas.oas import OAS, Unit
 
+
+#
+# --- Manipulation of OAS "bulk_download.sh" and unit metadata
+#
+# To get "bulk_download.sh" for *unpaired* data:
+#   - Go to http://opig.stats.ox.ac.uk/webapps/oas/oas
+#   - Click search without adding any filter
+#   - Download the shell script and put it under "<oas_root>/unpaired"
+#
+# To get "bulk_download.sh" for *paired* data:
+#   - Go to http://opig.stats.ox.ac.uk/webapps/oas/oas_paired
+#   - Click search without adding any filter
+#   - Download the shell script and put it under "<oas_root>/paired"
+#
+
+def _parse_oas_url(url: str) -> Dict[str, str]:
+    """
+    Parses a OAS URL as present in `bulk_download.sh`.
+
+    This function has also heuristics to detect changes in the URLs
+    that might be indicative of changes to the dataset.
+
+    Returns
+    -------
+    A dictionary with the following keys:
+      - oas_subset is either "paired" or "unpaired"
+      - study_id is the OAS study ID (typically name of first author_year of publication)
+      - unit_id is the OAS unit ID, currently defined by the filename without extension
+      - file_name is the file name of the unit
+      - origin_id is the ID to the raw data (usually a SRA id (https://www.ncbi.nlm.nih.gov/sra))
+      - origin_occurrence is an optional specialiser for the origin (like "1")
+      - chain: "Heavy" or "Light" for unpaired, None for paired
+      - isotype: "Bulk" for "Light", one of ("IGHA", "IGHG", "IGHM"...) if "Heavy", None if unpaired
+
+    Examples
+    --------
+    >>> url = 'http://opig.stats.ox.ac.uk/webapps/ngsdb/paired/Setliff_2019/csv/SRR10313332_paired.csv.gz'
+    >>> expected = {'oas_subset': 'paired',
+    ...             'study_id': 'Setliff_2019',
+    ...             'unit_id': 'SRR10313332_paired',
+    ...             'file_name': 'SRR10313332_paired.csv.gz',
+    ...             'origin_id': 'SRR10313332',
+    ...             'origin_occurrence': None,
+    ...             'chain': None,
+    ...             'isotype': None}
+    >>> _parse_oas_url(url) == expected
+    True
+
+    >>> url = 'http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Eliyahu_2018/csv/ERR2843400_Heavy_IGHE.csv.gz'
+    >>> expected = {'oas_subset': 'unpaired',
+    ...             'study_id': 'Eliyahu_2018',
+    ...             'unit_id': 'ERR2843400_Heavy_IGHE',
+    ...             'file_name': 'ERR2843400_Heavy_IGHE.csv.gz',
+    ...             'origin_id': 'ERR2843400',
+    ...             'origin_occurrence': None,
+    ...             'chain': 'Heavy',
+    ...             'isotype': 'IGHE'}
+    >>> _parse_oas_url(url) == expected
+    True
+
+    """
+    result = urlparse(_fix_oas_paired_url(url))
+    if result.scheme != 'http':
+        raise ValueError(f'URL {url} scheme must be http ({url})')
+    if result.netloc != 'opig.stats.ox.ac.uk':
+        raise ValueError(f'OAS seems to have been moved from "opig.stats.ox.ac.uk", update check ({url})')
+
+    parts = PurePosixPath(unquote(result.path)).parts
+    if 7 != len(parts):
+        raise ValueError(f'Expected 7 parts in the path for {url}, got ({len(parts)})')
+    if parts[:3] != ('/', 'webapps', 'ngsdb') or parts[5] != 'csv':
+        raise ValueError(f'Expected fixed parts do not match {url}')
+
+    *_, oas_subset, study_id, data_format, file_name = parts
+
+    if oas_subset not in ('unpaired', 'paired'):
+        raise ValueError(f'OAS subset not in ("paired", "unpaired") ({url})')
+
+    if oas_subset == 'paired':
+        origin_id, origin_occurrence, chain, isotype = file_name.split('_')[0], None, None, None
+    else:
+        parts = file_name.partition('.')[0].split('_')
+        try:
+            # Like: ERR2843400_Heavy_IGHE.csv.gz
+            origin_id, chain, isotype = parts
+            origin_occurrence = None
+        except ValueError:
+            try:
+                # Like: ERR1759659_1_Heavy_Bulk.csv.gz
+                # TODO: ask how to interpret these (1)
+                origin_id, origin_occurrence, chain, isotype = parts
+            except ValueError:
+                # Like: rettig_2018_04_Heavy_Bulk.csv.gz
+                # TODO: ask how to interpret these (2018, 04)
+                study_id_one, study_id_two, origin_occurrence, chain, isotype = parts
+                origin_id = study_id_one + study_id_two
+
+    return {'oas_subset': oas_subset,
+            'study_id': study_id,
+            'unit_id': file_name.replace('.csv.gz', ''),
+            'file_name': file_name,
+            'origin_id': origin_id,
+            'origin_occurrence': origin_occurrence,
+            'chain': chain,
+            'isotype': isotype}
+
+
+def _fix_oas_paired_url(url: str) -> str:
+    """
+    Fixes OAS paired URLs.
+
+    On 2021/09/10 there is a bug in the generation of bulk_download.sh for paired units.
+    This function should fix it, and should be applicable to any OAS URL.
+
+    Examples
+    --------
+    >>> broken_paired_url = 'http://opig.stats.ox.ac.uk/webapps/ngsdb/pairedSetliff_2019/csv/SRR10313332_paired.csv.gz'
+    >>> _fix_oas_paired_url(broken_paired_url)
+    'http://opig.stats.ox.ac.uk/webapps/ngsdb/paired/Setliff_2019/csv/SRR10313332_paired.csv.gz'
+
+    >>> fixed_paired_url = 'http://opig.stats.ox.ac.uk/webapps/ngsdb/paired/Setliff_2019/csv/SRR10313332_paired.csv.gz'
+    >>> _fix_oas_paired_url(fixed_paired_url)
+    'http://opig.stats.ox.ac.uk/webapps/ngsdb/paired/Setliff_2019/csv/SRR10313332_paired.csv.gz'
+
+    >>> unpaired_url = 'http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Eliyahu_2018/csv/ERR2843400_Heavy_IGHE.csv.gz'
+    >>> _fix_oas_paired_url(unpaired_url)
+    'http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Eliyahu_2018/csv/ERR2843400_Heavy_IGHE.csv.gz'
+    """
+    if 'ngsdb/paired/' not in url:
+        return url.replace('ngsdb/paired', 'ngsdb/paired/')
+    return url
+
+
+def _fix_bulk_download(path) -> List[str]:
+    """
+    Returns a list of wget commands, one per OAS unit to download.
+
+    Takes care of "fixing" the download scripts, returning a deduplicated set of valid urls.
+
+    As of 2021/09/10, there are two "problems" with these scripts:
+      - Broken URLs for the paired subset (simply forgotten to add “/” after “paired”)
+      - Duplicated file names in the unpaired subset (same SRA sequencing depositions in different studies)
+    """
+    path = Path(path)
+    urls = []
+    with path.open('rt') as reader:
+        for line in reader:
+            line = line.strip()
+            if line:
+                # Extract line
+                _, url = line.split()
+                # Sanity check
+                _parse_oas_url(url)
+                # Add
+                urls.append(_fix_oas_paired_url(url))
+
+    # Detect duplicates
+    deduplicated_urls = sorted(set(urls))
+    assert len(deduplicated_urls) == len(urls)
+    #
+    # But note there are duplicated file names in the unpaired subset.
+    # These seem to correstpont to the same SRA deposition used in different studies.
+    # An example:
+    #
+    # unpaired ❯❯❯ ls -l ERR1812282*
+    #   535643 Jul 29 00:42 ERR1812282_Heavy_Bulk.csv.gz
+    #   547554 Aug  7 12:24 ERR1812282_Heavy_Bulk.csv.gz.1
+    # 53716121 Jul 28 23:49 ERR1812282_Heavy_IGHA.csv.gz
+    # 53804472 Aug  7 11:32 ERR1812282_Heavy_IGHA.csv.gz.1
+    # 24014928 Jul 28 22:20 ERR1812282_Heavy_IGHE.csv.gz
+    # 24019976 Aug  7 10:03 ERR1812282_Heavy_IGHE.csv.gz.1
+    # 97540778 Jul 28 21:21 ERR1812282_Heavy_IGHG.csv.gz
+    # 97668180 Aug  7 09:04 ERR1812282_Heavy_IGHG.csv.gz.1
+    # 70807271 Jul 28 21:41 ERR1812282_Heavy_IGHM.csv.gz
+    # 70747184 Aug  7 09:25 ERR1812282_Heavy_IGHM.csv.gz.1
+    #
+    # Corresponding to:
+    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Levin_2017/csv/ERR1812282_Heavy_Bulk.csv.gz
+    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Levin_2017/csv/ERR1812282_Heavy_IGHM.csv.gz
+    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Levin_2017/csv/ERR1812282_Heavy_IGHE.csv.gz
+    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Levin_2017/csv/ERR1812282_Heavy_IGHA.csv.gz
+    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Levin_2017/csv/ERR1812282_Heavy_IGHG.csv.gz
+    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Thornqvist_2018/csv/ERR1812282_Heavy_Bulk.csv.gz
+    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Thornqvist_2018/csv/ERR1812282_Heavy_IGHM.csv.gz
+    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Thornqvist_2018/csv/ERR1812282_Heavy_IGHE.csv.gz
+    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Thornqvist_2018/csv/ERR1812282_Heavy_IGHA.csv.gz
+    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Thornqvist_2018/csv/ERR1812282_Heavy_IGHG.csv.gz
+    #
+    # So the issue is having the same RSA deposition across studies.
+    # An interesting question is if these get the same antibody information in OAS.
+    #
+
+    return deduplicated_urls
+
+
+def _download_units_info(urls: List[str],
+                         job_id: int = -1,
+                         verbose: bool = True,
+                         add_study_metadata: bool = True) -> pd.DataFrame:
+    import requests
+    with requests.Session() as session:
+        headers = []
+        url: str
+        for i, url in enumerate(urls):
+            header = {'url': url}
+            header.update(_parse_oas_url(url))
+            header.update(session.head(url).headers)
+            if add_study_metadata:
+                # TODO: can we reuse sessions / do one connection?
+                # TODO: get from local cache if possible
+                unit_metadata = _read_unit_metadata(url, add_column_names=True)
+                assert not (set(unit_metadata) & set(header))
+                header.update(unit_metadata)
+            if verbose:
+                print(f'job={job_id} unit={i + 1}/{len(urls)}: {header}')
+            headers.append(header)
+        return pd.DataFrame(headers)
+
+
+def oas_units_meta(oas_path: Union[str, Path] = None,
+                   paired: bool = None,
+                   keep_missing: bool = False,
+                   recompute: bool = False,
+                   n_jobs: int = -1) -> pd.DataFrame:
+    """
+    Returns a pandas dataframe with the metadata collected online from the units CSVs.
+    """
+
+    if paired is None:
+        # merge both paired and unpaired subsets
+        subset_dfs = []
+        for paired in (True, False):
+            subset_dfs.append(
+                oas_units_meta(oas_path=oas_path,
+                               recompute=recompute,
+                               paired=paired,
+                               keep_missing=keep_missing,
+                               n_jobs=n_jobs)
+            )
+        return pd.concat(subset_dfs).reset_index(drop=True)
+
+    if oas_path is None:
+        oas_path = find_oas_path()
+    path = Path(oas_path) / ('paired' if paired else 'unpaired')
+
+    # check the download script exists
+    bulk_download_path = path / 'bulk_download.sh'
+    if not bulk_download_path.is_file():
+        help_text = (f'To get the download script for {"*unpaired*" if not paired else "*paired*"} data:\n'
+                     f'  - Go to http://opig.stats.ox.ac.uk/webapps/oas/{"oas" if not paired else "oas_paired"}\n'
+                     f'  - Click search without adding any filter\n'
+                     f'  - Download the shell script and copy it to "{path.absolute()}"\n')
+        print(help_text)
+        raise Exception(f'{path} does not exist')
+
+    # parse it
+    urls = _fix_bulk_download(bulk_download_path)
+
+    # read cache or download
+    bulk_download_info_cache_path = bulk_download_path.with_suffix('.info.parquet')
+    try:
+        if recompute:
+            raise IOError
+        units_download_info_df = from_parquet(bulk_download_info_cache_path)
+    except IOError:
+        # Parallel download each unit metadata
+        n_jobs = effective_n_jobs(n_jobs) if n_jobs is not None else 64
+        units_download_info_df: pd.DataFrame = pd.concat(
+            Parallel(n_jobs=n_jobs, backend='threading')(
+                delayed(_download_units_info)(
+                    urls=list(urls_chunk),
+                    job_id=job_id,
+                    add_study_metadata=True,
+                    verbose=True
+                )
+                for job_id, urls_chunk in enumerate(distribute(n_jobs, urls))
+            )
+        ).reset_index(drop=True)
+        # Massage the dataframe
+        dtype = {
+            k: t for k, t in {'Age': str,
+                              'Unique sequences': pd.Int64Dtype(),
+                              'Total sequences': pd.Int64Dtype()}.items()
+            if k in units_download_info_df.columns
+        }
+        units_download_info_df = units_download_info_df.astype(dtype=dtype)
+        # noinspection PyTypeChecker
+        # Store as pickle (in cased debugging needs to happen)
+        units_download_info_df.to_pickle(bulk_download_info_cache_path.with_suffix('.pickle'))
+        # And as parquet, for consistency...
+        to_parquet(units_download_info_df, bulk_download_info_cache_path)
+
+    assert len(urls) == len(units_download_info_df)
+
+    if not keep_missing:
+        try:
+            units_download_info_df = units_download_info_df[units_download_info_df['http_error'].isnull()]
+        except KeyError:
+            ...  # No HTTP errors
+
+    # Account for legacy dumps
+    # FIXME: remove when dumps are updated
+    if 'unit_id' not in units_download_info_df.columns:
+        units_download_info_df['unit_id'] = units_download_info_df['file_name'].str.replace('.csv.gz', '', regex=False)
+
+    # Ensure unit_id is first in the frame
+    columns = ['oas_subset', 'study_id', 'unit_id']
+    columns += [column for column in units_download_info_df.columns if column not in columns]
+
+    # Make column_names play well with the likes of json
+    def to_list(x):
+        try:
+            return list(x)
+        except TypeError:
+            return None
+    units_download_info_df['column_names'] = units_download_info_df['column_names'].apply(to_list)
+
+    return units_download_info_df[columns]
+
+
+# --- Parsing ANARCI status
+
+def _new_to_old_rule(new_rule: str) -> Tuple[str, str]:
+    if new_rule == 'Missing Conserved Cysteine 23 or 104':
+        return 'Missing Conserved Cysteine', ''
+    if new_rule.endswith('is shorter than IMGT defined'):
+        return 'Shorter than IMGT defined', new_rule.partition(' ')[0].strip()
+    if new_rule.startswith('Unusual amino acid'):
+        return 'Unusual residue', new_rule.split(':')[-1].strip()
+    if new_rule.startswith('Insertion:'):
+        return 'Insertion', new_rule.rpartition(':')[2].strip()
+    raise ValueError(f'Do not know how to parse rule: "{new_rule}"')
+
+
+def parse_anarci_status(status: Optional[str]) -> Dict:
+    """
+    Parses the ANARCI status string in OAS and returns a dictionary with all violated QA tests.
+
+    From https://onlinelibrary.wiley.com/doi/10.1002/pro.4205
+    ---
+    For each sequence, the IMGT numbering scheme was added using
+    antibody numbering and antigen receptor classification (ANARCI) April 23, 2020.
+    Any sequence that ANARCI could not process was removed.
+    This step predominantly removes sequences that contain a stop codon.
+    An ANARCI status highlighting potential problems for each sequence is retained in the database.
+    This status contains comments regarding unusual residues, lack of conserved cysteines,
+    deletions and insertions outside of the CDRs, truncation of frameworks 1 or 4,
+    and if the CDR3 is longer than 37 residues.
+    Finally, sequences were grouped into units sharing the same metadata,
+    the same chain (e.g., heavy, light, or paired), and isotype.
+    ---
+
+    See also SAAB:
+    https://github.com/oxpig/saab_plus/blob/2cfbf90db8aba7da8ca900feae3ae3b250c6bf08/lib/python/saab_plus/aboss_utils/species_viability.py
+
+    Parameters
+    ----------
+    status : string or None
+      The status string as
+
+    Examples
+    --------
+    >>> parse_anarci_status(None)
+    {}
+    >>> parse_anarci_status('|Deletions: 1, 2||Missing Conserved Cysteine: 23|')
+    {'deletions': array([1, 2], dtype=uint8), 'missing_conserved_cysteine': array([23], dtype=uint8)}
+    """
+
+    if pd.isnull(status):
+        return {}
+
+    qas: Dict[str, Union[np.ndarray, set, list, bool]] = {}
+
+    if status.startswith('['):
+        # Like "['Missing Conserved Cysteine 23 or 104', 'fw1 is shorter than IMGT defined']"
+        qas_iterator = (_new_to_old_rule(qa) for qa in literal_eval(status))
+    else:
+        # Like "|Deletions: 1, 2||Missing Conserved Cysteine: 23|"
+        qas_iterator = (qa.split(':') if ':' in qa else (qa, '') for qa in status.split('|') if qa)
+
+    for qa_type, qa_details in qas_iterator:
+        qa_type = qa_type.strip()
+        qa_details = qa_details.strip()
+        if qa_type == 'Deletions':
+            for deletion in qa_details.split(','):
+                qas.setdefault('deletions', set()).add(int(deletion))
+        elif qa_type == 'Insertion':
+            for insertion in qa_details.split(','):
+                qas.setdefault('insertions', set()).add(insertion.strip())
+        elif qa_type == 'Missing Conserved Cysteine':
+            qas['missing_conserved_cysteine'] = True
+        elif qa_type == 'Shorter than IMGT defined':
+            for region in qa_details.split(','):
+                qas[f'{region}_shorter_than_imgt_defined'] = True
+        elif qa_type == 'Unusual residue':
+            qas['unusual_residue'] = True
+        elif qa_type == 'CDR3 is over 37 aa long':
+            qas['cdr3_is_over_37_aa_long'] = True
+        else:
+            raise ValueError(f'Unknown QA type "{qa_type}" in ANARCI status "{status}"')
+
+    if 'insertions' in qas:
+        qas['insertions'] = sorted(qas['insertions'])
+
+    if 'deletions' in qas:
+        qas['deletions'] = np.array(sorted(qas['deletions']), dtype=np.uint8)
+
+    return qas
+
+
+# --- Parse OAS CSV units
 
 def _read_unit_metadata(url_or_path, add_column_names=True):
     try:
@@ -80,20 +493,6 @@ ANARCI_IMGT_CDR_LENGTHS = {
     'cdr2': (0, 10),
     'cdr3': (0, 106),  # N.B. ANARCI limit 53 insertion codes x 2
 }
-
-#
-# --- Manipulation of OAS "bulk_download.sh" and unit metadata
-#
-# To get this file for *unpaired* data:
-#   - Go to http://opig.stats.ox.ac.uk/webapps/oas/oas
-#   - Click search without adding any filter
-#   - Download the shell script and put it under "<oas_root>/unpaired"
-#
-# To get this file for *paired* data:
-#   - Go to http://opig.stats.ox.ac.uk/webapps/oas/oas_paired
-#   - Click search without adding any filter
-#   - Download the shell script and put it under "<oas_root>/paired"
-#
 
 
 def _preprocess_anarci_data(numbering_data_dict, locus, *, expected_sequence=None, expected_cdr3=None) -> dict:
@@ -553,311 +952,6 @@ def _process_oas_csv_unit(unit: Unit,
             csv_chunk_reader.close()
 
 
-def _parse_oas_url(url: str) -> Dict[str, str]:
-    """
-    Parses a OAS URL as present in `bulk_download.sh`.
-
-    This function has also heuristics to detect changes in the URLs
-    that might be indicative of changes to the dataset.
-
-    Returns
-    -------
-    A dictionary with the following keys:
-      - oas_subset is either "paired" or "unpaired"
-      - study_id is the OAS study ID (typically name of first author_year of publication)
-      - unit_id is the OAS unit ID, currently defined by the filename without extension
-      - file_name is the file name of the unit
-      - origin_id is the ID to the raw data (usually a SRA id (https://www.ncbi.nlm.nih.gov/sra))
-      - origin_occurrence is an optional specialiser for the origin (like "1")
-      - chain: "Heavy" or "Light" for unpaired, None for paired
-      - isotype: "Bulk" for "Light", one of ("IGHA", "IGHG", "IGHM"...) if "Heavy", None if unpaired
-
-    Examples
-    --------
-    >>> url = 'http://opig.stats.ox.ac.uk/webapps/ngsdb/paired/Setliff_2019/csv/SRR10313332_paired.csv.gz'
-    >>> expected = {'oas_subset': 'paired',
-    ...             'study_id': 'Setliff_2019',
-    ...             'unit_id': 'SRR10313332_paired',
-    ...             'file_name': 'SRR10313332_paired.csv.gz',
-    ...             'origin_id': 'SRR10313332',
-    ...             'origin_occurrence': None,
-    ...             'chain': None,
-    ...             'isotype': None}
-    >>> _parse_oas_url(url) == expected
-    True
-
-    >>> url = 'http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Eliyahu_2018/csv/ERR2843400_Heavy_IGHE.csv.gz'
-    >>> expected = {'oas_subset': 'unpaired',
-    ...             'study_id': 'Eliyahu_2018',
-    ...             'unit_id': 'ERR2843400_Heavy_IGHE',
-    ...             'file_name': 'ERR2843400_Heavy_IGHE.csv.gz',
-    ...             'origin_id': 'ERR2843400',
-    ...             'origin_occurrence': None,
-    ...             'chain': 'Heavy',
-    ...             'isotype': 'IGHE'}
-    >>> _parse_oas_url(url) == expected
-    True
-
-    """
-    result = urlparse(_fix_oas_paired_url(url))
-    if result.scheme != 'http':
-        raise ValueError(f'URL {url} scheme must be http ({url})')
-    if result.netloc != 'opig.stats.ox.ac.uk':
-        raise ValueError(f'OAS seems to have been moved from "opig.stats.ox.ac.uk", update check ({url})')
-
-    parts = PurePosixPath(unquote(result.path)).parts
-    if 7 != len(parts):
-        raise ValueError(f'Expected 7 parts in the path for {url}, got ({len(parts)})')
-    if parts[:3] != ('/', 'webapps', 'ngsdb') or parts[5] != 'csv':
-        raise ValueError(f'Expected fixed parts do not match {url}')
-
-    *_, oas_subset, study_id, data_format, file_name = parts
-
-    if oas_subset not in ('unpaired', 'paired'):
-        raise ValueError(f'OAS subset not in ("paired", "unpaired") ({url})')
-
-    if oas_subset == 'paired':
-        origin_id, origin_occurrence, chain, isotype = file_name.split('_')[0], None, None, None
-    else:
-        parts = file_name.partition('.')[0].split('_')
-        try:
-            # Like: ERR2843400_Heavy_IGHE.csv.gz
-            origin_id, chain, isotype = parts
-            origin_occurrence = None
-        except ValueError:
-            try:
-                # Like: ERR1759659_1_Heavy_Bulk.csv.gz
-                # TODO: ask how to interpret these (1)
-                origin_id, origin_occurrence, chain, isotype = parts
-            except ValueError:
-                # Like: rettig_2018_04_Heavy_Bulk.csv.gz
-                # TODO: ask how to interpret these (2018, 04)
-                study_id_one, study_id_two, origin_occurrence, chain, isotype = parts
-                origin_id = study_id_one + study_id_two
-
-    return {'oas_subset': oas_subset,
-            'study_id': study_id,
-            'unit_id': file_name.replace('.csv.gz', ''),
-            'file_name': file_name,
-            'origin_id': origin_id,
-            'origin_occurrence': origin_occurrence,
-            'chain': chain,
-            'isotype': isotype}
-
-
-def _fix_oas_paired_url(url: str) -> str:
-    """
-    Fixes OAS paired URLs.
-
-    On 2021/09/10 there is a bug in the generation of bulk_download.sh for paired units.
-    This function should fix it, and should be applicable to any OAS URL.
-
-    Examples
-    --------
-    >>> broken_paired_url = 'http://opig.stats.ox.ac.uk/webapps/ngsdb/pairedSetliff_2019/csv/SRR10313332_paired.csv.gz'
-    >>> _fix_oas_paired_url(broken_paired_url)
-    'http://opig.stats.ox.ac.uk/webapps/ngsdb/paired/Setliff_2019/csv/SRR10313332_paired.csv.gz'
-
-    >>> fixed_paired_url = 'http://opig.stats.ox.ac.uk/webapps/ngsdb/paired/Setliff_2019/csv/SRR10313332_paired.csv.gz'
-    >>> _fix_oas_paired_url(fixed_paired_url)
-    'http://opig.stats.ox.ac.uk/webapps/ngsdb/paired/Setliff_2019/csv/SRR10313332_paired.csv.gz'
-
-    >>> unpaired_url = 'http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Eliyahu_2018/csv/ERR2843400_Heavy_IGHE.csv.gz'
-    >>> _fix_oas_paired_url(unpaired_url)
-    'http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Eliyahu_2018/csv/ERR2843400_Heavy_IGHE.csv.gz'
-    """
-    if 'ngsdb/paired/' not in url:
-        return url.replace('ngsdb/paired', 'ngsdb/paired/')
-    return url
-
-
-def _fix_bulk_download(path) -> List[str]:
-    """
-    Returns a list of wget commands, one per OAS unit to download.
-
-    Takes care of "fixing" the download scripts, returning a deduplicated set of valid urls.
-
-    As of 2021/09/10, there are two "problems" with these scripts:
-      - Broken URLs for the paired subset (simply forgotten to add “/” after “paired”)
-      - Duplicated file names in the unpaired subset (same SRA sequencing depositions in different studies)
-    """
-    path = Path(path)
-    urls = []
-    with path.open('rt') as reader:
-        for line in reader:
-            line = line.strip()
-            if line:
-                # Extract line
-                _, url = line.split()
-                # Sanity check
-                _parse_oas_url(url)
-                # Add
-                urls.append(_fix_oas_paired_url(url))
-
-    # Detect duplicates
-    deduplicated_urls = sorted(set(urls))
-    assert len(deduplicated_urls) == len(urls)
-    #
-    # But note there are duplicated file names in the unpaired subset.
-    # These seem to correstpont to the same SRA deposition used in different studies.
-    # An example:
-    #
-    # unpaired ❯❯❯ ls -l ERR1812282*
-    #   535643 Jul 29 00:42 ERR1812282_Heavy_Bulk.csv.gz
-    #   547554 Aug  7 12:24 ERR1812282_Heavy_Bulk.csv.gz.1
-    # 53716121 Jul 28 23:49 ERR1812282_Heavy_IGHA.csv.gz
-    # 53804472 Aug  7 11:32 ERR1812282_Heavy_IGHA.csv.gz.1
-    # 24014928 Jul 28 22:20 ERR1812282_Heavy_IGHE.csv.gz
-    # 24019976 Aug  7 10:03 ERR1812282_Heavy_IGHE.csv.gz.1
-    # 97540778 Jul 28 21:21 ERR1812282_Heavy_IGHG.csv.gz
-    # 97668180 Aug  7 09:04 ERR1812282_Heavy_IGHG.csv.gz.1
-    # 70807271 Jul 28 21:41 ERR1812282_Heavy_IGHM.csv.gz
-    # 70747184 Aug  7 09:25 ERR1812282_Heavy_IGHM.csv.gz.1
-    #
-    # Corresponding to:
-    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Levin_2017/csv/ERR1812282_Heavy_Bulk.csv.gz
-    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Levin_2017/csv/ERR1812282_Heavy_IGHM.csv.gz
-    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Levin_2017/csv/ERR1812282_Heavy_IGHE.csv.gz
-    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Levin_2017/csv/ERR1812282_Heavy_IGHA.csv.gz
-    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Levin_2017/csv/ERR1812282_Heavy_IGHG.csv.gz
-    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Thornqvist_2018/csv/ERR1812282_Heavy_Bulk.csv.gz
-    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Thornqvist_2018/csv/ERR1812282_Heavy_IGHM.csv.gz
-    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Thornqvist_2018/csv/ERR1812282_Heavy_IGHE.csv.gz
-    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Thornqvist_2018/csv/ERR1812282_Heavy_IGHA.csv.gz
-    # wget http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Thornqvist_2018/csv/ERR1812282_Heavy_IGHG.csv.gz
-    #
-    # So the issue is having the same RSA deposition across studies.
-    # An interesting question is if these get the same antibody information in OAS.
-    #
-
-    return deduplicated_urls
-
-
-def _download_units_info(urls: List[str],
-                         job_id: int = -1,
-                         verbose: bool = True,
-                         add_study_metadata: bool = True) -> pd.DataFrame:
-    import requests
-    with requests.Session() as session:
-        headers = []
-        url: str
-        for i, url in enumerate(urls):
-            header = {'url': url}
-            header.update(_parse_oas_url(url))
-            header.update(session.head(url).headers)
-            if add_study_metadata:
-                # TODO: can we reuse sessions / do one connection?
-                # TODO: get from local cache if possible
-                unit_metadata = _read_unit_metadata(url, add_column_names=True)
-                assert not (set(unit_metadata) & set(header))
-                header.update(unit_metadata)
-            if verbose:
-                print(f'job={job_id} unit={i + 1}/{len(urls)}: {header}')
-            headers.append(header)
-        return pd.DataFrame(headers)
-
-
-def oas_units_meta(oas_path: Union[str, Path] = None,
-                   paired: bool = None,
-                   keep_missing: bool = False,
-                   recompute: bool = False,
-                   n_jobs: int = -1) -> pd.DataFrame:
-    """
-    Returns a pandas dataframe with the metadata collected online from the units CSVs.
-    """
-
-    if paired is None:
-        # merge both paired and unpaired subsets
-        subset_dfs = []
-        for paired in (True, False):
-            subset_dfs.append(
-                oas_units_meta(oas_path=oas_path,
-                               recompute=recompute,
-                               paired=paired,
-                               keep_missing=keep_missing,
-                               n_jobs=n_jobs)
-            )
-        return pd.concat(subset_dfs).reset_index(drop=True)
-
-    if oas_path is None:
-        oas_path = find_oas_path()
-    path = Path(oas_path) / ('paired' if paired else 'unpaired')
-
-    # check the download script exists
-    bulk_download_path = path / 'bulk_download.sh'
-    if not bulk_download_path.is_file():
-        help_text = (f'To get the download script for {"*unpaired*" if not paired else "*paired*"} data:\n'
-                     f'  - Go to http://opig.stats.ox.ac.uk/webapps/oas/{"oas" if not paired else "oas_paired"}\n'
-                     f'  - Click search without adding any filter\n'
-                     f'  - Download the shell script and copy it to "{path.absolute()}"\n')
-        print(help_text)
-        raise Exception(f'{path} does not exist')
-
-    # parse it
-    urls = _fix_bulk_download(bulk_download_path)
-
-    # read cache or download
-    bulk_download_info_cache_path = bulk_download_path.with_suffix('.info.parquet')
-    try:
-        if recompute:
-            raise IOError
-        units_download_info_df = from_parquet(bulk_download_info_cache_path)
-    except IOError:
-        # Parallel download each unit metadata
-        n_jobs = effective_n_jobs(n_jobs) if n_jobs is not None else 64
-        units_download_info_df: pd.DataFrame = pd.concat(
-            Parallel(n_jobs=n_jobs, backend='threading')(
-                delayed(_download_units_info)(
-                    urls=list(urls_chunk),
-                    job_id=job_id,
-                    add_study_metadata=True,
-                    verbose=True
-                )
-                for job_id, urls_chunk in enumerate(distribute(n_jobs, urls))
-            )
-        ).reset_index(drop=True)
-        # Massage the dataframe
-        dtype = {
-            k: t for k, t in {'Age': str,
-                              'Unique sequences': pd.Int64Dtype(),
-                              'Total sequences': pd.Int64Dtype()}.items()
-            if k in units_download_info_df.columns
-        }
-        units_download_info_df = units_download_info_df.astype(dtype=dtype)
-        # noinspection PyTypeChecker
-        # Store as pickle (in cased debugging needs to happen)
-        units_download_info_df.to_pickle(bulk_download_info_cache_path.with_suffix('.pickle'))
-        # And as parquet, for consistency...
-        to_parquet(units_download_info_df, bulk_download_info_cache_path)
-
-    assert len(urls) == len(units_download_info_df)
-
-    if not keep_missing:
-        try:
-            units_download_info_df = units_download_info_df[units_download_info_df['http_error'].isnull()]
-        except KeyError:
-            ...  # No HTTP errors
-
-    # Account for legacy dumps
-    # FIXME: remove when dumps are updated
-    if 'unit_id' not in units_download_info_df.columns:
-        units_download_info_df['unit_id'] = units_download_info_df['file_name'].str.replace('.csv.gz', '', regex=False)
-
-    # Ensure unit_id is first in the frame
-    columns = ['oas_subset', 'study_id', 'unit_id']
-    columns += [column for column in units_download_info_df.columns if column not in columns]
-
-    # Make column_names play well with the likes of json
-    def to_list(x):
-        try:
-            return list(x)
-        except TypeError:
-            return None
-    units_download_info_df['column_names'] = units_download_info_df['column_names'].apply(to_list)
-
-    return units_download_info_df[columns]
-
-
 # --- Entry points
 
 def cache_units_meta(recompute: bool = False, paired: bool = None):
@@ -1087,105 +1181,6 @@ def _processing_clis():
             writer.write('\n'.join(commands))
 
 
-# --- Some things that should become proper tests
-
-def check_parsing_corner_cases():
-    # Very long CDR3s with insertions, codes at and beyond "AA"
-    oas = OAS()
-    unit = oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_Heavy_IGHA')
-    _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
-
-
-# --- Parsing ANARCI status
-
-def _new_to_old_rule(new_rule: str) -> Tuple[str, str]:
-    if new_rule == 'Missing Conserved Cysteine 23 or 104':
-        return 'Missing Conserved Cysteine', ''
-    if new_rule.endswith('is shorter than IMGT defined'):
-        return 'Shorter than IMGT defined', new_rule.partition(' ')[0].strip()
-    if new_rule.startswith('Unusual amino acid'):
-        return 'Unusual residue', new_rule.split(':')[-1].strip()
-    if new_rule.startswith('Insertion:'):
-        return 'Insertion', new_rule.rpartition(':')[2].strip()
-    raise ValueError(f'Do not know how to parse rule: "{new_rule}"')
-
-
-def parse_anarci_status(status: Optional[str]) -> Dict:
-    """
-    Parses the ANARCI status string in OAS and returns a dictionary with all violated QA tests.
-
-    From https://onlinelibrary.wiley.com/doi/10.1002/pro.4205
-    ---
-    For each sequence, the IMGT numbering scheme was added using
-    antibody numbering and antigen receptor classification (ANARCI) April 23, 2020.
-    Any sequence that ANARCI could not process was removed.
-    This step predominantly removes sequences that contain a stop codon.
-    An ANARCI status highlighting potential problems for each sequence is retained in the database.
-    This status contains comments regarding unusual residues, lack of conserved cysteines,
-    deletions and insertions outside of the CDRs, truncation of frameworks 1 or 4,
-    and if the CDR3 is longer than 37 residues.
-    Finally, sequences were grouped into units sharing the same metadata,
-    the same chain (e.g., heavy, light, or paired), and isotype.
-    ---
-
-    See also SAAB:
-    https://github.com/oxpig/saab_plus/blob/2cfbf90db8aba7da8ca900feae3ae3b250c6bf08/lib/python/saab_plus/aboss_utils/species_viability.py
-
-    Parameters
-    ----------
-    status : string or None
-      The status string as
-
-    Examples
-    --------
-    >>> parse_anarci_status(None)
-    {}
-    >>> parse_anarci_status('|Deletions: 1, 2||Missing Conserved Cysteine: 23|')
-    {'deletions': array([1, 2], dtype=uint8), 'missing_conserved_cysteine': array([23], dtype=uint8)}
-    """
-
-    if pd.isnull(status):
-        return {}
-
-    qas: Dict[str, Union[np.ndarray, set, list, bool]] = {}
-
-    if status.startswith('['):
-        # Like "['Missing Conserved Cysteine 23 or 104', 'fw1 is shorter than IMGT defined']"
-        qas_iterator = (_new_to_old_rule(qa) for qa in literal_eval(status))
-    else:
-        # Like "|Deletions: 1, 2||Missing Conserved Cysteine: 23|"
-        qas_iterator = (qa.split(':') if ':' in qa else (qa, '') for qa in status.split('|') if qa)
-
-    for qa_type, qa_details in qas_iterator:
-        qa_type = qa_type.strip()
-        qa_details = qa_details.strip()
-        if qa_type == 'Deletions':
-            for deletion in qa_details.split(','):
-                qas.setdefault('deletions', set()).add(int(deletion))
-        elif qa_type == 'Insertion':
-            for insertion in qa_details.split(','):
-                qas.setdefault('insertions', set()).add(insertion.strip())
-        elif qa_type == 'Missing Conserved Cysteine':
-            qas['missing_conserved_cysteine'] = True
-        elif qa_type == 'Shorter than IMGT defined':
-            for region in qa_details.split(','):
-                qas[f'{region}_shorter_than_imgt_defined'] = True
-        elif qa_type == 'Unusual residue':
-            qas['unusual_residue'] = True
-        elif qa_type == 'CDR3 is over 37 aa long':
-            qas['cdr3_is_over_37_aa_long'] = True
-        else:
-            raise ValueError(f'Unknown QA type "{qa_type}" in ANARCI status "{status}"')
-
-    if 'insertions' in qas:
-        qas['insertions'] = sorted(qas['insertions'])
-
-    if 'deletions' in qas:
-        qas['deletions'] = np.array(sorted(qas['deletions']), dtype=np.uint8)
-
-    return qas
-
-
 def parse_all_anarci_status():
     """
     Iterate over all anarci status and parse them.
@@ -1209,6 +1204,15 @@ def parse_all_anarci_status():
                                 print(f'Exception for {status}: {str(ex)}')
                 except AttributeError:
                     ...
+
+
+# --- Some things that should become proper tests
+
+def check_parsing_corner_cases():
+    # Very long CDR3s with insertions, codes at and beyond "AA"
+    oas = OAS()
+    unit = oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_Heavy_IGHA')
+    _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
 
 
 # --- Where there is smoke...
