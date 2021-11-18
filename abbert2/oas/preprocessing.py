@@ -1189,7 +1189,11 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
 
 
 def parse_all_anarci_status():
-    """Iterate over all anarci status and parse them."""
+    """
+    Iterate over all anarci status and parse them.
+
+    This is to find unsupported rules, as there are no specs for these strings.
+    """
     oas = OAS()
     for unit in oas.units_in_meta():
         print(unit.id)
