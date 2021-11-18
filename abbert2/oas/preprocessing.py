@@ -1181,8 +1181,6 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
         elif qa_type == 'Unusual residue':
             qas['unusual_residue'] = True
         elif qa_type == 'CDR3 is over 37 aa long':
-            if 'cdr3_is_over_37_aa_long' in qas:
-                raise ValueError(f'Duplicated QA "CDR3 is over 37 aa long" in ANARCI status "{status}"')
             qas['cdr3_is_over_37_aa_long'] = True
         else:
             raise ValueError(f'Unknown QA type "{qa_type}" in ANARCI status "{status}"')
