@@ -1114,6 +1114,8 @@ def _new_to_old_rule(new_rule: str) -> Tuple[str, str]:
         return 'Shorter than IMGT defined', new_rule.partition(' ')[0].strip()
     if new_rule.startswith('Unusual amino acid'):
         return 'Unusual residue', new_rule.split(':')[-1].strip()
+    if new_rule.startswith('Insertion:'):
+        return 'Insertion', new_rule.rpartition(':')[2].strip()
     raise ValueError(f'Do not know how to parse rule: "{new_rule}"')
 
 
@@ -1154,7 +1156,7 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
     if pd.isnull(status):
         return {}
 
-    qas = {}
+    qas: Dict[str, Union[np.ndarray, set, list, bool]] = {}
 
     if status.startswith('['):
         # Like "['Missing Conserved Cysteine 23 or 104', 'fw1 is shorter than IMGT defined']"
@@ -1167,24 +1169,28 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
         qa_type = qa_type.strip()
         qa_details = qa_details.strip()
         if qa_type == 'Deletions':
-            if 'deletions' in qas:
-                raise ValueError(f'Duplicated QA "Deletions" in ANARCI status "{status}"')
-            qas['deletions'] = np.array([int(position) for position in qa_details.split(',')], dtype=np.uint8)
+            for deletion in qa_details.split(','):
+                qas.setdefault('deletions', set()).add(int(deletion))
+        elif qa_type == 'Insertion':
+            for insertion in qa_details.split(','):
+                qas.setdefault('insertions', set()).add(insertion.strip())
         elif qa_type == 'Missing Conserved Cysteine':
             qas['missing_conserved_cysteine'] = True
         elif qa_type == 'Shorter than IMGT defined':
             for region in qa_details.split(','):
                 qas[f'{region}_shorter_than_imgt_defined'] = True
-        elif qa_type == 'Insertion':
-            if 'insertion' in qas:
-                raise ValueError(f'Duplicated QA "Insertion" in ANARCI status "{status}"')
-            qas['insertion'] = qa_details.replace(' ', '')
         elif qa_type == 'Unusual residue':
             qas['unusual_residue'] = True
         elif qa_type == 'CDR3 is over 37 aa long':
             qas['cdr3_is_over_37_aa_long'] = True
         else:
             raise ValueError(f'Unknown QA type "{qa_type}" in ANARCI status "{status}"')
+
+    if 'insertions' in qas:
+        qas['insertions'] = sorted(qas['insertions'])
+
+    if 'deletions' in qas:
+        qas['deletions'] = np.array(sorted(qas['deletions']), dtype=np.uint8)
 
     return qas
 
