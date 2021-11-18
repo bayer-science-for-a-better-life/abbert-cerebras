@@ -54,6 +54,13 @@ ANARCI_STATUS_EXPECTATIONS = [
         }
     ),
 
+    (
+        "['Insertion: 44A', 'Insertion: 44B']",
+        {
+            'insertions': ['44A', '44B'],
+        }
+    ),
+
     (None, {}),
 ]
 
