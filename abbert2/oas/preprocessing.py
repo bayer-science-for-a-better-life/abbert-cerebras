@@ -1195,7 +1195,7 @@ def parse_all_anarci_status():
     This is to find unsupported rules, as there are no specs for these strings.
     """
     oas = OAS()
-    for unit in oas.units_in_meta():
+    for unit in sorted(oas.units_in_meta()):
         print(unit.id)
         if unit.has_sequences:
             df = unit.sequences_df()
