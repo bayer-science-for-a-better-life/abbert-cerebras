@@ -201,9 +201,6 @@ def _preprocess_anarci_data(numbering_data_dict, locus, *, expected_sequence=Non
         f'has_wrong_sequence_reconstruction_{heavy_or_light}': None,
         f'has_wrong_cdr3_reconstruction_{heavy_or_light}': None,
         f'has_kappa_gap_21_{heavy_or_light}': False,
-        f'has_long_cdr1_{heavy_or_light}': None,
-        f'has_long_cdr2_{heavy_or_light}': None,
-        f'has_long_cdr3_{heavy_or_light}': None,
         # alignment
         f'has_insertions_{heavy_or_light}': False,
         f'fw1_start_{heavy_or_light}': None,
@@ -235,12 +232,6 @@ def _preprocess_anarci_data(numbering_data_dict, locus, *, expected_sequence=Non
         alignment_data[f'{region}_start_{heavy_or_light}'] = last_region_end if len(aas_in_region) else None
         alignment_data[f'{region}_length_{heavy_or_light}'] = len(aas_in_region)
         last_region_end += len(aas_in_region)
-
-        # Detect unsupported CDR lengths (we could do the same with framework regions)
-        if region.startswith('cdr') and 0 < len(aas_in_region):
-            alignment_data[f'has_long_{region}_{heavy_or_light}'] = (
-                    len(aas_in_region) > ANARCI_IMGT_CDR_LENGTHS[region][1]
-            )
 
         # Sort the region AAs
         region_positions = []
