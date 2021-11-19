@@ -531,15 +531,18 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
 
 # --- Parse OAS CSV units
 
-def _read_unit_metadata(url_or_path, add_column_names=True):
-    try:
-        with open(url_or_path) as reader:
-            metadata = parse_oas_metadata_json(next(reader))
-            if add_column_names:
-                metadata['column_names'] = [column.strip() for column in next(reader).split(',')]
-            return metadata
-    except HTTPError as ex:
-        return {'http_error': str(ex)}
+def _read_unit_metadata(url_or_path, add_column_names=True, num_retries=5):
+    error = None
+    for retry in range(num_retries):
+        try:
+            with open(url_or_path) as reader:
+                metadata = parse_oas_metadata_json(next(reader))
+                if add_column_names:
+                    metadata['column_names'] = [column.strip() for column in next(reader).split(',')]
+                return metadata
+        except HTTPError as ex:
+            error = ex
+    return {'http_error': str(error)}
 
 
 def parse_oas_metadata_json(metadata_json):
