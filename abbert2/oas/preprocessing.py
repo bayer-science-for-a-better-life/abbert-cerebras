@@ -593,7 +593,11 @@ ANARCI_IMGT_CDR_LENGTHS = {
 }
 
 
-def _preprocess_anarci_data(numbering_data_dict, locus, *, expected_sequence=None, expected_cdr3=None) -> dict:
+def _preprocess_anarci_data(numbering_data_dict, locus,
+                            *,
+                            expected_sequence=None,
+                            expected_cdr3=None,
+                            anarci_status=None) -> dict:
     """
     Parses the ANARCI imgt annotations in the original OAS units into a more efficient representation.
     Flags potential problems.
@@ -691,13 +695,6 @@ def _preprocess_anarci_data(numbering_data_dict, locus, *, expected_sequence=Non
 
     # We will populate all these fields for the current record
     alignment_data = {
-        # flags
-        f'unfit_{heavy_or_light}': False,
-        f'has_unexpected_insertions_{heavy_or_light}': False,
-        f'has_mutated_conserved_cysteines_{heavy_or_light}': False,
-        f'has_wrong_sequence_reconstruction_{heavy_or_light}': None,
-        f'has_wrong_cdr3_reconstruction_{heavy_or_light}': None,
-        f'has_kappa_gap_21_{heavy_or_light}': False,
         # alignment
         f'has_insertions_{heavy_or_light}': False,
         f'fw1_start_{heavy_or_light}': None,
@@ -717,6 +714,13 @@ def _preprocess_anarci_data(numbering_data_dict, locus, *, expected_sequence=Non
         f'aligned_sequence_{heavy_or_light}': [],
         f'positions_{heavy_or_light}': [],
         f'insertions_{heavy_or_light}': [],
+        # flags
+        f'unfit_{heavy_or_light}': False,
+        f'has_unexpected_insertions_{heavy_or_light}': False,
+        f'has_mutated_conserved_cysteines_{heavy_or_light}': False,
+        f'has_wrong_sequence_reconstruction_{heavy_or_light}': None,
+        f'has_wrong_cdr3_reconstruction_{heavy_or_light}': None,
+        f'has_kappa_gap_21_{heavy_or_light}': False,
     }
 
     last_region_end = 0
@@ -785,21 +789,15 @@ def _preprocess_anarci_data(numbering_data_dict, locus, *, expected_sequence=Non
                 alignment_data[f'aligned_sequence_{heavy_or_light}'][cdr3_start:cdr3_end].tobytes().decode('utf-8'))
             alignment_data[f'has_wrong_cdr3_reconstruction_{heavy_or_light}'] = aligned_cdr3 != expected_cdr3
 
-    # Final veredict about the fitness of the chain
-    QC_FLAGS = (
-        # f'has_unexpected_insertions_{heavy_or_light}',
-        f'has_mutated_conserved_cysteines_{heavy_or_light}',
-        # f'has_kappa_gap_21_{heavy_or_light}',
-        # f'has_wrong_sequence_reconstruction_{heavy_or_light}',
-        # f'has_wrong_cdr3_reconstruction_{heavy_or_light}',
-        # f'has_long_cdr1_{heavy_or_light}',
-        # f'has_long_cdr2_{heavy_or_light}',
-        # f'has_long_cdr3_{heavy_or_light}',
-    )
-    alignment_data[f'unfit_{heavy_or_light}'] = any(alignment_data[flag] for flag in QC_FLAGS)
+    # Add ANARCI QA flags
+    if anarci_status is not None:
+        anarci_status = {
+            f'anarci_{qa_name}_{heavy_or_light}': qa_value
+            for qa_name, qa_value in parse_anarci_status(anarci_status).items()
+        }
+        alignment_data.update(anarci_status)
 
     return alignment_data
-    # FIXME: all this string manipulation is going to pass a toll
 
 
 def _per_chain_columns(columns, df=None):
@@ -881,7 +879,8 @@ def _process_sequences_df(df, unit: Unit, verbose=False):
             numbering = _preprocess_anarci_data(literal_eval(numbering),
                                                 locus=locus,
                                                 expected_sequence=None,  # bring back if needed
-                                                expected_cdr3=cdr3_aa)
+                                                expected_cdr3=cdr3_aa,
+                                                anarci_status=anarci_status)
 
             record.update(numbering)
             processed_records.append(record)
