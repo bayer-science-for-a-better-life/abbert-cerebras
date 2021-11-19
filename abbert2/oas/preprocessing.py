@@ -1082,7 +1082,7 @@ def cache_units_meta(recompute: bool = False, paired: bool = None, n_jobs=-1):
         df = df[df.http_error.isnull()]
         if len(missing_downlods):
             print(f'Missing downloads: {len(missing_downlods)} ({sorted(missing_downlods.url)})')
-    except KeyError:
+    except (KeyError, AttributeError):
         ...
 
     # --- Simple size statistics, compare with reported numbers in the web
