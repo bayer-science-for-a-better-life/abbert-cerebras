@@ -1117,10 +1117,10 @@ def cache_units_meta(recompute: bool = False, paired: bool = None, n_jobs=-1):
     print('File size stats (in MiB)')
 
     def to_mib(value):
-        if value:
-            return value / 1024 ** 2
+        if not pd.isnull(value):
+            return int(value) / 1024 ** 2
         return value
-    df['file_size_MiB'] = df["Content-Length"].astype(pd.Int64Dtype()).apply(to_mib)
+    df['file_size_MiB'] = df["Content-Length"].apply(to_mib)
     print(f'Total download size: {df["file_size_MiB"].sum()} MiB')
     print(df['file_size_MiB'].describe())
     with pd.option_context('display.max_rows', None):
