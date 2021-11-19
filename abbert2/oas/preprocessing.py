@@ -1049,7 +1049,7 @@ def _process_oas_csv_unit(unit: Unit,
 
 # --- Entry points
 
-def cache_units_meta(recompute: bool = False, paired: bool = None):
+def cache_units_meta(recompute: bool = False, paired: bool = None, n_jobs=-1):
     """
     Caches the OAS units metadata from the web and shows some information about them.
 
@@ -1062,11 +1062,14 @@ def cache_units_meta(recompute: bool = False, paired: bool = None):
       If True, only report the paired subset.
       If False, only report the paired subset.
       If None, report both subsets
+
+    n_jobs: int, default -1
+      Number of jobs to use (joblib semantics)
     """
 
     # --- Load all units metadata and show schema
 
-    df = oas_units_meta(recompute=recompute, paired=paired, keep_missing=True)
+    df = oas_units_meta(recompute=recompute, paired=paired, keep_missing=True, n_jobs=n_jobs)
     df.info()
 
     # --- Report and get rid of downloads that are missing
