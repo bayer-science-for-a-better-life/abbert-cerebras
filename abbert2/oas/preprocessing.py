@@ -232,8 +232,6 @@ def _download_units_info(urls: List[str],
             header.update(_parse_oas_url(url))
             header.update(session.head(url).headers)
             if add_study_metadata:
-                # TODO: can we reuse sessions / do one connection?
-                # TODO: get from local cache if possible
                 unit_metadata = _read_unit_metadata(url, add_column_names=True)
                 assert not (set(unit_metadata) & set(header))
                 header.update(unit_metadata)
@@ -250,12 +248,102 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
                    n_jobs: int = -1) -> pd.DataFrame:
     """
     Returns a pandas dataframe with the metadata collected online from the units CSVs.
+
+    The dataframe looks like:
+    ---
+    RangeIndex: 12694 entries, 0 to 12693
+    Data columns (total 29 columns):
+     #   Column             Non-Null Count  Dtype
+    ---  ------             --------------  -----
+     0   oas_subset         12694 non-null  object
+     1   study_id           12694 non-null  object
+     2   unit_id            12694 non-null  object
+     3   url                12694 non-null  object
+     4   file_name          12694 non-null  object
+     5   origin_id          12694 non-null  object
+     6   origin_occurrence  902 non-null    object
+     7   chain              12647 non-null  object
+     8   Date               12694 non-null  object
+     9   Last-Modified      12694 non-null  object
+     10  Content-Length     12694 non-null  object
+     11  Run                12694 non-null  object
+     12  Link               12694 non-null  object
+     13  Author             12694 non-null  object
+     14  Species            12694 non-null  object
+     15  BSource            12694 non-null  object
+     16  BType              12694 non-null  object
+     17  Longitudinal       12694 non-null  object
+     18  Age                12694 non-null  object
+     19  Disease            12694 non-null  object
+     20  Subject            12694 non-null  object
+     21  Vaccine            12694 non-null  object
+     22  Chain              12694 non-null  object
+     23  Unique sequences   12694 non-null  Int64
+     24  Isotype            12694 non-null  object
+     25  Total sequences    12647 non-null  Int64
+     26  Organism           157 non-null    object
+     27  column_names       12694 non-null  object
+     28  http_error         0 non-null      object
+    dtypes: Int64(2), object(27)
+    memory usage: 2.8+ MB
+    {'Age': 'no',
+     'Author': 'Banerjee et al., 2017',
+     'BSource': 'Spleen',
+     'BType': 'Unsorted-B-Cells',
+     'Chain': 'Heavy',
+     'Content-Length': '680524887',
+     'Date': 'Sun, 14 Nov 2021 09:31:20 GMT',
+     'Disease': 'None',
+     'Isotype': 'Bulk',
+     'Last-Modified': 'Thu, 29 Jul 2021 11:26:52 GMT',
+     'Link': 'https://doi.org/10.1016/j.virol.2017.02.015',
+     'Longitudinal': 'Terminal-bleed',
+     'Organism': None,
+     'Run': 'SRR5060321',
+     'Species': 'rabbit',
+     'Subject': 'no',
+     'Total sequences': 2655033,
+     'Unique sequences': 1671672,
+     'Vaccine': 'HIV',
+     'chain': 'Heavy',
+     'column_names': ['sequence',
+                      ...                # many columns...
+                      'ANARCI_status'],
+     'file_name': 'SRR5060321_Heavy_Bulk.csv.gz',
+     'http_error': None,
+     'oas_subset': 'unpaired',
+     'origin_id': 'SRR5060321',
+     'origin_occurrence': None,
+     'study_id': 'Banerjee_2017',
+     'unit_id': 'SRR5060321_Heavy_Bulk',
+     'url': 'http://opig.stats.ox.ac.uk/webapps/ngsdb/unpaired/Banerjee_2017/csv/SRR5060321_Heavy_Bulk.csv.gz'}
+    ---
+
+    Parameters
+    ----------
+    oas_path : string or Path, default None
+      The path to the local OAS copy
+
+    paired : bool, default None
+      If True, return only the paired subset
+      If False, return only the unpaired subset
+      If None, return both subsets
+
+    keep_missing : bool, default False
+      If True, units with missing online presence (i.e., non existent URLs) are kept
+
+    recompute : bool, default False
+      If True redownload the metadata from the online CSVs
+      Otherwise try to use cached data
+
+    n_jobs : int, default -1
+      Number of jobs to use when collecting metadata online (joblib semantics)
     """
 
     if paired is None:
         # merge both paired and unpaired subsets
         subset_dfs = []
-        for paired in (True, False):
+        for paired in (False, True):
             subset_dfs.append(
                 oas_units_meta(oas_path=oas_path,
                                recompute=recompute,
@@ -324,15 +412,6 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
         except KeyError:
             ...  # No HTTP errors
 
-    # Account for legacy dumps
-    # FIXME: remove when dumps are updated
-    if 'unit_id' not in units_download_info_df.columns:
-        units_download_info_df['unit_id'] = units_download_info_df['file_name'].str.replace('.csv.gz', '', regex=False)
-
-    # Ensure unit_id is first in the frame
-    columns = ['oas_subset', 'study_id', 'unit_id']
-    columns += [column for column in units_download_info_df.columns if column not in columns]
-
     # Make column_names play well with the likes of json
     def to_list(x):
         try:
@@ -340,6 +419,22 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
         except TypeError:
             return None
     units_download_info_df['column_names'] = units_download_info_df['column_names'].apply(to_list)
+
+    # Remove some useless columns
+    units_download_info_df = units_download_info_df.drop(columns=[
+        'ETag',
+        'Server',
+        'Content-Type',
+        'Accept-Ranges',
+        'Proxy-Connection',
+        'isotype'
+    ])
+
+    # Ensure unit_id is first in the frame and some other mild column reordering
+    columns = ['oas_subset', 'study_id', 'unit_id']
+    trailing_columns = [column for column in ('column_names', 'http_error') if column in units_download_info_df.columns]
+    columns += [column for column in units_download_info_df.columns if column not in columns + trailing_columns]
+    columns += trailing_columns
 
     return units_download_info_df[columns]
 
@@ -1227,8 +1322,6 @@ if __name__ == '__main__':
         unit.sequences_df().info()
 
 # --- Brain dumps
-
-# TODO: remove most HTTP headers from metadata (you lazy)
 
 #
 # The world of zlib alternatives is quite interesting:
