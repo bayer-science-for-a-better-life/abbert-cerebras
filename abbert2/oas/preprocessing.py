@@ -674,8 +674,6 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
     #
     #   - wrong sequence reconstruction
     #
-    #   - unfit (having any of the previous)
-    #
 
     #
     # Slow, but since we run only once...
@@ -715,12 +713,18 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
         f'positions_{heavy_or_light}': [],
         f'insertions_{heavy_or_light}': [],
         # flags
-        f'unfit_{heavy_or_light}': False,
         f'has_unexpected_insertions_{heavy_or_light}': False,
         f'has_mutated_conserved_cysteines_{heavy_or_light}': False,
         f'has_wrong_sequence_reconstruction_{heavy_or_light}': None,
         f'has_wrong_cdr3_reconstruction_{heavy_or_light}': None,
         f'has_kappa_gap_21_{heavy_or_light}': False,
+        f'anarci_deletions_{heavy_or_light}': None,
+        f'anarci_insertions_{heavy_or_light}': None,
+        f'anarci_missing_conserved_cysteine_{heavy_or_light}': False,
+        f'anarci_unusual_residue_{heavy_or_light}': False,
+        f'anarci_fw1_shorter_than_imgt_defined_{heavy_or_light}': False,
+        f'anarci_fw4_shorter_than_imgt_defined_{heavy_or_light}': False,
+        f'anarci_cdr3_is_over_37_aa_long_{heavy_or_light}': False,
     }
 
     last_region_end = 0
