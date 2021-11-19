@@ -1262,7 +1262,7 @@ def _processing_clis():
     chunk_size = 8000
     machine_shards = {
         # 'dgx1': 8,
-        'dgx2': 20,
+        'dgx2': 40,
         # 'dgx3': 10,
         # 'dgx4': 28,
     }
