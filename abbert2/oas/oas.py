@@ -52,13 +52,14 @@ from typing import Tuple, Union, Iterator, Optional, List, Callable
 
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 import requests
 from joblib import Parallel, delayed
 from pyarrow import ArrowInvalid
-import pyarrow.parquet as pq
 from tqdm import tqdm
 
-from abbert2.common import to_json_friendly, from_parquet, mtime, to_parquet
+from abbert2.common import to_json_friendly, from_parquet, mtime, to_parquet, parse_anarci_position_aa_to_imgt_code, \
+    anarci_imgt_code_to_insertion, parse_anarci_position_to_imgt_code
 from abbert2.oas.common import find_oas_path, check_oas_subset
 
 
@@ -812,37 +813,13 @@ def consolidate_all_units_stats(oas_path: Optional[Union[str, Path]] = None,
     )
 
 
-def parse_position_insertion(position_insertion: str):
-    try:
-        position, insertion = int(position_insertion), 0
-    except ValueError:
-        position, insertion = int(position_insertion[:-1]), ord(position_insertion[-1])
-    # assume IMGT, and then insertions are sorted in reverse for position 112
-    # make the trick
-    if position == 112:
-        insertion = -insertion
-    return position, insertion
-
-
-def parse_position_aa(position_aa):
-    position, aa = position_aa.split('=')
-    position, insertion = parse_position_insertion(position)
-    return position, insertion, aa
-
-
-def code2letter(code):
-    if not code:
-        return ''
-    return chr(abs(code))
-
-
 def aligned_positions_to_df(aps):
 
     records = []
     for position_aa, count in aps.items():
-        position, insertion, aa = parse_position_aa(position_aa)
+        position, insertion, aa = parse_anarci_position_aa_to_imgt_code(position_aa)
         records.append({
-            'position': str(position) + code2letter(insertion),
+            'position': str(position) + anarci_imgt_code_to_insertion(insertion),
             'aa': aa,
             'count': count
         })
@@ -919,13 +896,13 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
         if apc_df is not None:
             apc_df = apc_df.sort_index(axis='columns')
             # Positions numbered-sorted
-            apc_df = apc_df.loc[sorted(apc_df.index, key=parse_position_insertion)]
+            apc_df = apc_df.loc[sorted(apc_df.index, key=parse_anarci_position_to_imgt_code)]
             # Use int type
             apc_df = apc_df.astype(pd.Int64Dtype())
             # Add a small indicator of the region
             from abnumber.common import SCHEME_POSITION_TO_REGION
             apc_df['region'] = apc_df.index.map(
-                lambda x: SCHEME_POSITION_TO_REGION['imgt'][parse_position_insertion(x)[0]].lower()
+                lambda x: SCHEME_POSITION_TO_REGION['imgt'][parse_anarci_position_to_imgt_code(x)[0]].lower()
             )
             apc_df = apc_df[['region'] + [column for column in apc_df.columns if column != 'region']]
             # Generate marginals
