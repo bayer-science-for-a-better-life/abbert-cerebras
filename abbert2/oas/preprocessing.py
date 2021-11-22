@@ -779,7 +779,7 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
     if expected_sequence is not None:
         # noinspection PyUnresolvedReferences
         alignment_data[f'has_wrong_sequence_reconstruction_{heavy_or_light}'] = (
-                alignment_data[f'aligned_sequence_{heavy_or_light}'].tobytes().decode('utf-8') != expected_sequence
+                alignment_data[f'aligned_sequence_{heavy_or_light}'] != expected_sequence
         )
     if expected_cdr3 is not None:
         if alignment_data[f'cdr3_start_{heavy_or_light}'] is None:
@@ -790,7 +790,7 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
                     alignment_data[f'cdr3_start_{heavy_or_light}'] + alignment_data[f'cdr3_length_{heavy_or_light}'])
             # noinspection PyUnresolvedReferences
             aligned_cdr3 = (
-                alignment_data[f'aligned_sequence_{heavy_or_light}'][cdr3_start:cdr3_end].tobytes().decode('utf-8'))
+                alignment_data[f'aligned_sequence_{heavy_or_light}'][cdr3_start:cdr3_end])
             alignment_data[f'has_wrong_cdr3_reconstruction_{heavy_or_light}'] = aligned_cdr3 != expected_cdr3
 
     # Add ANARCI QA flags
