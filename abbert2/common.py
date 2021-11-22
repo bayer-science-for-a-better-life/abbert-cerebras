@@ -189,7 +189,7 @@ def mtime(path: Optional[Union[str, Path]]) -> Optional[pd.Timestamp]:
 def to_parquet(df: pd.DataFrame,
                path: Union[Path, str],
                compression: Optional[str] = 'zstd',
-               compression_level: Optional[int] = 20,
+               compression_level: Optional[int] = 9,
                preserve_index=True,
                **write_table_kwargs):
     path = Path(path)
