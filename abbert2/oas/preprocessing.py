@@ -825,7 +825,7 @@ def _igblast_tf_to_bool(tf):
     raise ValueError(f'Unknown IGBLAST value {tf}')
 
 
-def _process_sequences_df(df, unit: Unit, verbose=False):
+def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True):
 
     logs = {'num_records': len(df)}
 
@@ -913,7 +913,7 @@ def _process_sequences_df(df, unit: Unit, verbose=False):
     # Drop some more redundant columns
     df = df.drop(columns=_per_chain_columns(('cdr3_aa', 'ANARCI_numbering'), df=df))
 
-    # Type and rename more columns
+    # Type and snake-casing more columns
     df = df.rename(columns={
         'Redundancy_heavy': 'redundancy_heavy',
         'ANARCI_status_heavy': 'anarci_status_heavy',
@@ -947,7 +947,96 @@ def _process_sequences_df(df, unit: Unit, verbose=False):
                                       'complete_vdj'),
                                      df=df):
         df[column] = df[column].apply(_igblast_tf_to_bool)
-        df = df.rename(columns={column: f'igblast_{column}'})
+
+    #
+    # TODO: keep making it a bit closer to AIRR
+    # see:
+    #   https://docs.airr-community.org/en/stable/
+    #   https://docs.airr-community.org/en/stable/datarep/rearrangements.html
+    #   https://docs.airr-community.org/en/stable/datarep/rearrangements.html#rearrangementschema
+    # e.g.
+    #   cdr3_start, cdr3_end -> based on 1-numbering and inclusive...
+    #
+
+    COLUMNS = {
+        # locus
+        'locus': None,
+        # germlines
+        'v_call': None,
+        'd_call': None,
+        'j_call': None,
+        # sequence
+        'aligned_sequence': 'sequence_aa',
+        # numbering
+        'positions': 'imgt_positions',    # Not sure if anything similar from AIRR
+        'insertions': 'imgt_insertions',  # Not sure if anything similar from AIRR
+        # is the alignment based on the opposite strand?
+        'rev_comp': None,
+        # junction
+        'junction_aa': None,
+        'junction_aa_length': None,
+        # regions (at the moment, python intervals)
+        'fw1_start': None,
+        'fw1_length': None,
+        'cdr1_start': None,
+        'cdr1_length': None,
+        'fw2_start': None,
+        'fw2_length': None,
+        'cdr2_start': None,
+        'fw3_start': None,
+        'fw3_length': None,
+        'cdr2_length': None,
+        'cdr3_start': None,
+        'cdr3_length': None,
+        'fw4_start': None,
+        'fw4_length': None,
+        # duplicate counts
+        'redundancy': 'duplicate_count',
+        # igblast / airr flags
+        'stop_codon': None,
+        'vj_in_frame': None,
+        'v_frameshift': None,
+        'productive': None,
+        'complete_vdj': None,
+        # our flags
+        'has_insertions': None,
+        'has_unexpected_insertions': None,
+        'has_mutated_conserved_cysteines': None,
+        'has_wrong_sequence_reconstruction': None,
+        'has_wrong_cdr3_reconstruction': None,
+        'has_kappa_gap_21': None,
+        # anarci flags
+        'anarci_deletions': None,
+        'anarci_insertions': None,
+        'anarci_missing_conserved_cysteine': None,
+        'anarci_unusual_residue': None,
+        'anarci_fw1_shorter_than_imgt_defined': None,
+        'anarci_fw4_shorter_than_imgt_defined': None,
+        'anarci_cdr3_is_over_37_aa_long': None,
+        'anarci_status': None,
+    }
+    renamer = {}
+    for chain in ('heavy', 'light'):
+        if f'locus_{chain}' not in df.columns:
+            continue
+        renamer.update({
+            f'{column}_{chain}': f'{column if new_name is None else new_name}_{chain}'
+            for column, new_name in COLUMNS.items()
+        })
+        renamer.update({
+            column: column for column in df.columns
+            if column.endswith(f'_{chain}') and column not in renamer
+        })
+    df = df.rename(columns=renamer)
+    df = df[list(renamer.values())]
+
+    # Drop anarci status?
+    if drop_anarci_status:
+        for chain in ('heavy', 'light'):
+            try:
+                del df[f'anarci_status_{chain}']
+            except KeyError:
+                ...
 
     # Done
     logs['taken_s'] = time.time() - start
