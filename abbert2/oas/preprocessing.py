@@ -947,6 +947,7 @@ def _process_sequences_df(df, unit: Unit, verbose=False):
                                       'complete_vdj'),
                                      df=df):
         df[column] = df[column].apply(_igblast_tf_to_bool)
+        df = df.rename(columns={column: f'igblast_{column}'})
 
     # Done
     logs['taken_s'] = time.time() - start
