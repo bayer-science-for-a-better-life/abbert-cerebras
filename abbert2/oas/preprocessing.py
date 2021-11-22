@@ -1028,7 +1028,7 @@ def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True
             if column.endswith(f'_{chain}') and column not in renamer
         })
     df = df.rename(columns=renamer)
-    df = df[list(renamer.values())]
+    df = df[[column for column in renamer.values() if column in df.columns]]
 
     # Drop anarci status?
     if drop_anarci_status:
