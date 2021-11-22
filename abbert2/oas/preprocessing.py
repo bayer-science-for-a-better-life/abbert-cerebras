@@ -770,7 +770,7 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
     #     they are less practical though.
     #   - Likely u1 dtype can work for positions (evaluate after collecting stats).
     alignment_data[f'aligned_sequence_{heavy_or_light}'] = (
-        np.array(alignment_data[f'aligned_sequence_{heavy_or_light}'], dtype='S1'))
+        ''.join(alignment_data[f'aligned_sequence_{heavy_or_light}']))  # FIXME: save as the needed bytes
     alignment_data[f'positions_{heavy_or_light}'] = (
         np.array(alignment_data[f'positions_{heavy_or_light}'], dtype=np.dtype('u2')))
     alignment_data[f'insertions_{heavy_or_light}'] = (
