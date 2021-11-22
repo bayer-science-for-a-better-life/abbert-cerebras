@@ -1368,7 +1368,7 @@ def process_units(*,
                                                          verbose=verbose)
                 logs.update(process_logs)
                 if df is not None:
-                    to_parquet(df, unit.sequences_path)
+                    to_parquet(df, unit.sequences_path, preserve_index=False)
                 else:
                     raise Exception('Workers error')
             except Exception as ex:
