@@ -10,7 +10,7 @@ import traceback
 from ast import literal_eval
 from itertools import chain
 from pathlib import Path, PurePosixPath
-from typing import Union, Tuple, Dict, Optional, List
+from typing import Union, Tuple, Dict, Optional, List, Sequence
 from urllib.parse import urlparse, unquote
 
 import numpy as np
@@ -804,13 +804,25 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
     return alignment_data
 
 
-def _per_chain_columns(columns, df=None):
+def _per_chain_columns(columns: Union[str, Sequence[str]],
+                       df: pd.DataFrame = None):
     if isinstance(columns, str):
         columns = [columns]
     possible_columns = [f'{column}_{chain}' for column in columns for chain in ('heavy', 'light')]
     if df is not None:
         possible_columns = [column for column in possible_columns if column in df.columns]
     return possible_columns
+
+
+def _igblast_tf_to_bool(tf):
+    """Make IGBLAST QA value into a bool."""
+    if pd.isnull(tf):
+        return tf
+    if tf == 'T':
+        return True
+    if tf == 'F':
+        return False
+    raise ValueError(f'Unknown IGBLAST value {tf}')
 
 
 def _process_sequences_df(df, unit: Unit, verbose=False):
@@ -901,16 +913,42 @@ def _process_sequences_df(df, unit: Unit, verbose=False):
     # Drop some more redundant columns
     df = df.drop(columns=_per_chain_columns(('cdr3_aa', 'ANARCI_numbering'), df=df))
 
-    # Type and rename a couple more columns
-    for column in _per_chain_columns('junction_aa_length', df=df):
-        df[column] = df[column].astype(pd.UInt16Dtype())
+    # Type and rename more columns
     df = df.rename(columns={
         'Redundancy_heavy': 'redundancy_heavy',
         'ANARCI_status_heavy': 'anarci_status_heavy',
         'Redundancy_light': 'redundancy_light',
         'ANARCI_status_light': 'anarci_status_light',
     })
+    for column in _per_chain_columns(('junction_aa_length',
+                                      'fw1_start',
+                                      'fw1_length',
+                                      'cdr1_start',
+                                      'cdr1_length',
+                                      'fw2_start',
+                                      'fw2_length',
+                                      'cdr2_start',
+                                      'cdr2_length',
+                                      'fw3_start',
+                                      'fw3_length',
+                                      'cdr3_start',
+                                      'cdr3_length',
+                                      'fw4_start',
+                                      'fw4_length',),
+                                     df=df):
+        df[column] = df[column].astype(pd.UInt16Dtype())
+    for column in _per_chain_columns('redundancy', df=df):
+        df[column] = df[column].astype(pd.UInt32Dtype())
+    for column in _per_chain_columns(('stop_codon',
+                                      'vj_in_frame',
+                                      'v_frameshift',
+                                      'productive',
+                                      'rev_comp',
+                                      'complete_vdj'),
+                                     df=df):
+        df[column] = df[column].apply(_igblast_tf_to_bool)
 
+    # Done
     logs['taken_s'] = time.time() - start
 
     if verbose:
