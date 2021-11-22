@@ -770,11 +770,11 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
     #     they are less practical though.
     #   - Likely u1 dtype can work for positions (evaluate after collecting stats).
     alignment_data[f'aligned_sequence_{heavy_or_light}'] = (
-        ''.join(alignment_data[f'aligned_sequence_{heavy_or_light}']))  # FIXME: save as the needed bytes
+        ''.join(alignment_data[f'aligned_sequence_{heavy_or_light}']))  # FIXME: save as the needed bytes or S1 dtype
     alignment_data[f'positions_{heavy_or_light}'] = (
         np.array(alignment_data[f'positions_{heavy_or_light}'], dtype=np.dtype('u2')))
     alignment_data[f'insertions_{heavy_or_light}'] = (
-        np.array(alignment_data[f'insertions_{heavy_or_light}'], dtype='S2')
+        alignment_data[f'insertions_{heavy_or_light}']  # should be dtype S2 when we figure out how to put it in parquet
         if alignment_data[f'has_insertions_{heavy_or_light}'] else None)
     if expected_sequence is not None:
         # noinspection PyUnresolvedReferences
