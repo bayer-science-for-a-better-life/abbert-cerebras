@@ -190,11 +190,12 @@ def to_parquet(df: pd.DataFrame,
                path: Union[Path, str],
                compression: Optional[str] = 'zstd',
                compression_level: Optional[int] = 20,
+               preserve_index=True,
                **write_table_kwargs):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     # noinspection PyArgumentList
-    pq.write_table(pa.Table.from_pandas(df), path,
+    pq.write_table(pa.Table.from_pandas(df, preserve_index=preserve_index), path,
                    compression=compression, compression_level=compression_level,
                    **write_table_kwargs)
 
