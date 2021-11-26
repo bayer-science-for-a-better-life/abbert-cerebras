@@ -720,9 +720,9 @@ class Unit:
         stats = {}
         for chain in self.present_chains:
             aligned_position_counts = defaultdict(int)
-            for sequence, positions, insertions in zip(df[f'aligned_sequence_{chain}'],
-                                                       df[f'positions_{chain}'],
-                                                       df[f'insertions_{chain}']):
+            for sequence, positions, insertions in zip(df[f'sequence_aa_{chain}'],
+                                                       df[f'imgt_positions_{chain}'],
+                                                       df[f'imgt_insertions_{chain}']):
                 if not isinstance(sequence, np.ndarray):
                     continue
                 insertions = () if not isinstance(insertions, np.ndarray) else insertions
