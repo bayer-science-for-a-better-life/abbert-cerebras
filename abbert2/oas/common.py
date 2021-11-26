@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+import numpy as np
+
 # --- Paths
 
 _RELATIVE_DATA_PATH = Path(__file__).parent.parent.parent / 'data'
@@ -55,3 +57,23 @@ def find_oas_path(oas_version='20211114', verbose=False):
 def check_oas_subset(subset: str):
     if subset not in ('paired', 'unpaired'):
         raise ValueError(f'subset should be one of ("paired", "unpaired"), but is {subset}')
+
+
+# --- Data
+
+def to_chain_independent(df, chains=('heavy', 'light'), add_index=True, add_chain=True):
+    if df is None:
+        return
+    if isinstance(chains, str):
+        chains = chains,
+    for chain in chains:
+        columns = [column for column in df.columns if column.endswith(f'_{chain}')]
+        if columns:
+            chain_df = df[columns].rename(columns=lambda column: column.rpartition('_')[0])
+            if 'chain' in chain_df.columns:
+                raise ValueError(f'"chain" should not appear as a column in the dataframe')
+            if add_chain:
+                chain_df['chain'] = chain
+            if add_index:
+                chain_df['index'] = np.arange(len(chain_df))
+            yield chain, chain_df
