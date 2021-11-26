@@ -827,11 +827,17 @@ def _igblast_tf_to_bool(tf):
 
 def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True):
 
+    start = time.time()
     logs = {'num_records': len(df)}
 
     # Make sure unpaired units get the same suffix as paired ones
-    start = time.time()
-    df = _rename_by_chain_type(df, unit=unit)
+    # Is this an unpaired unit? => Name as paired (clunky but works)
+    if 'sequence' in df.columns:
+        loci = df.locus.unique()
+        if len(loci) != 1:
+            raise Exception(f'More than one locus ({loci}) in unit {unit.path}')
+        suffix = '_heavy' if loci[0] == 'H' else '_light'
+        df = df.rename(columns=lambda colname: colname + suffix)
     logs['taken_rename_chain_type'] = time.time() - start
 
     # We will keep just a few of the many columns for the time being.
@@ -1045,17 +1051,6 @@ def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True
         print(f'DONE PARSING {len(df)} RECORDS IN {logs["taken_s"]:.2f} SECONDS')
 
     return df, logs
-
-
-def _rename_by_chain_type(df, unit: Unit):
-    # Is this an unpaired unit? => Name as paired (clunky but works)
-    if 'sequence' in df.columns:
-        loci = df.locus.unique()
-        if len(loci) != 1:
-            raise Exception(f'More than one locus ({loci}) in unit {unit.path}')
-        suffix = '_heavy' if loci[0] == 'H' else '_light'
-        df = df.rename(columns=lambda colname: colname + suffix)
-    return df
 
 
 def _process_oas_csv_unit(unit: Unit,
