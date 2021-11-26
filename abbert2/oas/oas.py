@@ -1009,9 +1009,6 @@ def print_count_stats():
         # Perhaps, collapse small tail positions
         # Do histogram, nice normalized plus marginals
 
-        # TODO What is the story with '*'? => stop codon, remove
-        # TODO What is the story with 'X'?
-
 
 # --- Data partitioning and filtering examples
 
