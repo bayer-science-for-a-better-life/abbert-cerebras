@@ -815,7 +815,7 @@ def _per_chain_columns(columns: Union[str, Sequence[str]],
 
 
 def _igblast_tf_to_bool(tf):
-    """Make IGBLAST QA value into a bool."""
+    """Cast IGBLAST QA value to bool."""
     if pd.isnull(tf):
         return tf
     if tf == 'T':
@@ -840,7 +840,7 @@ def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True
     # (as compression is per column and cannot realize the redundancy between columns).
     # If bringing back, the best would be to remove redundancy where possible
     # (e.g., by storing indices instead of substrings).
-    # Here an example record with values, for documentations
+    # Here an example record with selected values, for documentations
     SELECTED_UNPAIRED_RECORD_EXAMPLE = {
         'locus': 'H',
         'stop_codon': 'F',
