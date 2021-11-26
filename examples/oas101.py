@@ -2,6 +2,12 @@ from pprint import pprint
 
 from abbert2.oas import OAS, RELATIVE_OAS_TEST_DATA_PATH
 
+#
+# TODO: adapt example to new data format
+#   - update TEST_DATA
+#   - update column names and adapt to new type
+#
+
 # OAS is the entry point for the dataset
 oas = OAS(oas_path=RELATIVE_OAS_TEST_DATA_PATH)
 
