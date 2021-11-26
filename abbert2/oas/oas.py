@@ -1136,6 +1136,113 @@ def train_validation_test_iterator(
 # --- Maintenance
 
 
+def compare_csv_schemas():
+    """Compares the schemas of the original OAS CSVs."""
+
+    oas = OAS()
+
+    # What columns did we find in the original CSVs?
+    df = oas.unit_metadata_df
+    df['column_names'] = df.column_names.apply(
+        lambda x: tuple(sorted(set(x.replace('_heavy', '').replace('_light', '') for x in x)))
+    )
+    print(df.groupby('column_names').size())
+    print(df.groupby('column_names')['study_id'].unique())
+
+    # 12637 unpaired units have these columns
+    UNPAIRED = (
+        'ANARCI_numbering', 'ANARCI_status', 'Redundancy', 'c_region', 'cdr1', 'cdr1_aa', 'cdr1_end', 'cdr1_start',
+        'cdr2', 'cdr2_aa', 'cdr2_end', 'cdr2_start', 'cdr3', 'cdr3_aa', 'cdr3_end', 'cdr3_start', 'complete_vdj',
+        'd_alignment_end', 'd_alignment_start', 'd_call', 'd_cigar', 'd_germline_alignment', 'd_germline_alignment_aa',
+        'd_germline_end', 'd_germline_start', 'd_identity', 'd_score', 'd_sequence_alignment',
+        'd_sequence_alignment_aa', 'd_sequence_end', 'd_sequence_start', 'd_support', 'fwr1', 'fwr1_aa', 'fwr1_end',
+        'fwr1_start', 'fwr2',
+        'fwr2_aa', 'fwr2_end', 'fwr2_start', 'fwr3', 'fwr3_aa', 'fwr3_end', 'fwr3_start', 'fwr4', 'fwr4_aa', 'fwr4_end',
+        'fwr4_start', 'germline_alignment', 'germline_alignment_aa', 'j_alignment_end', 'j_alignment_start', 'j_call',
+        'j_cigar',
+        'j_germline_alignment', 'j_germline_alignment_aa', 'j_germline_end', 'j_germline_start', 'j_identity',
+        'j_score', 'j_sequence_alignment', 'j_sequence_alignment_aa', 'j_sequence_end', 'j_sequence_start', 'j_support',
+        'junction', 'junction_aa', 'junction_aa_length', 'junction_length', 'locus', 'np1', 'np1_length', 'np2',
+        'np2_length',
+        'productive', 'rev_comp', 'sequence', 'sequence_alignment', 'sequence_alignment_aa', 'stop_codon',
+        'v_alignment_end', 'v_alignment_start', 'v_call', 'v_cigar', 'v_frameshift', 'v_germline_alignment',
+        'v_germline_alignment_aa', 'v_germline_end', 'v_germline_start', 'v_identity', 'v_score',
+        'v_sequence_alignment', 'v_sequence_alignment_aa', 'v_sequence_end', 'v_sequence_start', 'v_support',
+        'vj_in_frame'
+    )
+
+    # 11 units from Briney_2019 have these columns
+    BRINEY = (
+        'ANARCI_numbering', 'ANARCI_status', 'Redundancy', 'c_region', 'cdr1', 'cdr1_aa', 'cdr1_end', 'cdr1_start',
+        'cdr2',
+        'cdr2_aa', 'cdr2_end', 'cdr2_start', 'cdr3', 'cdr3_aa', 'cdr3_end', 'cdr3_start', 'd_alignment_end',
+        'd_alignment_start', 'd_call', 'd_cigar', 'd_germline_alignment', 'd_germline_alignment_aa', 'd_germline_end',
+        'd_germline_start', 'd_identity', 'd_score', 'd_sequence_alignment', 'd_sequence_alignment_aa',
+        'd_sequence_end',
+        'd_sequence_start', 'd_support', 'fwr1', 'fwr1_aa', 'fwr1_end', 'fwr1_start', 'fwr2', 'fwr2_aa', 'fwr2_end',
+        'fwr2_start', 'fwr3', 'fwr3_aa', 'fwr3_end', 'fwr3_start', 'germline_alignment', 'germline_alignment_aa',
+        'j_alignment_end', 'j_alignment_start', 'j_call', 'j_cigar', 'j_germline_alignment', 'j_germline_alignment_aa',
+        'j_germline_end', 'j_germline_start', 'j_identity', 'j_score', 'j_sequence_alignment',
+        'j_sequence_alignment_aa',
+        'j_sequence_end', 'j_sequence_start', 'j_support', 'junction', 'junction_aa', 'junction_aa_length',
+        'junction_length', 'locus', 'np1', 'np1_length', 'np2', 'np2_length', 'productive', 'rev_comp', 'sequence',
+        'sequence_alignment', 'sequence_alignment_aa', 'stop_codon', 'v_alignment_end', 'v_alignment_start', 'v_call',
+        'v_cigar', 'v_germline_alignment', 'v_germline_alignment_aa', 'v_germline_end', 'v_germline_start',
+        'v_identity',
+        'v_score', 'v_sequence_alignment', 'v_sequence_alignment_aa', 'v_sequence_end', 'v_sequence_start', 'v_support',
+        'vj_in_frame'
+    )
+
+    # The 47 paired units have these columns
+    PAIRED = (
+        'ANARCI_numbering', 'ANARCI_status', 'cdr1', 'cdr1_aa', 'cdr1_end', 'cdr1_start', 'cdr2', 'cdr2_aa', 'cdr2_end',
+        'cdr2_start', 'cdr3', 'cdr3_aa', 'cdr3_end', 'cdr3_start', 'd_alignment_end', 'd_alignment_start', 'd_call',
+        'd_cigar', 'd_germline_alignment', 'd_germline_alignment_aa', 'd_germline_end', 'd_germline_start',
+        'd_identity',
+        'd_score', 'd_sequence_alignment', 'd_sequence_alignment_aa', 'd_sequence_end', 'd_sequence_start', 'd_support',
+        'fwr1', 'fwr1_aa', 'fwr1_end', 'fwr1_start', 'fwr2', 'fwr2_aa', 'fwr2_end', 'fwr2_start', 'fwr3', 'fwr3_aa',
+        'fwr3_end', 'fwr3_start', 'germline_alignment', 'germline_alignment_aa', 'j_alignment_end', 'j_alignment_start',
+        'j_call', 'j_cigar', 'j_germline_alignment', 'j_germline_alignment_aa', 'j_germline_end', 'j_germline_start',
+        'j_identity', 'j_score', 'j_sequence_alignment', 'j_sequence_alignment_aa', 'j_sequence_end',
+        'j_sequence_start',
+        'j_support', 'junction', 'junction_aa', 'junction_aa_length', 'junction_length', 'locus', 'np1', 'np1_length',
+        'np2', 'np2_length', 'productive', 'rev_comp', 'sequence', 'sequence_alignment', 'sequence_alignment_aa',
+        'sequence_id', 'stop_codon', 'v_alignment_end', 'v_alignment_start', 'v_call', 'v_cigar',
+        'v_germline_alignment',
+        'v_germline_alignment_aa', 'v_germline_end', 'v_germline_start', 'v_identity', 'v_score',
+        'v_sequence_alignment',
+        'v_sequence_alignment_aa', 'v_sequence_end', 'v_sequence_start', 'v_support', 'vj_in_frame'
+    )
+
+    print('U - B:', sorted(set(UNPAIRED) - set(BRINEY)))
+    print('B - U:', sorted(set(BRINEY) - set(UNPAIRED)))
+    print('U - P:', sorted(set(UNPAIRED) - set(PAIRED)))
+    print('P - U:', sorted(set(PAIRED) - set(UNPAIRED)))
+    #
+    # U - B: ['complete_vdj', 'fwr4', 'fwr4_aa', 'fwr4_end', 'fwr4_start', 'v_frameshift']
+    # B - U: []
+    # U - P: ['Redundancy', 'c_region', 'complete_vdj', 'fwr4', 'fwr4_aa', 'fwr4_end', 'fwr4_start', 'v_frameshift']
+    # P - U: ['sequence_id']
+    #
+    # Conclusions:
+    #   - we need to compute ourselves redundancy in the paired set
+    #   - all the other missing columns, we probably can live with
+    #
+
+
+def compare_new_schemas():
+    """Compares the schemas of the generated parquet files."""
+    oas = OAS()
+
+    column_sets = {}
+    for unit in oas.units_in_disk():
+        columns = unit.in_disk_column_names()
+        if columns:
+            unit_id = '-'.join(unit.id)
+            column_sets.setdefault(tuple(sorted(columns)), []).append(unit_id)
+    print(len(sorted(column_sets)))
+
+
 def diagnose():
     """Shows some diagnose information, for example, what units have failed processing."""
 
