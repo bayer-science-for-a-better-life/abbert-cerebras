@@ -628,18 +628,30 @@ class Unit:
             chains = chains + ('light',)
         return chains
 
-    @property
-    def has_heavy_sequences(self) -> bool:
+    def _schema_arrow(self):
         pq = self._pq()
         if pq is not None:
-            return -1 != self._pq().schema_arrow.get_field_index('aligned_sequence_heavy')
+            return self._pq().schema_arrow
+        return None
+
+    def in_disk_column_names(self):
+        schema = self._schema_arrow()
+        if schema is not None:
+            return schema.names
+        return None
+
+    @property
+    def has_heavy_sequences(self) -> bool:
+        schema = self._schema_arrow()
+        if schema is not None:
+            return -1 != schema.get_field_index('sequence_aa_heavy')
         return False
 
     @property
     def has_light_sequences(self) -> bool:
-        pq = self._pq()
-        if pq is not None:
-            return -1 != self._pq().schema_arrow.get_field_index('aligned_sequence_light')
+        schema = self._schema_arrow()
+        if schema is not None:
+            return -1 != schema.get_field_index('sequence_aa_light')
         return False
 
     @property
