@@ -606,7 +606,7 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
     #
     # Explaining what follows.
     #
-    # OAS was IMGT annotated with some (old?) version of ANARCI
+    # OAS was IMGT annotated with ANARCI 2020.04.23
     #   http://www.imgt.org/IMGTindex/numbering.php
     #
     # Theoretically IMGT insertions in CDR3 should only happen in residues 111 and 112
