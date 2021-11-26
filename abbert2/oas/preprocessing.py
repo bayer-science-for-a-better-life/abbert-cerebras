@@ -1133,7 +1133,7 @@ def _process_oas_csv_unit(unit: Unit,
         # --- Do the actual work
 
         if parallel is None:
-            dfs_logs = [_process_sequences_df(df=df, unit=unit, verbose=verbose) for df in chunks]
+            dfs_logs = [_process_sequences_df(df=records, unit=unit, verbose=verbose) for records in chunks]
         else:
             dfs_logs = parallel(
                 delayed(_process_sequences_df)
