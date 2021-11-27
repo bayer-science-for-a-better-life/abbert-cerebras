@@ -810,15 +810,15 @@ class Unit:
 
         # copy original csv
         if include_original_csv:
-            copy_but_do_not_overwrite(self.original_csv_path)
+            # +2: unit metadata and column names
+            copy_but_do_not_overwrite(self.original_csv_path, num_rows_header=max_num_sequences + 2)
 
 
 # --- Entry points
 
 
 def populate_metadata_jsons(oas_path: Path = None):
-    oas = OAS(oas_path=oas_path)
-    oas.populate_metadata_jsons()
+    OAS(oas_path=oas_path).populate_metadata_jsons()
 
 
 def extract_processed_oas(oas_path: Optional[Union[str, Path]] = None,
