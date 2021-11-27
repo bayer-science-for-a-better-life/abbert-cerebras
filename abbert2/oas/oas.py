@@ -777,11 +777,11 @@ class Unit:
             return None
 
         stats = {}
-        for chain in self.present_chains:
+        for chain, chain_df in df.groupby('chain'):
             aligned_position_counts = defaultdict(int)
-            for sequence, positions, insertions in zip(df[f'sequence_aa_{chain}'],
-                                                       df[f'imgt_positions_{chain}'],
-                                                       df[f'imgt_insertions_{chain}']):
+            for sequence, positions, insertions in zip(chain_df['sequence_aa'],
+                                                       chain_df['imgt_positions'],
+                                                       chain_df['imgt_insertions']):
                 if not isinstance(sequence, np.ndarray):
                     continue
                 insertions = () if not isinstance(insertions, np.ndarray) else insertions
@@ -789,17 +789,14 @@ class Unit:
                 for aa, position, insertion in zip_longest(sequence,
                                                            positions,
                                                            insertions,
-                                                           fillvalue=b''):
-                    position = f'{position}{insertion.decode("utf-8").strip()}'
-                    aa = aa.decode("utf-8")
-                    counts_key = f'{position}={aa}'
-                    aligned_position_counts[counts_key] += 1
+                                                           fillvalue=''):
+                    aligned_position_counts[f'{position}{insertion}={aa}'] += 1
             stats[chain] = {
                 'aligned_position_counts': dict(aligned_position_counts),
-                'sequence_length_counts': df[f'aligned_sequence_{chain}'].str.len().value_counts().to_dict(),
+                'sequence_length_counts': df[f'sequence_aa'].str.len().value_counts().to_dict(),
             }
             for region in ('fw1', 'cdr1', 'fw2', 'cdr2', 'fw3', 'cdr3', 'fw4'):
-                stats[chain][f'{region}_length_counts'] = df[f'{region}_length_{chain}'].value_counts().to_dict()
+                stats[chain][f'{region}_length_counts'] = df[f'{region}_length'].value_counts().to_dict()
             # TODO: collect other stats for things like QA, germlines...
         pd.to_pickle(stats, cache_path)
         return stats
