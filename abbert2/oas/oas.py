@@ -770,7 +770,7 @@ class Unit:
                 include_sequences: bool = True,
                 include_original_csv: bool = False,
                 include_stats: bool = False,
-                max_num_sequences: Optional[int] = None,
+                max_num_sequences: int = -1,
                 overwrite: bool = False):
 
         oas_path = Path(oas_path)
@@ -786,7 +786,7 @@ class Unit:
             if dest.is_file() and not overwrite:
                 raise Exception(f'Path already exists and will not overwrite ({dest})')
             dest_path.mkdir(parents=True, exist_ok=True)
-            if num_rows_header is None:
+            if num_rows_header < 0:
                 shutil.copy(src, dest)
             else:
                 # this should be used just for the CSV
@@ -800,7 +800,7 @@ class Unit:
 
         # copy processed sequences
         if include_sequences and self.has_sequences:
-            if max_num_sequences is None:
+            if max_num_sequences < 0:
                 copy_but_do_not_overwrite(self.sequences_path)
             else:
                 dest = dest_path / self.sequences_path.name
