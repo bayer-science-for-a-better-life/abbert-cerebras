@@ -324,21 +324,25 @@ if __name__ == '__main__':
 
     oas = OAS()
 
+    only_test = True
+
     TEST_UNITS = (
         oas.unit('unpaired', 'Gidoni_2019', 'ERR2567201_Heavy_IGHD'),
         oas.unit('unpaired', 'Greiff_2017', 'ERR1759628_Heavy_Bulk'),
         oas.unit('paired', 'Alsoiussi_2020', 'SRR11528761_paired'),
+        oas.unit('paired', 'Goldstein_2019', 'SRR9179276_paired')
     )
 
-    UNITS = oas.units_in_disk(oas_subset='unpaired')
+    UNITS = TEST_UNITS if only_test else oas.units_in_disk(oas_subset='unpaired')
 
     for unit in UNITS:
         if not unit.has_sequences:
             continue
         df = unit.sequences_df()
         filtered_df, logs = filter_df(df, unit=unit, keep_df_history=False)
-        print(pd.DataFrame(logs))
         print(f'{unit.id}: from {len(df)} to {len(filtered_df)}')
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            print(pd.DataFrame(logs)[['name', 'filtered_out', 'taken_s']])
         print('-' * 80)
 
 
