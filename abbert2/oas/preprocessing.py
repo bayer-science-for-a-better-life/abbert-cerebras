@@ -823,20 +823,27 @@ def _igblast_tf_to_bool(tf):
     raise ValueError(f'Unknown IGBLAST value {tf}')
 
 
-def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True):
+def _process_sequences_df(df: pd.DataFrame,
+                          unit: Unit,
+                          verbose=False,
+                          drop_anarci_status=True) -> Tuple[pd.DataFrame, dict]:
 
-    start = time.time()
-    logs = {'num_records': len(df)}
+    # --- basic sanity checks
 
-    # Make sure unpaired units get the same suffix as paired ones
-    # Is this an unpaired unit? => Name as paired (clunky but works)
-    if 'sequence' in df.columns:
+    if unit.oas_subset == 'paired' and ('locus_heavy' not in df.columns or 'locus_light' not in df.columns):
+        raise ValueError(f'Paired unit {unit.id} does not have correct locus columns')
+
+    if unit.oas_subset == 'unpaired' and 'locus' not in df.columns:
+        raise ValueError(f'Unaired unit {unit.id} does not have correct locus columns')
+
+    if unit.oas_subset == 'unpaired':
         loci = df.locus.unique()
         if len(loci) != 1:
-            raise Exception(f'More than one locus ({loci}) in unit {unit.path}')
-        suffix = '_heavy' if loci[0] == 'H' else '_light'
-        df = df.rename(columns=lambda colname: colname + suffix)
-    logs['taken_rename_chain_type'] = time.time() - start
+            raise ValueError(f'More than one locus ({loci}) in unit {unit.path}')
+
+    # --- do munging
+
+    logs = {'num_records': len(df)}
 
     # We will keep just a few of the many columns for the time being.
     # Note, nucleotides might be interested later on, together with some of the IgBlast gathered info.
@@ -898,7 +905,6 @@ def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True
             numbering_start = time.time()
             numbering = _preprocess_anarci_data(literal_eval(numbering),
                                                 locus=locus,
-                                                expected_sequence=None,  # bring back if needed
                                                 expected_cdr3=cdr3_aa,
                                                 anarci_status=anarci_status)
 
