@@ -1448,11 +1448,19 @@ def parse_all_anarci_status():
 
 # --- Some things that should become proper tests
 
-def check_parsing_corner_cases():
+def check_csv_parsing_corner_cases():
     # Very long CDR3s with insertions, codes at and beyond "AA"
     oas = OAS()
     unit = oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_Heavy_IGHA')
     _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
+
+
+def check_csv_parsing():
+    oas = OAS()
+    for unit in oas.units_in_disk(oas_subset='unpaired'):
+        _process_oas_csv_unit(unit=unit, async_io=False, verbose=True, reraise=True)
+    for unit in oas.units_in_disk(oas_subset='paired'):
+        _process_oas_csv_unit(unit=unit, async_io=True, chunk_size=1, verbose=True, reraise=True)
 
 
 # --- Where there is smoke...
