@@ -826,7 +826,7 @@ class Unit:
 # --- Entry points
 
 
-def populate_metadata_jsons(oas_path: Path = None):
+def populate_metadata_jsons(oas_path: Optional[Union[str, Path]] = None):
     OAS(oas_path=oas_path).populate_metadata_jsons()
 
 
