@@ -45,7 +45,7 @@ import shutil
 from builtins import IOError
 from collections import defaultdict
 from functools import cached_property, total_ordering
-from itertools import chain, zip_longest
+from itertools import chain, zip_longest, islice
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Tuple, Union, Iterator, Optional, List, Callable, Iterable
@@ -57,6 +57,8 @@ import requests
 from joblib import Parallel, delayed
 from pyarrow import ArrowInvalid
 from tqdm import tqdm
+
+from smart_open import open
 
 from abbert2.common import to_json_friendly, from_parquet, mtime, to_parquet, parse_anarci_position_aa_to_imgt_code, \
     anarci_imgt_code_to_insertion, parse_anarci_position_to_imgt_code
@@ -772,14 +774,21 @@ class Unit:
 
         dest_path = oas_path / self.oas_subset / self.study_id / self.unit_id
 
-        def copy_but_do_not_overwrite(src):
+        def copy_but_do_not_overwrite(src, num_rows_header=None):
             if not src.is_file():
                 return
             dest = dest_path / src.name
             if dest.is_file() and not overwrite:
                 raise Exception(f'Path already exists and will not overwrite ({dest})')
             dest_path.mkdir(parents=True, exist_ok=True)
-            shutil.copy(src, dest)
+            if num_rows_header is None:
+                shutil.copy(src, dest)
+            else:
+                # this should be used just for the CSV
+                with open(self.original_csv_path, 'rt') as reader:
+                    with open(dest, 'wt') as writer:
+                        for line in islice(reader, num_rows_header):
+                            writer.write(line)
 
         # copy metadata
         copy_but_do_not_overwrite(self.metadata_path)
