@@ -763,6 +763,7 @@ def _preprocess_anarci_data(numbering_data_dict,
         alignment_data['imgt_positions'] += [position for position, *_ in region_positions]
         alignment_data['imgt_insertions'] += [insertion for *_, insertion, _ in region_positions]
 
+    #
     # Make the alignment data a tad more efficient to work with. Still playing...
     #
     #   - Likely using arrays for aligned sequences is not needed.
@@ -776,6 +777,8 @@ def _preprocess_anarci_data(numbering_data_dict,
     alignment_data['imgt_insertions'] = (
         alignment_data['imgt_insertions']  # use only needed bytes / S2 dtype / int16 with mapped code?
         if alignment_data['has_insertions'] else None)
+
+    # Check expectations
     if expected_cdr3 is not None:
         if alignment_data['cdr3_start'] is None:
             alignment_data['has_wrong_cdr3_reconstruction'] = True
@@ -784,9 +787,9 @@ def _preprocess_anarci_data(numbering_data_dict,
             cdr3_end = (
                     alignment_data['cdr3_start'] + alignment_data['cdr3_length'])
             # noinspection PyUnresolvedReferences
-            aligned_cdr3 = (
+            anarci_cdr3 = (
                 alignment_data['sequence_aa'][cdr3_start:cdr3_end])
-            alignment_data['has_wrong_cdr3_reconstruction'] = aligned_cdr3 != expected_cdr3
+            alignment_data['has_wrong_cdr3_reconstruction'] = anarci_cdr3 != expected_cdr3
 
     # Add ANARCI QA flags
     if anarci_status is not None:
