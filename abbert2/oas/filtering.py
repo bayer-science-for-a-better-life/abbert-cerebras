@@ -1,6 +1,6 @@
 """Selecting antibodies across the OAS dataset."""
 import time
-from typing import Tuple, Sequence, Optional
+from typing import Tuple, Sequence, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -56,7 +56,6 @@ class MergeRedundant(Filter):
         return f'MergeRedundant(use_all_known={self.use_all_known})'
 
     def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
-
         if self.use_all_known:
             raise NotImplementedError
 
@@ -74,7 +73,6 @@ class MergeRedundant(Filter):
 
     @staticmethod
     def duplicates_within_same_unit_example():
-
         # --- VH Example
         # Are there duplicates within the same unit?
 
@@ -110,9 +108,9 @@ class OnlyProductive(Filter):
 
 
 class OnlyIsotypes(Filter):
-
     # As of 2021/11/26, OAS declares these isotypes at the unit level:
     POSSIBLE_ISOTYPES = 'Bulk', 'All', 'IGHM', 'IGHA', 'IGHE', 'IGHG', 'IGHD'
+
     # e.g., IgM might be better all filtered out because many never saw an antigen
 
     def __init__(self, isotypes=None) -> None:
@@ -323,44 +321,47 @@ class NoDuplicates(Filter):
         return df[no_duplicate]
 
 
-FILTERS = {
+def create_filters_from_name(name: str = 'none') -> Sequence[Filter]:
+    return {
+        'none': (),
 
-    'no-filters': (),
+        'default': (
+            OnlyProductive(),
+            NoShortFWR1(threshold=20),
+            NoShortFWR4(threshold=10),
+            NoInsertionsOutOfCDRs(),
+            NoUnsupportedCDR3Length(),
+            NoUnusualResidues(),
+            NoMissingConservedCysteine(),
+            NoKappaGap21(),
+            MergeRedundant(),
+            NoDuplicates(),
+        ),
 
-    'default': (
-        OnlyProductive(),
-        NoShortFWR1(threshold=20),
-        NoShortFWR4(threshold=10),
-        NoInsertionsOutOfCDRs(),
-        NoUnsupportedCDR3Length(),
-        NoUnusualResidues(),
-        NoMissingConservedCysteine(),
-        NoKappaGap21(),
-        MergeRedundant(),
-        NoDuplicates(),
-    ),
-
-    'most-strict': (
-        MergeRedundant(),
-        CountThreshold(threshold=3),
-        OnlyProductive(),
-        NoShortFWR1(threshold=20),
-        NoShortFWR4(threshold=10),
-        NoDeletions(),
-        NoInsertionsOutOfCDRs(),
-        NoUnsupportedCDR3Length(),
-        NoUnusualResidues(),
-        NoMissingConservedCysteine(),
-        NoKappaGap21(),
-        NoDuplicates(),
-    ),
-}
+        'most-strict': (
+            MergeRedundant(),
+            CountThreshold(threshold=3),
+            OnlyProductive(),
+            NoShortFWR1(threshold=20),
+            NoShortFWR4(threshold=10),
+            NoDeletions(),
+            NoInsertionsOutOfCDRs(),
+            NoUnsupportedCDR3Length(),
+            NoUnusualResidues(),
+            NoMissingConservedCysteine(),
+            NoKappaGap21(),
+            NoDuplicates(),
+        ),
+    }[name]
 
 
 def filter_df(df: pd.DataFrame,
               unit: Unit = None,
-              filters: Sequence[Filter] = FILTERS['default'],
+              *,
+              filters: Union[str, Sequence[Filter]] = 'default',
               keep_df_history: bool = False):
+    if isinstance(filters, str):
+        filters = create_filters_from_name(filters)
     logs = []
     for a_filter in filters:
         df, log = a_filter(df=df, unit=unit)
@@ -386,16 +387,17 @@ if __name__ == '__main__':
 
     UNITS = TEST_UNITS if only_test else oas.units_in_disk(oas_subset='unpaired')
 
+    filters = create_filters_from_name('default')
+
     for unit in UNITS:
         if not unit.has_sequences:
             continue
         df = unit.sequences_df()
-        filtered_df, logs = filter_df(df, unit=unit, keep_df_history=False)
+        filtered_df, logs = filter_df(df, filters=filters, unit=unit, keep_df_history=False)
         print(f'{unit.id}: from {len(df)} to {len(filtered_df)}')
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             print(pd.DataFrame(logs)[['name', 'filtered_out', 'taken_s']])
         print('-' * 80)
-
 
 #
 # ANTIBERTA PAPER:
