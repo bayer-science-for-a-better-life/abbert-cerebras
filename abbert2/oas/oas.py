@@ -851,7 +851,7 @@ class Unit:
                 if dest.is_file() and not overwrite:
                     raise Exception(f'Path already exists and will not overwrite ({dest})')
                 df = self.sequences_df()
-                if max_num_sequences:
+                if max_num_sequences >= 0:
                     df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
                 if filters:
                     # noinspection PyTypeChecker
