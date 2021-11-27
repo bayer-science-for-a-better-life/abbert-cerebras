@@ -512,7 +512,9 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
             qas['missing_conserved_cysteine'] = True
         elif qa_type == 'Shorter than IMGT defined':
             for region in qa_details.split(','):
-                qas[f'{region.strip()}_shorter_than_imgt_defined'] = True
+                region = region.strip()
+                region = {'fw1': 'fwr1', 'fw4': 'fwr4'}.get(region, region)
+                qas[f'{region}_shorter_than_imgt_defined'] = True
         elif qa_type == 'Unusual residue':
             qas['unusual_residue'] = True
         elif qa_type == 'CDR3 is over 37 aa long':
