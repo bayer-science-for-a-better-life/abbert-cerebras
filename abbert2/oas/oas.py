@@ -91,12 +91,14 @@ def _normalize_oas_species(species):
 
 # --- Misc utils
 
-def copy_but_do_not_overwrite(src, dest_path, *, num_rows_header=-1, overwrite=False):
+def copy_but_do_not_overwrite(src, dest_path, *, num_rows_header=-1, overwrite=False, fail_if_exists=False):
     if not src.is_file():
         return
     dest = dest_path / src.name
     if dest.is_file() and not overwrite:
-        raise Exception(f'Path already exists and will not overwrite ({dest})')
+        if fail_if_exists:
+            raise Exception(f'Path already exists and will not overwrite ({dest})')
+        return
     dest_path.mkdir(parents=True, exist_ok=True)
     if num_rows_header < 0:
         shutil.copy(src, dest)
