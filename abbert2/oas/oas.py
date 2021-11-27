@@ -192,7 +192,7 @@ class OAS:
             check_oas_subset(oas_subset)
             for study_path in sorted((self.oas_path / oas_subset).glob('*')):
                 if study_path.is_dir():
-                    for unit_path in study_path.glob('*'):
+                    for unit_path in sorted(study_path.glob('*')):
                         if unit_path.is_dir():
                             yield self.unit(oas_subset, study_path.stem, unit_path.stem)
 
