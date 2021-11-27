@@ -721,10 +721,15 @@ class Unit:
     def region_max_length(self, region='cdr3', chain='heavy') -> Optional[int]:
         pq = self._pq()
         if pq is not None:
-            column_index = pq.schema_arrow.get_field_index(f'{region}_length_{chain}')
-            if column_index != -1:
-                return max(pq.metadata.row_group(row_group).column(column_index).statistics.max
-                           for row_group in range(pq.metadata.num_row_groups))
+            if chain is None:
+                # leverage parquet precomputed column stats
+                column_index = pq.schema_arrow.get_field_index(f'{region}_length')
+                if column_index != -1:
+                    return max(pq.metadata.row_group(row_group).column(column_index).statistics.max
+                               for row_group in range(pq.metadata.num_row_groups))
+            df = self.sequences_df(columns=['chain', f'{region}_length']).query('chain == "{chain}"')
+            if df is not None and len(df):
+                return df[f'{region}_length'].max()
         return None
 
     @property
