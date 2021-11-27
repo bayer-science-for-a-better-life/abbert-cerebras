@@ -1433,18 +1433,17 @@ def parse_all_anarci_status():
         print(unit.id)
         if unit.has_sequences:
             df = unit.sequences_df()
-            for chain in ('heavy', 'light'):
-                try:
-                    for status in getattr(df, f'anarci_status_{chain}'):
-                        try:
-                            parse_anarci_status(status)
-                        except ValueError as ex:
-                            if 'QA' in str(ex):
-                                print(str(ex))
-                            else:
-                                print(f'Exception for {status}: {str(ex)}')
-                except AttributeError:
-                    ...
+            try:
+                for status in df.anarci_status:
+                    try:
+                        parse_anarci_status(status)
+                    except ValueError as ex:
+                        if 'QA' in str(ex):
+                            print(str(ex))
+                        else:
+                            print(f'Exception for {status}: {str(ex)}')
+            except AttributeError:
+                ...
 
 
 # --- Some things that should become proper tests
