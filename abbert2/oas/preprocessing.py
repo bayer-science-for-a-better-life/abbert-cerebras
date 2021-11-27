@@ -186,7 +186,7 @@ def _fix_bulk_download(path) -> List[str]:
     assert len(deduplicated_urls) == len(urls)
     #
     # But note there are duplicated file names in the unpaired subset.
-    # These seem to correstpont to the same SRA deposition used in different studies.
+    # These seem to correspond to the same SRA deposition used in different studies.
     # An example:
     #
     # unpaired ❯❯❯ ls -l ERR1812282*
