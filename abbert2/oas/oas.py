@@ -673,12 +673,10 @@ class Unit:
 
     @property
     def present_chains(self) -> Tuple[str, ...]:
-        chains = ()
-        if self.has_heavy_sequences:
-            chains = chains + ('heavy',)
-        if self.has_light_sequences:
-            chains = chains + ('light',)
-        return chains
+        df = self.sequences_df(columns='chain')
+        if df is None:
+            return ()
+        return tuple(sorted(df['chain'].unique()))
 
     def _schema_arrow(self):
         pq = self._pq()
