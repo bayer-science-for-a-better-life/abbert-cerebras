@@ -9,13 +9,13 @@ def populate_metadata_jsons(oas_path: Optional[Union[str, Path]] = None):
     OAS(oas_path=oas_path).populate_metadata_jsons()
 
 
-def extract_processed_oas(oas_path: Optional[Union[str, Path]] = None,
-                          dest_path: Path = Path.home() / 'oas-processed',
-                          include_sequences: bool = False,
-                          include_original_csv: bool = False,
-                          include_stats: bool = False,
-                          max_num_sequences: int = -1,
-                          overwrite: bool = False):
+def copy(oas_path: Optional[Union[str, Path]] = None,
+         dest_path: Path = Path.home() / 'oas-processed',
+         include_sequences: bool = False,
+         include_original_csv: bool = False,
+         include_stats: bool = False,
+         max_num_sequences: int = -1,
+         overwrite: bool = False):
     oas = OAS(oas_path=oas_path)
     for unit in oas.units_in_disk():
         if unit.has_sequences:
@@ -46,7 +46,7 @@ def main():
 
         # --- Maintenance commands
         # This allows to extract a copy of the processed units (e.g., to create tars)
-        extract_processed_oas,
+        copy,
         # This prints reports on the units
         diagnose,
         # This attemps to parse all collected anarci status
