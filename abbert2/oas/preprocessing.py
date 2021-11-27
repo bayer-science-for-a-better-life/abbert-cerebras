@@ -724,10 +724,13 @@ def _preprocess_anarci_data(numbering_data_dict,
         'anarci_cdr3_is_over_37_aa_long': False,
     }
 
+    expected_keys = set(region_key for region_key, _ in regions)
+    if not (expected_keys & set(numbering_data_dict)):
+        raise ValueError(f'ANARCI dictionary does not contain any expected key '
+                         f'({sorted(expected_keys)} vs {sorted(numbering_data_dict)}))')
+
     last_region_end = 0
     for region_key, region in regions:
-
-        # TODO: protect against wrong anarci dictionary
 
         # What AAs do we have in the region?
         aas_in_region = list(numbering_data_dict.get(region_key, {}).items())
