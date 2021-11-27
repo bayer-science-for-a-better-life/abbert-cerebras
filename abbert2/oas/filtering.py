@@ -107,6 +107,7 @@ class OnlyIsotypes(Filter):
         return df[df['isotype'].isin(self.isotypes)]
 
 
+# noinspection DuplicatedCode
 class NoStopCodon(Filter):
     def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
         return df.query(f'not stop_codon')
@@ -179,6 +180,7 @@ class NoInsertionsOutOfCDRs(Filter):
         return df[df[f'anarci_insertions'].notna()]
 
 
+# noinspection DuplicatedCode
 class NoUnsupportedCDR3Length(Filter):
     def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
         return df.query(f'not anarci_cdr3_is_over_37_aa_long')
