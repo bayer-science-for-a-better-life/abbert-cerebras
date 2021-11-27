@@ -9,6 +9,12 @@ from abbert2.oas import OAS, Unit
 
 class Filter:
 
+    def __init__(self) -> None:
+        super().__init__()
+        self.total_taken_s = 0
+        self.num_processed = 0
+        self.num_filtered_out = 0
+
     @property
     def name(self):
         return self.__class__.__name__
@@ -23,6 +29,9 @@ class Filter:
             'filtered_out': len(df) - len(new_df),
             'taken_s': time.perf_counter() - start,
         }
+        self.total_taken_s += log['taken_s']
+        self.num_processed += log['unfiltered_length']
+        self.num_filtered_out += log['filtered_out']
         return new_df, log
 
     def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
