@@ -45,22 +45,24 @@ import shutil
 from builtins import IOError
 from collections import defaultdict
 from functools import cached_property, total_ordering
-from itertools import chain, zip_longest
+from itertools import chain, zip_longest, islice
 from json import JSONDecodeError
 from pathlib import Path
-from typing import Tuple, Union, Iterator, Optional, List, Callable, Iterable
+from typing import Tuple, Union, Iterator, Optional, List, Callable, Sequence
 
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import requests
+import xxhash
 from joblib import Parallel, delayed
 from pyarrow import ArrowInvalid
+from smart_open import open
 from tqdm import tqdm
 
 from abbert2.common import to_json_friendly, from_parquet, mtime, to_parquet, parse_anarci_position_aa_to_imgt_code, \
     anarci_imgt_code_to_insertion, parse_anarci_position_to_imgt_code
-from abbert2.oas.common import find_oas_path, check_oas_subset, to_chain_independent
+from abbert2.oas.common import find_oas_path, check_oas_subset
 
 
 # --- Some field normalization code
@@ -85,6 +87,27 @@ def _normalize_oas_species(species):
 
         'rhesus': 'rhesus',
     }.get(species, species)
+
+
+# --- Misc utils
+
+def copy_but_do_not_overwrite(src, dest_path, *, num_rows_header=-1, overwrite=False, fail_if_exists=False):
+    if not src.is_file():
+        return
+    dest = dest_path / src.name
+    if dest.is_file() and not overwrite:
+        if fail_if_exists:
+            raise Exception(f'Path already exists and will not overwrite ({dest})')
+        return
+    dest_path.mkdir(parents=True, exist_ok=True)
+    if num_rows_header < 0:
+        shutil.copy(src, dest)
+    else:
+        # this should be used just for the CSV
+        with open(src, 'rt') as reader:
+            with open(dest, 'wt') as writer:
+                for line in islice(reader, num_rows_header):
+                    writer.write(line)
 
 
 # --- Convenient abstractions over the dataset
@@ -170,7 +193,7 @@ class OAS:
             check_oas_subset(oas_subset)
             for study_path in sorted((self.oas_path / oas_subset).glob('*')):
                 if study_path.is_dir():
-                    for unit_path in study_path.glob('*'):
+                    for unit_path in sorted(study_path.glob('*')):
                         if unit_path.is_dir():
                             yield self.unit(oas_subset, study_path.stem, unit_path.stem)
 
@@ -240,6 +263,65 @@ class OAS:
             df[int_column] = df[int_column].astype(pd.Int64Dtype())
 
         return df
+
+    # --- More file management
+
+    def copy_to(self,
+                dest_path: Path = Path.home() / 'oas-copy',
+                include_paired: bool = True,
+                include_unpaired: bool = True,
+                include_subset_meta: bool = False,
+                include_summaries: bool = False,
+                include_sequences: bool = False,
+                include_original_csv: bool = False,
+                include_stats: bool = False,
+                max_num_sequences: int = -1,
+                unit_probability: float = 1,
+                filtering_strategy: str = 'none',
+                overwrite: bool = False):
+
+        # Avoid circular import
+        from abbert2.oas.filtering import create_filters_from_name
+        # Global filter states for the whole run
+        filters = create_filters_from_name(filtering_strategy)
+
+        def copy_subset(oas_subset: str):
+
+            # --- Subset online collected metadata
+            if include_subset_meta:
+                for path in (self.oas_path / oas_subset).glob('bulk_download*'):
+                    subset_path = dest_path / oas_subset
+                    subset_path.mkdir(parents=True, exist_ok=True)
+                    copy_but_do_not_overwrite(path, dest_path=subset_path, overwrite=overwrite)
+
+            # --- Units
+            for unit in self.units_in_disk(oas_subset=oas_subset):
+                if 0 < unit_probability < 1:
+                    seed = xxhash.xxh32_intdigest('_'.join(unit.id))
+                    if np.random.RandomState(seed=seed).uniform() > unit_probability:
+                        continue  # unselected
+                if unit.has_sequences:
+                    print(f'COPYING {unit.id}')
+                    unit.copy_to(dest_path,
+                                 include_sequences=include_sequences,
+                                 include_original_csv=include_original_csv,
+                                 include_stats=include_stats,
+                                 max_num_sequences=max_num_sequences,
+                                 filters=filters,
+                                 overwrite=overwrite)
+
+            # --- Summaries
+            if include_summaries:
+                summaries_path = dest_path / 'summaries'
+                for path in (self.oas_path / 'summaries').glob('*'):
+                    copy_but_do_not_overwrite(path, dest_path=summaries_path, overwrite=overwrite)
+
+            print(f'Find your OAS dump in {dest_path}')
+
+        if include_paired:
+            copy_subset(oas_subset='paired')
+        if include_unpaired:
+            copy_subset(oas_subset='unpaired')
 
 
 @total_ordering
@@ -586,27 +668,6 @@ class Unit:
         except (IOError, FileNotFoundError, ArrowInvalid):
             return None
 
-    def tidy_sequences_df(self,
-                          columns=None,
-                          chains=('heavy', 'light'),
-                          add_chain=True,
-                          add_index=True) -> Iterable[Tuple[str, pd.DataFrame]]:
-
-        # Read only the needed columns
-        in_disk_columns = self.in_disk_column_names()
-        if columns is None:
-            columns = list(in_disk_columns)
-        # make columns chain aignostic
-        columns = pd.Series(column if not (column.endswith('_heavy') or column.endswith('_light')) else
-                            column.rpartition('_')[0] for column in columns).drop_duplicates()
-        # and now make them chain aware...
-        for chain in chains:
-            df = self.sequences_df(columns=[f'{column}_{chain}' for column in columns])
-            try:
-                yield next(to_chain_independent(df, chains=chain, add_index=add_index, add_chain=add_chain))
-            except StopIteration:
-                ...
-
     @property
     def sequences_file_size(self) -> Optional[int]:
         if self.has_sequences:
@@ -621,12 +682,10 @@ class Unit:
 
     @property
     def present_chains(self) -> Tuple[str, ...]:
-        chains = ()
-        if self.has_heavy_sequences:
-            chains = chains + ('heavy',)
-        if self.has_light_sequences:
-            chains = chains + ('light',)
-        return chains
+        df = self.sequences_df(columns='chain')
+        if df is None:
+            return ()
+        return tuple(sorted(df['chain'].unique()))
 
     def _schema_arrow(self):
         pq = self._pq()
@@ -671,10 +730,15 @@ class Unit:
     def region_max_length(self, region='cdr3', chain='heavy') -> Optional[int]:
         pq = self._pq()
         if pq is not None:
-            column_index = pq.schema_arrow.get_field_index(f'{region}_length_{chain}')
-            if column_index != -1:
-                return max(pq.metadata.row_group(row_group).column(column_index).statistics.max
-                           for row_group in range(pq.metadata.num_row_groups))
+            if chain is None:
+                # leverage parquet precomputed column stats
+                column_index = pq.schema_arrow.get_field_index(f'{region}_length')
+                if column_index != -1:
+                    return max(pq.metadata.row_group(row_group).column(column_index).statistics.max
+                               for row_group in range(pq.metadata.num_row_groups))
+            df = self.sequences_df(columns=['chain', f'{region}_length']).query('chain == "{chain}"')
+            if df is not None and len(df):
+                return df[f'{region}_length'].max()
         return None
 
     @property
@@ -703,9 +767,13 @@ class Unit:
 
     # --- Consolidated stats
 
+    @property
+    def stats_path(self) -> Path:
+        return self.path / f'{self.unit_id}.stats.pickle'
+
     def consolidated_stats(self, recompute: bool = False):
 
-        cache_path = self.path / 'stats.pickle'
+        cache_path = self.stats_path
 
         if not recompute:
             try:
@@ -718,11 +786,11 @@ class Unit:
             return None
 
         stats = {}
-        for chain in self.present_chains:
+        for chain, chain_df in df.groupby('chain'):
             aligned_position_counts = defaultdict(int)
-            for sequence, positions, insertions in zip(df[f'sequence_aa_{chain}'],
-                                                       df[f'imgt_positions_{chain}'],
-                                                       df[f'imgt_insertions_{chain}']):
+            for sequence, positions, insertions in zip(chain_df['sequence_aa'],
+                                                       chain_df['imgt_positions'],
+                                                       chain_df['imgt_insertions']):
                 if not isinstance(sequence, np.ndarray):
                     continue
                 insertions = () if not isinstance(insertions, np.ndarray) else insertions
@@ -730,17 +798,14 @@ class Unit:
                 for aa, position, insertion in zip_longest(sequence,
                                                            positions,
                                                            insertions,
-                                                           fillvalue=b''):
-                    position = f'{position}{insertion.decode("utf-8").strip()}'
-                    aa = aa.decode("utf-8")
-                    counts_key = f'{position}={aa}'
-                    aligned_position_counts[counts_key] += 1
+                                                           fillvalue=''):
+                    aligned_position_counts[f'{position}{insertion}={aa}'] += 1
             stats[chain] = {
                 'aligned_position_counts': dict(aligned_position_counts),
-                'sequence_length_counts': df[f'aligned_sequence_{chain}'].str.len().value_counts().to_dict(),
+                'sequence_length_counts': df[f'sequence_aa'].str.len().value_counts().to_dict(),
             }
             for region in ('fw1', 'cdr1', 'fw2', 'cdr2', 'fw3', 'cdr3', 'fw4'):
-                stats[chain][f'{region}_length_counts'] = df[f'{region}_length_{chain}'].value_counts().to_dict()
+                stats[chain][f'{region}_length_counts'] = df[f'{region}_length'].value_counts().to_dict()
             # TODO: collect other stats for things like QA, germlines...
         pd.to_pickle(stats, cache_path)
         return stats
@@ -762,9 +827,13 @@ class Unit:
     def copy_to(self,
                 oas_path: Union[str, Path],
                 include_sequences: bool = True,
-                max_num_sequences: Optional[int] = None,
                 include_original_csv: bool = False,
+                include_stats: bool = False,
+                max_num_sequences: int = -1,
+                filters: Sequence[Callable] = None,
                 overwrite: bool = False):
+
+        from abbert2.oas.filtering import filter_df
 
         oas_path = Path(oas_path)
         if oas_path == self.oas_path:
@@ -772,60 +841,42 @@ class Unit:
 
         dest_path = oas_path / self.oas_subset / self.study_id / self.unit_id
 
-        def copy_but_do_not_overwrite(src):
-            if not src.is_file():
-                return
-            dest = dest_path / src.name
-            if dest.is_file() and not overwrite:
-                raise Exception(f'Path already exists and will not overwrite ({dest})')
-            dest_path.mkdir(parents=True, exist_ok=True)
-            shutil.copy(src, dest)
-
         # copy metadata
-        copy_but_do_not_overwrite(self.metadata_path)
+        copy_but_do_not_overwrite(self.metadata_path, dest_path, overwrite=overwrite)
 
         # copy processed sequences
         if include_sequences and self.has_sequences:
-            if max_num_sequences is None:
-                copy_but_do_not_overwrite(self.sequences_path)
+            if max_num_sequences < 0 and not filters:
+                copy_but_do_not_overwrite(self.sequences_path, dest_path, overwrite=overwrite)
             else:
                 dest = dest_path / self.sequences_path.name
                 if dest.is_file() and not overwrite:
                     raise Exception(f'Path already exists and will not overwrite ({dest})')
                 df = self.sequences_df()
-                df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
+                if max_num_sequences >= 0:
+                    df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
+                if filters:
+                    # noinspection PyTypeChecker
+                    df, logs = filter_df(df, unit=self, filters=filters, keep_df_history=False)
                 to_parquet(df, dest)
         if include_sequences:
-            copy_but_do_not_overwrite(self.processing_logs_file)
-            copy_but_do_not_overwrite(self.processing_error_logs_file)
+            copy_but_do_not_overwrite(self.processing_logs_file, dest_path, overwrite=overwrite)
+            copy_but_do_not_overwrite(self.processing_error_logs_file, dest_path, overwrite=overwrite)
 
         # copy original csv
         if include_original_csv:
-            copy_but_do_not_overwrite(self.original_csv_path)
+            # +2: unit metadata and column names
+            copy_but_do_not_overwrite(self.original_csv_path,
+                                      dest_path,
+                                      num_rows_header=max_num_sequences + 2,
+                                      overwrite=overwrite)
+
+        # copy processed stats (N.B., without recomputing for subsets)
+        if include_stats:
+            copy_but_do_not_overwrite(self.stats_path, dest_path, overwrite=overwrite)
 
 
 # --- Entry points
-
-
-def populate_metadata_jsons(oas_path: Path = None):
-    oas = OAS(oas_path=oas_path)
-    oas.populate_metadata_jsons()
-
-
-def extract_processed_oas(oas_path: Optional[Union[str, Path]] = None,
-                          dest_path: Path = Path.home() / 'oas-processed',
-                          overwrite: bool = False):
-    oas = OAS(oas_path=oas_path)
-    for unit in oas.units_in_disk():
-        if unit.has_sequences:
-            print(f'COPYING {unit.id}')
-            unit.copy_to(dest_path,
-                         include_sequences=True,
-                         max_num_sequences=None,
-                         include_original_csv=False,
-                         overwrite=overwrite)
-    print(f'Find your OAS dump in {dest_path}')
-
 
 def _consolidate_unit_stats(unit: Unit, overwrite=False):
     if unit.has_sequences:

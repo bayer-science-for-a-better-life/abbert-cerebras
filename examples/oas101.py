@@ -1,12 +1,8 @@
 from pprint import pprint
 
-from abbert2.oas import OAS, RELATIVE_OAS_TEST_DATA_PATH
+from abnumber import Chain
 
-#
-# TODO: adapt example to new data format
-#   - update TEST_DATA
-#   - update column names and adapt to new type
-#
+from abbert2.oas import OAS, RELATIVE_OAS_TEST_DATA_PATH
 
 # OAS is the entry point for the dataset
 oas = OAS(oas_path=RELATIVE_OAS_TEST_DATA_PATH)
@@ -34,6 +30,7 @@ for unit in oas.units_in_disk():
 
     # Note that unit provide convenient access to most of these data
     print(f'Unit disease={unit.disease}, vaccine={unit.vaccine}')
+    print(f'Unit Species: {unit.species}')
 
     #
     # Optionally, a unit will have already its sequences ready to be used
@@ -46,10 +43,9 @@ for unit in oas.units_in_disk():
     if unit.has_sequences:
         df = unit.sequences_df()
         df.info()
-        for chain in ('light', 'heavy'):
-            try:
-                print(f'An antibody {chain} chain: {df.iloc[0][f"aligned_sequence_{chain}"]}')
-            except KeyError:
-                ...
-
+        sequence_aa = df.iloc[0]['sequence_aa']
+        chain = Chain(sequence_aa, scheme='imgt')
+        print(f'An antibody variable domain (correct?): {sequence_aa}')
+        print(f'An antibody variable domain (correct!): {chain.seq}')
+        print(df.iloc[0])
     print('-' * 80)

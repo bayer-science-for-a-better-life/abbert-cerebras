@@ -202,6 +202,8 @@ def to_parquet(df: pd.DataFrame,
 
 # noinspection DuplicatedCode
 def from_parquet(path: Union[Path, str], columns=None):
+    if isinstance(columns, str):
+        columns = columns,
     if columns is not None:
         columns = list(columns)
     return pq.read_table(path, columns=columns).to_pandas()

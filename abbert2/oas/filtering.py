@@ -1,49 +1,78 @@
 """Selecting antibodies across the OAS dataset."""
 import time
-from typing import Tuple, Sequence, Optional
+from typing import Tuple, Sequence, Optional, Union
 
+import numpy as np
 import pandas as pd
+import xxhash
 
 from abbert2.oas import OAS, Unit
 
 
 class Filter:
 
+    def __init__(self) -> None:
+        super().__init__()
+        self.total_taken_s = 0
+        self.num_processed = 0
+        self.num_filtered_out = 0
+
     @property
     def name(self):
         return self.__class__.__name__
 
-    def __call__(self, df: pd.DataFrame, chain: str = None, unit: Unit = None) -> Tuple[pd.DataFrame, dict]:
+    def __call__(self, df: pd.DataFrame, unit: Unit = None) -> Tuple[pd.DataFrame, dict]:
         start = time.perf_counter()
-        new_df = self._filter(df=df, chain_suffix='' if chain is None else f'_{chain}', unit=unit)
+        new_df = self._filter(df=df, unit=unit)
         log = {
             'name': self.name,
-            'chain': chain,
             'unfiltered_length': len(df),
             'filtered_length': len(new_df),
             'filtered_out': len(df) - len(new_df),
             'taken_s': time.perf_counter() - start,
         }
+        self.total_taken_s += log['taken_s']
+        self.num_processed += log['unfiltered_length']
+        self.num_filtered_out += log['filtered_out']
         return new_df, log
 
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit: Unit = None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         raise NotImplementedError
 
 
 class Identity(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df
 
 
-class MergeDuplicates(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        # value_counts if not Redundancy in dataset
-        # groupby and sum if redundancy in dataset
-        pass
+class MergeRedundant(Filter):
+
+    def __init__(self, use_all_known: bool = False) -> None:
+        super().__init__()
+        self.use_all_known = use_all_known
+
+    @property
+    def name(self):
+        return f'MergeRedundant(use_all_known={self.use_all_known})'
+
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        if self.use_all_known:
+            raise NotImplementedError
+
+        # assume that missing redundancy means 1 (happens in paired)
+        df['redundancy'].fillna(value=1, inplace=True)
+        estimated_redundancy = df.groupby('sequence_aa')['redundancy'].sum()
+
+        # for the time being, ignore different metadata and keep the first occurrence
+        df.drop_duplicates('sequence_aa')
+
+        # and assign the estimated redundancy
+        df['redundancy'] = estimated_redundancy.loc[df['sequence_aa']].values
+
+        return df
 
     @staticmethod
     def duplicates_within_same_unit_example():
-
         # --- VH Example
         # Are there duplicates within the same unit?
 
@@ -74,14 +103,14 @@ class MergeDuplicates(Filter):
 
 
 class OnlyProductive(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df.query(f'productive{chain_suffix}')
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df.query(f'productive')
 
 
 class OnlyIsotypes(Filter):
-
     # As of 2021/11/26, OAS declares these isotypes at the unit level:
     POSSIBLE_ISOTYPES = 'Bulk', 'All', 'IGHM', 'IGHA', 'IGHE', 'IGHG', 'IGHD'
+
     # e.g., IgM might be better all filtered out because many never saw an antigen
 
     def __init__(self, isotypes=None) -> None:
@@ -96,7 +125,7 @@ class OnlyIsotypes(Filter):
     def name(self):
         return f'OnlyIsotypes(isotypes={sorted(self.isotypes)})'
 
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         #
         # N.B. this will actually fail, as we would need to put isotype in our dataframes
         #   - isotype is a unit-level field,
@@ -105,25 +134,28 @@ class OnlyIsotypes(Filter):
         #     but the key of this filter is to remove naïve antibodies,
         #     and so the NoNaive filter could be used instead
         #
-        return df[df['isotype'].isin(self.isotypes)]
+        # return df[df['isotype'].isin(self.isotypes)]
+        #
+        raise NotImplementedError
 
 
+# noinspection DuplicatedCode
 class NoStopCodon(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df.query(f'not stop_codon{chain_suffix}')
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df.query(f'not stop_codon')
 
 
 class VJInFrame(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df.query(f'vj_in_frame{chain_suffix}')
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df.query(f'vj_in_frame')
 
 
 class NoUnexpectedInsertions(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df.query(f'not has_unexpected_insertions{chain_suffix}')
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df.query(f'not has_unexpected_insertions')
 
 
-class NoShortFW1(Filter):
+class NoShortFWR1(Filter):
 
     # "SANGER sequencing is imprecise at the beginning in the begginnig and end"
     # So we want to make sure our sequence is complete and, specially, correct in CDRs
@@ -134,15 +166,15 @@ class NoShortFW1(Filter):
 
     @property
     def name(self):
-        return f'NoShortFW1(threshold={self.threshold})'
+        return f'NoShortFWR1(threshold={self.threshold})'
 
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         if self.threshold is None:
-            return df.query(f'not anarci_fw1_shorter_than_imgt_defined{chain_suffix}')
-        return df.query(f'fw1_length{chain_suffix} >= {self.threshold}')
+            return df.query(f'not anarci_fwr1_shorter_than_imgt_defined')
+        return df.query(f'fwr1_length >= {self.threshold}')
 
 
-class NoShortFW4(Filter):
+class NoShortFWR4(Filter):
 
     # "SANGER sequencing is imprecise at the beginning in the begginnig and end"
     # So we want to make sure our sequence is complete and, specially, correct in CDRs
@@ -153,17 +185,17 @@ class NoShortFW4(Filter):
 
     @property
     def name(self):
-        return f'NoShortFW4(threshold={self.threshold})'
+        return f'NoShortFWR4(threshold={self.threshold})'
 
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         if self.threshold is None:
-            return df.query(f'not anarci_fw4_shorter_than_imgt_defined{chain_suffix}')
-        return df.query(f'fw4_length{chain_suffix} >= {self.threshold}')
+            return df.query(f'not anarci_fwr4_shorter_than_imgt_defined')
+        return df.query(f'fwr4_length >= {self.threshold}')
 
 
 class NoKappaGap21(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df.query(f'not has_kappa_gap_21{chain_suffix}')
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df.query(f'not has_kappa_gap_21')
 
 
 class NoDeletions(Filter):
@@ -171,28 +203,29 @@ class NoDeletions(Filter):
     # Note that some deletions are meant to be present (as IMGT tries to cover all IG domains)
     # See for example:
     #   http://www.imgt.org/IMGTrepertoire/Proteins/proteinDisplays.php?species=human&latin=Homo%20sapiens&group=IGHV
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df[df[f'anarci_deletions{chain_suffix}'].isna()]
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df[df[f'anarci_deletions'].isna()]
 
 
 class NoInsertionsOutOfCDRs(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df[~df[f'anarci_insertions{chain_suffix}'].isna()]
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df[df[f'anarci_insertions'].isna()]
 
 
+# noinspection DuplicatedCode
 class NoUnsupportedCDR3Length(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df.query(f'not anarci_cdr3_is_over_37_aa_long{chain_suffix} ')
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df.query(f'not anarci_cdr3_is_over_37_aa_long')
 
 
 class NoMissingConservedCysteine(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df.query(f'not anarci_missing_conserved_cysteine{chain_suffix}')
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df.query(f'not anarci_missing_conserved_cysteine')
 
 
 class NoUnusualResidues(Filter):
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df.query(f'not anarci_unusual_residue{chain_suffix}')
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df.query(f'not anarci_unusual_residue')
 
 
 class CountThreshold(Filter):
@@ -209,8 +242,8 @@ class CountThreshold(Filter):
     def name(self):
         return f'CountThreshold(threshold={self.threshold})'
 
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
-        return df.query(f'duplicate_count{chain_suffix} >= {self.threshold}')
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df.query(f'duplicate_count >= {self.threshold}')
 
 
 class NoNaive(Filter):
@@ -247,48 +280,91 @@ class NoNaive(Filter):
     def name(self):
         return f'NoNaive(threshold={self.threshold})'
 
-    def _filter(self, df: pd.DataFrame, chain_suffix: str, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         raise NotImplementedError
 
 
-FILTERS = {
+class NoDuplicates(Filter):
+    """
+    An online duplicate filter.
 
-    'no-filters': (),
+    N.B. will build a giagantic inefficient index in memory and needs that all happens in one process...
 
-    'default': (
-        OnlyProductive(),
-        NoShortFW1(threshold=20),
-        NoShortFW4(threshold=10),
-        NoInsertionsOutOfCDRs(),
-        NoUnsupportedCDR3Length(),
-        NoUnusualResidues(),
-        NoMissingConservedCysteine(),
-        NoKappaGap21()
-    ),
+    To avoid, precompute and redistribute to workers.
+    Map in this case to unit_hash, sequence_hash for the chosen sequence.
+    """
 
-    'most-strict': (
-        CountThreshold(threshold=3),
-        OnlyProductive(),
-        NoShortFW1(threshold=20),
-        NoShortFW4(threshold=10),
-        NoDeletions(),
-        NoInsertionsOutOfCDRs(),
-        NoUnsupportedCDR3Length(),
-        NoUnusualResidues(),
-        NoMissingConservedCysteine(),
-        NoKappaGap21()
-    ),
-}
+    def __init__(self) -> None:
+        super().__init__()
+        self._num_shards = 256
+        self._shards = [{} for _ in range(self._num_shards)]
+        self._total = 0
+        self._current = 0
+
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        no_duplicate = np.ones(len(df), dtype=bool)
+        for i, sequence in enumerate(df['sequence_aa']):
+            self._total += 1
+            if not sequence:  # some rogue paired antibody without this type of chain
+                continue
+            # noinspection PyArgumentList
+            hash0 = xxhash.xxh3_64_intdigest(sequence, seed=0)
+            # noinspection PyArgumentList
+            hash1 = xxhash.xxh3_64_intdigest(sequence, seed=1)
+            shard = self._shards[int(hash0 % self._num_shards)]
+            if hash1 not in shard:
+                shard[hash1] = 1
+                self._current += 1
+            else:
+                shard[hash1] += 1
+                no_duplicate[i] = False
+        return df[no_duplicate]
+
+
+def create_filters_from_name(name: str = 'none') -> Sequence[Filter]:
+    return {
+        'none': (),
+
+        'default': (
+            OnlyProductive(),
+            NoShortFWR1(threshold=20),
+            NoShortFWR4(threshold=10),
+            NoInsertionsOutOfCDRs(),
+            NoUnsupportedCDR3Length(),
+            NoUnusualResidues(),
+            NoMissingConservedCysteine(),
+            NoKappaGap21(),
+            MergeRedundant(),
+            NoDuplicates(),
+        ),
+
+        'most-strict': (
+            MergeRedundant(),
+            CountThreshold(threshold=3),
+            OnlyProductive(),
+            NoShortFWR1(threshold=20),
+            NoShortFWR4(threshold=10),
+            NoDeletions(),
+            NoInsertionsOutOfCDRs(),
+            NoUnsupportedCDR3Length(),
+            NoUnusualResidues(),
+            NoMissingConservedCysteine(),
+            NoKappaGap21(),
+            NoDuplicates(),
+        ),
+    }[name]
 
 
 def filter_df(df: pd.DataFrame,
-              chain: str = None,
               unit: Unit = None,
-              filters: Sequence[Filter] = FILTERS['default'],
+              *,
+              filters: Union[str, Sequence[Filter]] = 'default',
               keep_df_history: bool = False):
+    if isinstance(filters, str):
+        filters = create_filters_from_name(filters)
     logs = []
     for a_filter in filters:
-        df, log = a_filter(df=df, chain=chain, unit=unit)
+        df, log = a_filter(df=df, unit=unit)
         if keep_df_history:
             log['filtered_df'] = df
         logs.append(log)
@@ -299,23 +375,29 @@ if __name__ == '__main__':
 
     oas = OAS()
 
+    only_test = True
+
     TEST_UNITS = (
         oas.unit('unpaired', 'Gidoni_2019', 'ERR2567201_Heavy_IGHD'),
         oas.unit('unpaired', 'Greiff_2017', 'ERR1759628_Heavy_Bulk'),
         oas.unit('paired', 'Alsoiussi_2020', 'SRR11528761_paired'),
+        oas.unit('paired', 'Goldstein_2019', 'SRR9179276_paired'),
+        oas.unit('paired', 'Goldstein_2019', 'SRR9179276_paired'),
     )
 
-    UNITS = oas.units_in_disk(oas_subset='unpaired')
+    UNITS = TEST_UNITS if only_test else oas.units_in_disk(oas_subset='unpaired')
+
+    filters = create_filters_from_name('default')
 
     for unit in UNITS:
         if not unit.has_sequences:
             continue
-        for chain, chain_df in unit.tidy_sequences_df():
-            filtered_chain_df, logs = filter_df(chain_df, unit=unit, keep_df_history=False)
-            print(pd.DataFrame(logs))
-            print(f'{unit.id}: from {len(chain_df)} to {len(filtered_chain_df)}')
-            print('-' * 80)
-
+        df = unit.sequences_df()
+        filtered_df, logs = filter_df(df, filters=filters, unit=unit, keep_df_history=False)
+        print(f'{unit.id}: from {len(df)} to {len(filtered_df)}')
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            print(pd.DataFrame(logs)[['name', 'filtered_out', 'taken_s']])
+        print('-' * 80)
 
 #
 # ANTIBERTA PAPER:

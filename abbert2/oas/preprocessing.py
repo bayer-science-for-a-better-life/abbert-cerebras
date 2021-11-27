@@ -10,18 +10,19 @@ import traceback
 from ast import literal_eval
 from itertools import chain
 from pathlib import Path, PurePosixPath
-from typing import Union, Tuple, Dict, Optional, List, Sequence
+from typing import Union, Tuple, Dict, Optional, List
 from urllib.parse import urlparse, unquote
 
 import numpy as np
 import pandas as pd
+import xxhash
 from joblib import Parallel, delayed, effective_n_jobs
 from more_itertools import distribute
 from requests import HTTPError
 from smart_open import open
 
-from abbert2.oas.common import find_oas_path
 from abbert2.common import to_parquet, from_parquet, parse_anarci_position, anarci_insertion_to_code
+from abbert2.oas.common import find_oas_path
 from abbert2.oas.oas import OAS, Unit
 
 
@@ -185,7 +186,7 @@ def _fix_bulk_download(path) -> List[str]:
     assert len(deduplicated_urls) == len(urls)
     #
     # But note there are duplicated file names in the unpaired subset.
-    # These seem to correstpont to the same SRA deposition used in different studies.
+    # These seem to correspond to the same SRA deposition used in different studies.
     # An example:
     #
     # unpaired ❯❯❯ ls -l ERR1812282*
@@ -512,7 +513,9 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
             qas['missing_conserved_cysteine'] = True
         elif qa_type == 'Shorter than IMGT defined':
             for region in qa_details.split(','):
-                qas[f'{region.strip()}_shorter_than_imgt_defined'] = True
+                region = region.strip()
+                region = {'fw1': 'fwr1', 'fw4': 'fwr4'}.get(region, region)
+                qas[f'{region}_shorter_than_imgt_defined'] = True
         elif qa_type == 'Unusual residue':
             qas['unusual_residue'] = True
         elif qa_type == 'CDR3 is over 37 aa long':
@@ -593,9 +596,9 @@ ANARCI_IMGT_CDR_LENGTHS = {
 }
 
 
-def _preprocess_anarci_data(numbering_data_dict, locus,
+def _preprocess_anarci_data(numbering_data_dict,
+                            locus,
                             *,
-                            expected_sequence=None,
                             expected_cdr3=None,
                             anarci_status=None) -> dict:
     """
@@ -680,52 +683,54 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
     #
 
     regions = (
-        (f'fw{locus.lower()}1', f'fw1'),
-        (f'cdr{locus.lower()}1', f'cdr1'),
-        (f'fw{locus.lower()}2', f'fw2'),
-        (f'cdr{locus.lower()}2', f'cdr2'),
-        (f'fw{locus.lower()}3', f'fw3'),
-        (f'cdr{locus.lower()}3', f'cdr3'),
-        (f'fw{locus.lower()}4', f'fw4'),
+        (f'fw{locus.lower()}1', 'fwr1'),
+        (f'cdr{locus.lower()}1', 'cdr1'),
+        (f'fw{locus.lower()}2', 'fwr2'),
+        (f'cdr{locus.lower()}2', 'cdr2'),
+        (f'fw{locus.lower()}3', 'fwr3'),
+        (f'cdr{locus.lower()}3', 'cdr3'),
+        (f'fw{locus.lower()}4', 'fwr4'),
     )
-
-    heavy_or_light = 'heavy' if locus == 'H' else 'light'
 
     # We will populate all these fields for the current record
     alignment_data = {
         # alignment
-        f'has_insertions_{heavy_or_light}': False,
-        f'fw1_start_{heavy_or_light}': None,
-        f'fw1_length_{heavy_or_light}': None,
-        f'cdr1_start_{heavy_or_light}': None,
-        f'cdr1_length_{heavy_or_light}': None,
-        f'fw2_start_{heavy_or_light}': None,
-        f'fw2_length_{heavy_or_light}': None,
-        f'cdr2_start_{heavy_or_light}': None,
-        f'fw3_start_{heavy_or_light}': None,
-        f'fw3_length_{heavy_or_light}': None,
-        f'cdr2_length_{heavy_or_light}': None,
-        f'cdr3_start_{heavy_or_light}': None,
-        f'cdr3_length_{heavy_or_light}': None,
-        f'fw4_start_{heavy_or_light}': None,
-        f'fw4_length_{heavy_or_light}': None,
-        f'aligned_sequence_{heavy_or_light}': [],
-        f'positions_{heavy_or_light}': [],
-        f'insertions_{heavy_or_light}': [],
+        'sequence_aa': [],
+        'imgt_positions': [],
+        'imgt_insertions': [],
+        'fwr1_start': None,
+        'fwr1_length': None,
+        'cdr1_start': None,
+        'cdr1_length': None,
+        'fwr2_start': None,
+        'fwr2_length': None,
+        'cdr2_start': None,
+        'fwr3_start': None,
+        'fwr3_length': None,
+        'cdr2_length': None,
+        'cdr3_start': None,
+        'cdr3_length': None,
+        'fwr4_start': None,
+        'fwr4_length': None,
         # flags
-        f'has_unexpected_insertions_{heavy_or_light}': False,
-        f'has_mutated_conserved_cysteines_{heavy_or_light}': False,
-        f'has_wrong_sequence_reconstruction_{heavy_or_light}': None,
-        f'has_wrong_cdr3_reconstruction_{heavy_or_light}': None,
-        f'has_kappa_gap_21_{heavy_or_light}': False,
-        f'anarci_deletions_{heavy_or_light}': None,
-        f'anarci_insertions_{heavy_or_light}': None,
-        f'anarci_missing_conserved_cysteine_{heavy_or_light}': False,
-        f'anarci_unusual_residue_{heavy_or_light}': False,
-        f'anarci_fw1_shorter_than_imgt_defined_{heavy_or_light}': False,
-        f'anarci_fw4_shorter_than_imgt_defined_{heavy_or_light}': False,
-        f'anarci_cdr3_is_over_37_aa_long_{heavy_or_light}': False,
+        'has_insertions': False,
+        'has_unexpected_insertions': False,
+        'has_mutated_conserved_cysteines': False,
+        'has_wrong_cdr3_reconstruction': None,
+        'has_kappa_gap_21': False,
+        'anarci_deletions': None,
+        'anarci_insertions': None,
+        'anarci_missing_conserved_cysteine': False,
+        'anarci_unusual_residue': False,
+        'anarci_fwr1_shorter_than_imgt_defined': False,
+        'anarci_fwr4_shorter_than_imgt_defined': False,
+        'anarci_cdr3_is_over_37_aa_long': False,
     }
+
+    expected_keys = set(region_key for region_key, _ in regions)
+    if not (expected_keys & set(numbering_data_dict)):
+        raise ValueError(f'ANARCI dictionary does not contain any expected key '
+                         f'({sorted(expected_keys)} vs {sorted(numbering_data_dict)}))')
 
     last_region_end = 0
     for region_key, region in regions:
@@ -734,8 +739,8 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
         aas_in_region = list(numbering_data_dict.get(region_key, {}).items())
 
         # Start and length (None and 0 for not present regions)
-        alignment_data[f'{region}_start_{heavy_or_light}'] = last_region_end if len(aas_in_region) else None
-        alignment_data[f'{region}_length_{heavy_or_light}'] = len(aas_in_region)
+        alignment_data[f'{region}_start'] = last_region_end if len(aas_in_region) else None
+        alignment_data[f'{region}_length'] = len(aas_in_region)
         last_region_end += len(aas_in_region)
 
         # Sort the region AAs
@@ -744,59 +749,55 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
             position, insertion = parse_anarci_position(position)
             insertion_code = anarci_insertion_to_code(insertion)
             # Got insertions
-            if insertion_code != -1:
-                alignment_data[f'has_insertions_{heavy_or_light}'] = True
-            if alignment_data[f'has_insertions_{heavy_or_light}']:
+            if insertion_code:
+                alignment_data['has_insertions'] = True
                 if position not in (111, 112):
-                    alignment_data[f'has_unexpected_insertions_{heavy_or_light}'] = True
+                    alignment_data['has_unexpected_insertions'] = True
             if position in (23, 104) and aa != 'C':
-                alignment_data[f'has_mutated_conserved_cysteines_{heavy_or_light}'] = True
+                alignment_data['has_mutated_conserved_cysteines'] = True
             if locus == 'K' and position == 21 and aa == '-':
-                alignment_data[f'has_kappa_gap_21_{heavy_or_light}'] = True
+                alignment_data['has_kappa_gap_21'] = True
             # Mirroring of inserted residues
             insertion_code_order = insertion_code if position not in (112, 62) else -insertion_code
             region_positions.append((position, insertion_code_order, insertion, aa))
         region_positions = sorted(region_positions)
 
-        alignment_data[f'aligned_sequence_{heavy_or_light}'] += [aa for *_, aa in region_positions]
-        alignment_data[f'positions_{heavy_or_light}'] += [position for position, *_ in region_positions]
-        alignment_data[f'insertions_{heavy_or_light}'] += [insertion for *_, insertion, _ in region_positions]
+        alignment_data['sequence_aa'] += [aa for *_, aa in region_positions]
+        alignment_data['imgt_positions'] += [position for position, *_ in region_positions]
+        alignment_data['imgt_insertions'] += [insertion for *_, insertion, _ in region_positions]
 
+    #
     # Make the alignment data a tad more efficient to work with. Still playing...
-    #   - Likely using arrays for aligned sequences is not needed
-    #     (and precludes parquet from better representation?)
-    #     If so, just ''.join() both the sequence and the insertion codes.
-    #   - Probably sparse insertion codes make more sense performancewise,
-    #     they are less practical though.
-    #   - Likely u1 dtype can work for positions (evaluate after collecting stats).
-    alignment_data[f'aligned_sequence_{heavy_or_light}'] = (
-        ''.join(alignment_data[f'aligned_sequence_{heavy_or_light}']))  # FIXME: save as the needed bytes or S1 dtype
-    alignment_data[f'positions_{heavy_or_light}'] = (
-        np.array(alignment_data[f'positions_{heavy_or_light}'], dtype=np.dtype('u2')))
-    alignment_data[f'insertions_{heavy_or_light}'] = (
-        alignment_data[f'insertions_{heavy_or_light}']  # should be dtype S2 when we figure out how to put it in parquet
-        if alignment_data[f'has_insertions_{heavy_or_light}'] else None)
-    if expected_sequence is not None:
-        # noinspection PyUnresolvedReferences
-        alignment_data[f'has_wrong_sequence_reconstruction_{heavy_or_light}'] = (
-                alignment_data[f'aligned_sequence_{heavy_or_light}'] != expected_sequence
-        )
+    #
+    #   - Likely using arrays for aligned sequences is not needed.
+    #     They currently precludes parquet from better representation.
+    #
+    #   - Probably sparse insertion codes make more sense performance-wise.
+    #     They are less practical though.
+    #
+    alignment_data['sequence_aa'] = ''.join(alignment_data['sequence_aa'])  # use only needed bytes or S1 dtype?
+    alignment_data['imgt_positions'] = np.array(alignment_data['imgt_positions'], dtype=np.dtype('u1'))
+    alignment_data['imgt_insertions'] = (
+        alignment_data['imgt_insertions']  # use only needed bytes / S2 dtype / int16 with mapped code?
+        if alignment_data['has_insertions'] else None)
+
+    # Check expectations
     if expected_cdr3 is not None:
-        if alignment_data[f'cdr3_start_{heavy_or_light}'] is None:
-            alignment_data[f'has_wrong_cdr3_reconstruction_{heavy_or_light}'] = True
+        if alignment_data['cdr3_start'] is None:
+            alignment_data['has_wrong_cdr3_reconstruction'] = True
         else:
-            cdr3_start = alignment_data[f'cdr3_start_{heavy_or_light}']
+            cdr3_start = alignment_data['cdr3_start']
             cdr3_end = (
-                    alignment_data[f'cdr3_start_{heavy_or_light}'] + alignment_data[f'cdr3_length_{heavy_or_light}'])
+                    alignment_data['cdr3_start'] + alignment_data['cdr3_length'])
             # noinspection PyUnresolvedReferences
-            aligned_cdr3 = (
-                alignment_data[f'aligned_sequence_{heavy_or_light}'][cdr3_start:cdr3_end])
-            alignment_data[f'has_wrong_cdr3_reconstruction_{heavy_or_light}'] = aligned_cdr3 != expected_cdr3
+            anarci_cdr3 = (
+                alignment_data['sequence_aa'][cdr3_start:cdr3_end])
+            alignment_data['has_wrong_cdr3_reconstruction'] = anarci_cdr3 != expected_cdr3
 
     # Add ANARCI QA flags
     if anarci_status is not None:
         anarci_status = {
-            f'anarci_{qa_name}_{heavy_or_light}': qa_value
+            f'anarci_{qa_name}': qa_value
             for qa_name, qa_value in parse_anarci_status(anarci_status).items()
         }
         alignment_data.update(anarci_status)
@@ -804,18 +805,8 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
     return alignment_data
 
 
-def _per_chain_columns(columns: Union[str, Sequence[str]],
-                       df: pd.DataFrame = None):
-    if isinstance(columns, str):
-        columns = [columns]
-    possible_columns = [f'{column}_{chain}' for column in columns for chain in ('heavy', 'light')]
-    if df is not None:
-        possible_columns = [column for column in possible_columns if column in df.columns]
-    return possible_columns
-
-
 def _igblast_tf_to_bool(tf):
-    """Make IGBLAST QA value into a bool."""
+    """Cast IGBLAST QA value to bool."""
     if pd.isnull(tf):
         return tf
     if tf == 'T':
@@ -825,14 +816,25 @@ def _igblast_tf_to_bool(tf):
     raise ValueError(f'Unknown IGBLAST value {tf}')
 
 
-def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True):
+def _process_sequences_df(df: pd.DataFrame,
+                          unit: Unit,
+                          verbose=False,
+                          drop_anarci_status=True) -> Tuple[pd.DataFrame, dict]:
 
-    logs = {'num_records': len(df)}
+    # --- basic sanity checks
 
-    # Make sure unpaired units get the same suffix as paired ones
-    start = time.time()
-    df = _rename_by_chain_type(df, unit=unit)
-    logs['taken_rename_chain_type'] = time.time() - start
+    if unit.oas_subset == 'paired' and ('locus_heavy' not in df.columns or 'locus_light' not in df.columns):
+        raise ValueError(f'Paired unit {unit.id} does not have correct locus columns')
+
+    if unit.oas_subset == 'unpaired' and 'locus' not in df.columns:
+        raise ValueError(f'Unaired unit {unit.id} does not have correct locus columns')
+
+    if unit.oas_subset == 'unpaired':
+        loci = df.locus.unique()
+        if len(loci) != 1:
+            raise ValueError(f'More than one locus ({loci}) in unit {unit.path}')
+
+    # --- do munging
 
     # We will keep just a few of the many columns for the time being.
     # Note, nucleotides might be interested later on, together with some of the IgBlast gathered info.
@@ -840,7 +842,7 @@ def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True
     # (as compression is per column and cannot realize the redundancy between columns).
     # If bringing back, the best would be to remove redundancy where possible
     # (e.g., by storing indices instead of substrings).
-    # Here an example record with values, for documentations
+    # Here an example record with selected values, for documentations
     SELECTED_UNPAIRED_RECORD_EXAMPLE = {
         'locus': 'H',
         'stop_codon': 'F',
@@ -861,92 +863,108 @@ def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True
                          '|Insertion: F40A|'
                          '|Shorter than IMGT defined: fw1, fw4|'
     }
+
     start = time.time()
-    df = df[_per_chain_columns(list(SELECTED_UNPAIRED_RECORD_EXAMPLE), df=df)]
-    logs['taken_select_columns'] = time.time() - start
 
-    # Process the numbering
-    # Here we also check things like if a buggy ANARCI version was used
+    dfs = []
 
-    if verbose:
-        print(f'PARSING {len(df)} RECORDS')
+    for chain_suffix in ('', '_heavy', '_light'):
 
-    for chain in ('heavy', 'light'):
-
-        if f'ANARCI_numbering_{chain}' not in df.columns:
+        # Select chain columns
+        possible_columns = [f'{column}{chain_suffix}'
+                            for column in SELECTED_UNPAIRED_RECORD_EXAMPLE
+                            if f'{column}{chain_suffix}' in df.columns]
+        chain_df = df[possible_columns]
+        if chain_df.empty:
             continue
 
-        records = zip(df.index,
-                      df[f'ANARCI_numbering_{chain}'],
-                      df[f'ANARCI_status_{chain}'],
-                      df[f'cdr3_aa_{chain}'],
-                      df[f'locus_{chain}'])
+        if verbose:
+            print(f'PARSING {len(df)} RECORDS (unit={unit.id} chain_suffix={chain_suffix})')
 
+        # Remove column chain suffix
+        if chain_suffix:
+            chain_df = chain_df.rename(columns=lambda column: column.rpartition('_')[0])
+
+        # Process all the records
         processed_records = []
+        for index, numbering, anarci_status, cdr3_aa, locus in zip(chain_df.index,
+                                                                   chain_df[f'ANARCI_numbering'],
+                                                                   chain_df[f'ANARCI_status'],
+                                                                   chain_df[f'cdr3_aa'],
+                                                                   chain_df[f'locus']):
 
-        start = time.time()
-
-        for index, numbering, anarci_status, cdr3_aa, locus in records:
-
-            record = {'index': index}
+            record = {'index_in_unit': index, 'chain': 'heavy' if locus == 'H' else 'light'}
 
             # Parse numbering
-            numbering_start = time.time()
             numbering = _preprocess_anarci_data(literal_eval(numbering),
                                                 locus=locus,
-                                                expected_sequence=None,  # bring back if needed
                                                 expected_cdr3=cdr3_aa,
                                                 anarci_status=anarci_status)
-
             record.update(numbering)
-            processed_records.append(record)
-            logs[f'numbering_{chain}_taken_s'] = time.time() - numbering_start
 
-        merging_start = time.time()
-        df: pd.DataFrame = df.merge(pd.DataFrame(processed_records).set_index('index', drop=True),
-                                    left_index=True,
-                                    right_index=True,
-                                    how='left',
-                                    validate='one_to_one')
-        logs[f'merging_{chain}_taken_s'] = time.time() - merging_start
+            # Add hash (for reproducibility, as it is actually more efficient to always compute on the fly)
+            try:
+                # noinspection PyArgumentList
+                record['hash0'] = xxhash.xxh64_intdigest(record['sequence_aa'], seed=0)
+                # noinspection PyArgumentList
+                record['hash1'] = xxhash.xxh64_intdigest(record['sequence_aa'], seed=1)
+            except KeyError:
+                record['hash0'] = record['hash1'] = None
+
+            # Add to processed records
+            processed_records.append(record)
+
+        # Merge the processed records with the selected unit metadata
+        dfs.append(chain_df.merge(pd.DataFrame(processed_records),
+                                  left_index=True,
+                                  right_on='index_in_unit',
+                                  how='left',
+                                  validate='one_to_one'))
+
+    # Concatenate all the records
+    df: pd.DataFrame = pd.concat(dfs).sort_values('index_in_unit')
 
     # Drop some more redundant columns
-    df = df.drop(columns=_per_chain_columns(('cdr3_aa', 'ANARCI_numbering'), df=df))
+    df = df.drop(columns=['cdr3_aa', 'ANARCI_numbering'])
 
-    # Type and snake-casing more columns
-    df = df.rename(columns={
-        'Redundancy_heavy': 'redundancy_heavy',
-        'ANARCI_status_heavy': 'anarci_status_heavy',
-        'Redundancy_light': 'redundancy_light',
-        'ANARCI_status_light': 'anarci_status_light',
-    })
-    for column in _per_chain_columns(('junction_aa_length',
-                                      'fw1_start',
-                                      'fw1_length',
-                                      'cdr1_start',
-                                      'cdr1_length',
-                                      'fw2_start',
-                                      'fw2_length',
-                                      'cdr2_start',
-                                      'cdr2_length',
-                                      'fw3_start',
-                                      'fw3_length',
-                                      'cdr3_start',
-                                      'cdr3_length',
-                                      'fw4_start',
-                                      'fw4_length',),
-                                     df=df):
+    # Snake-casing more columns
+    df = df.rename(columns={'Redundancy': 'redundancy', 'ANARCI_status': 'anarci_status'})
+
+    # Ensure good types
+    for column in ('junction_aa_length',
+                   'fwr1_start',
+                   'fwr1_length',
+                   'cdr1_start',
+                   'cdr1_length',
+                   'fwr2_start',
+                   'fwr2_length',
+                   'cdr2_start',
+                   'cdr2_length',
+                   'fwr3_start',
+                   'fwr3_length',
+                   'cdr3_start',
+                   'cdr3_length',
+                   'fwr4_start',
+                   'fwr4_length'):
+        if column not in df.columns:
+            df[column] = None
         df[column] = df[column].astype(pd.UInt16Dtype())
-    for column in _per_chain_columns('redundancy', df=df):
-        df[column] = df[column].astype(pd.UInt32Dtype())
-    for column in _per_chain_columns(('stop_codon',
-                                      'vj_in_frame',
-                                      'v_frameshift',
-                                      'productive',
-                                      'rev_comp',
-                                      'complete_vdj'),
-                                     df=df):
-        df[column] = df[column].apply(_igblast_tf_to_bool)
+    if 'redundancy' not in df.columns:
+        df['redundancy'] = None
+    df['redundancy'] = df['redundancy'].astype(pd.UInt32Dtype())
+    for column in ('index_in_unit', 'hash0', 'hash1'):
+        df[column] = df[column].astype(pd.UInt64Dtype())
+    for column in ('stop_codon',
+                   'vj_in_frame',
+                   'v_frameshift',
+                   'productive',
+                   'rev_comp',
+                   'complete_vdj'):
+        if column not in df.columns:
+            df[column] = None
+        else:
+            df[column] = df[column].apply(_igblast_tf_to_bool)
+        df[column] = df[column].astype(pd.BooleanDtype())
 
     #
     # TODO: keep making it a bit closer to AIRR
@@ -955,43 +973,50 @@ def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True
     #   https://docs.airr-community.org/en/stable/datarep/rearrangements.html
     #   https://docs.airr-community.org/en/stable/datarep/rearrangements.html#rearrangementschema
     # e.g.
-    #   cdr3_start, cdr3_end -> based on 1-numbering and inclusive...
+    #   cdr3_start, cdr3_end -> based on 1-numbering and inclusive... (a bit inconvenient in python land)
+    #   redundancy -> duplicate_count
     #
 
     COLUMNS = {
-        # locus
+        # index in CSV file
+        'index_in_unit': None,
+        # chain + locus
+        'chain': None,
         'locus': None,
         # germlines
         'v_call': None,
         'd_call': None,
         'j_call': None,
         # sequence
-        'aligned_sequence': 'sequence_aa',
+        'sequence_aa': None,
         # numbering
-        'positions': 'imgt_positions',    # Not sure if anything similar from AIRR
-        'insertions': 'imgt_insertions',  # Not sure if anything similar from AIRR
+        'imgt_positions': None,   # Not sure if there is anything similar from AIRR
+        'imgt_insertions': None,  # Not sure if there is anything similar from AIRR
         # is the alignment based on the opposite strand?
         'rev_comp': None,
         # junction
         'junction_aa': None,
         'junction_aa_length': None,
+        # hashes
+        'hash0': None,
+        'hash1': None,
         # regions (at the moment, python intervals)
-        'fw1_start': None,
-        'fw1_length': None,
+        'fwr1_start': None,
+        'fwr1_length': None,
         'cdr1_start': None,
         'cdr1_length': None,
-        'fw2_start': None,
-        'fw2_length': None,
+        'fwr2_start': None,
+        'fwr2_length': None,
         'cdr2_start': None,
-        'fw3_start': None,
-        'fw3_length': None,
+        'fwr3_start': None,
+        'fwr3_length': None,
         'cdr2_length': None,
         'cdr3_start': None,
         'cdr3_length': None,
-        'fw4_start': None,
-        'fw4_length': None,
-        # duplicate counts
-        'redundancy': 'duplicate_count',
+        'fwr4_start': None,
+        'fwr4_length': None,
+        # duplicate counts (N.B., likely this is "duplicate_count" in AIRR standard, but defer renaming)
+        'redundancy': None,
         # igblast / airr flags
         'stop_codon': None,
         'vj_in_frame': None,
@@ -1002,7 +1027,6 @@ def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True
         'has_insertions': None,
         'has_unexpected_insertions': None,
         'has_mutated_conserved_cysteines': None,
-        'has_wrong_sequence_reconstruction': None,
         'has_wrong_cdr3_reconstruction': None,
         'has_kappa_gap_21': None,
         # anarci flags
@@ -1010,52 +1034,32 @@ def _process_sequences_df(df, unit: Unit, verbose=False, drop_anarci_status=True
         'anarci_insertions': None,
         'anarci_missing_conserved_cysteine': None,
         'anarci_unusual_residue': None,
-        'anarci_fw1_shorter_than_imgt_defined': None,
-        'anarci_fw4_shorter_than_imgt_defined': None,
+        'anarci_fwr1_shorter_than_imgt_defined': None,
+        'anarci_fwr4_shorter_than_imgt_defined': None,
         'anarci_cdr3_is_over_37_aa_long': None,
         'anarci_status': None,
     }
-    renamer = {}
-    for chain in ('heavy', 'light'):
-        if f'locus_{chain}' not in df.columns:
-            continue
-        renamer.update({
-            f'{column}_{chain}': f'{column if new_name is None else new_name}_{chain}'
-            for column, new_name in COLUMNS.items()
-        })
-        renamer.update({
-            column: column for column in df.columns
-            if column.endswith(f'_{chain}') and column not in renamer
-        })
-    df = df.rename(columns=renamer)
-    df = df[[column for column in renamer.values() if column in df.columns]]
+    if set(COLUMNS) - set(df.columns):
+        raise Exception(f'Some expected columns are missing {sorted(set(COLUMNS) - set(df.columns))} (unit={unit.id})')
+    if set(df.columns) - set(COLUMNS):
+        raise Exception(f'Some columns are spurious {sorted(set(df.columns) - set(COLUMNS))} (unit={unit.id})')
+    renamer = {column: f'{column if new_name is None else new_name}' for column, new_name in COLUMNS.items()}
+    df = df.rename(columns=renamer)[list(renamer.values())]
 
     # Drop anarci status?
     if drop_anarci_status:
-        for chain in ('heavy', 'light'):
-            try:
-                del df[f'anarci_status_{chain}']
-            except KeyError:
-                ...
+        del df['anarci_status']
 
     # Done
-    logs['taken_s'] = time.time() - start
+    logs = {
+        'num_records': len(df),
+        'taken_s': time.time() - start
+    }
 
     if verbose:
         print(f'DONE PARSING {len(df)} RECORDS IN {logs["taken_s"]:.2f} SECONDS')
 
     return df, logs
-
-
-def _rename_by_chain_type(df, unit: Unit):
-    # Is this an unpaired unit? => Name as paired (clunky but works)
-    if 'sequence' in df.columns:
-        loci = df.locus.unique()
-        if len(loci) != 1:
-            raise Exception(f'More than one locus ({loci}) in unit {unit.path}')
-        suffix = '_heavy' if loci[0] == 'H' else '_light'
-        df = df.rename(columns=lambda colname: colname + suffix)
-    return df
 
 
 def _process_oas_csv_unit(unit: Unit,
@@ -1138,7 +1142,7 @@ def _process_oas_csv_unit(unit: Unit,
         # --- Do the actual work
 
         if parallel is None:
-            dfs_logs = [_process_sequences_df(df=df, unit=unit, verbose=verbose) for df in chunks]
+            dfs_logs = [_process_sequences_df(df=records, unit=unit, verbose=verbose) for records in chunks]
         else:
             dfs_logs = parallel(
                 delayed(_process_sequences_df)
@@ -1429,27 +1433,34 @@ def parse_all_anarci_status():
         print(unit.id)
         if unit.has_sequences:
             df = unit.sequences_df()
-            for chain in ('heavy', 'light'):
-                try:
-                    for status in getattr(df, f'anarci_status_{chain}'):
-                        try:
-                            parse_anarci_status(status)
-                        except ValueError as ex:
-                            if 'QA' in str(ex):
-                                print(str(ex))
-                            else:
-                                print(f'Exception for {status}: {str(ex)}')
-                except AttributeError:
-                    ...
+            try:
+                for status in df.anarci_status:
+                    try:
+                        parse_anarci_status(status)
+                    except ValueError as ex:
+                        if 'QA' in str(ex):
+                            print(str(ex))
+                        else:
+                            print(f'Exception for {status}: {str(ex)}')
+            except AttributeError:
+                ...
 
 
 # --- Some things that should become proper tests
 
-def check_parsing_corner_cases():
+def check_csv_parsing_corner_cases():
     # Very long CDR3s with insertions, codes at and beyond "AA"
     oas = OAS()
     unit = oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_Heavy_IGHA')
     _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
+
+
+def check_csv_parsing():
+    oas = OAS()
+    for unit in oas.units_in_disk(oas_subset='unpaired'):
+        _process_oas_csv_unit(unit=unit, async_io=False, verbose=True, reraise=True)
+    for unit in oas.units_in_disk(oas_subset='paired'):
+        _process_oas_csv_unit(unit=unit, async_io=True, chunk_size=1, verbose=True, reraise=True)
 
 
 # --- Where there is smoke...
