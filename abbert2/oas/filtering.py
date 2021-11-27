@@ -94,7 +94,7 @@ class MergeRedundant(Filter):
 
 
 class OnlyProductive(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df.query(f'productive')
 
 
@@ -116,7 +116,7 @@ class OnlyIsotypes(Filter):
     def name(self):
         return f'OnlyIsotypes(isotypes={sorted(self.isotypes)})'
 
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         #
         # N.B. this will actually fail, as we would need to put isotype in our dataframes
         #   - isotype is a unit-level field,
@@ -125,22 +125,24 @@ class OnlyIsotypes(Filter):
         #     but the key of this filter is to remove naïve antibodies,
         #     and so the NoNaive filter could be used instead
         #
-        return df[df['isotype'].isin(self.isotypes)]
+        # return df[df['isotype'].isin(self.isotypes)]
+        #
+        raise NotImplementedError
 
 
 # noinspection DuplicatedCode
 class NoStopCodon(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df.query(f'not stop_codon')
 
 
 class VJInFrame(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df.query(f'vj_in_frame')
 
 
 class NoUnexpectedInsertions(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df.query(f'not has_unexpected_insertions')
 
 
@@ -157,7 +159,7 @@ class NoShortFWR1(Filter):
     def name(self):
         return f'NoShortFWR1(threshold={self.threshold})'
 
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         if self.threshold is None:
             return df.query(f'not anarci_fwr1_shorter_than_imgt_defined')
         return df.query(f'fwr1_length >= {self.threshold}')
@@ -176,14 +178,14 @@ class NoShortFWR4(Filter):
     def name(self):
         return f'NoShortFWR4(threshold={self.threshold})'
 
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         if self.threshold is None:
             return df.query(f'not anarci_fwr4_shorter_than_imgt_defined')
         return df.query(f'fwr4_length >= {self.threshold}')
 
 
 class NoKappaGap21(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df.query(f'not has_kappa_gap_21')
 
 
@@ -192,28 +194,28 @@ class NoDeletions(Filter):
     # Note that some deletions are meant to be present (as IMGT tries to cover all IG domains)
     # See for example:
     #   http://www.imgt.org/IMGTrepertoire/Proteins/proteinDisplays.php?species=human&latin=Homo%20sapiens&group=IGHV
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df[df[f'anarci_deletions'].isna()]
 
 
 class NoInsertionsOutOfCDRs(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
-        return df[df[f'anarci_insertions'].notna()]
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        return df[df[f'anarci_insertions'].isna()]
 
 
 # noinspection DuplicatedCode
 class NoUnsupportedCDR3Length(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df.query(f'not anarci_cdr3_is_over_37_aa_long')
 
 
 class NoMissingConservedCysteine(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df.query(f'not anarci_missing_conserved_cysteine')
 
 
 class NoUnusualResidues(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df.query(f'not anarci_unusual_residue')
 
 
@@ -231,7 +233,7 @@ class CountThreshold(Filter):
     def name(self):
         return f'CountThreshold(threshold={self.threshold})'
 
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df.query(f'duplicate_count >= {self.threshold}')
 
 
@@ -269,7 +271,7 @@ class NoNaive(Filter):
     def name(self):
         return f'NoNaive(threshold={self.threshold})'
 
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         raise NotImplementedError
 
 
