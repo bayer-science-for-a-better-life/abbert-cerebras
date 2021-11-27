@@ -30,15 +30,36 @@ class Filter:
 
 
 class Identity(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df
 
 
-class MergeDuplicates(Filter):
-    def _filter(self, df: pd.DataFrame, unit=None) -> pd.DataFrame:
-        # value_counts if not Redundancy in dataset
-        # groupby and sum if redundancy in dataset
-        pass
+class MergeRedundant(Filter):
+
+    def __init__(self, use_all_known: bool = False) -> None:
+        super().__init__()
+        self.use_all_known = use_all_known
+
+    @property
+    def name(self):
+        return f'MergeRedundant(use_all_known={self.use_all_known})'
+
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+
+        if self.use_all_known:
+            raise NotImplementedError
+
+        # assume that missing redundancy means 1 (happens in paired)
+        df['redundancy'].fillna(value=1, inplace=True)
+        estimated_redundancy = df.groupby('sequence_aa')['redundancy'].sum()
+
+        # for the time being, ignore different metadata and keep the first occurrence
+        df.drop_duplicates('sequence_aa')
+
+        # and assign the estimated redundancy
+        df['redundancy'] = estimated_redundancy.loc[df['sequence_aa']].values
+
+        return df
 
     @staticmethod
     def duplicates_within_same_unit_example():
