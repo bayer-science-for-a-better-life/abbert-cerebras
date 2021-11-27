@@ -22,7 +22,7 @@ def copy(oas_path: Optional[Union[str, Path]] = None,
          unit_probability: float = 1.0,
          filtering_strategy: str = 'none',
          overwrite: bool = False):
-    OAS(oas_path=oas_path).copy_to(dest_path,
+    OAS(oas_path=oas_path).copy_to(dest_path / f'filters={filtering_strategy}',
                                    include_paired=not no_paired,
                                    include_unpaired=not no_unpaired,
                                    include_subset_meta=include_subset_meta,
