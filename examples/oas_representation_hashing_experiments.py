@@ -1,4 +1,7 @@
 """
+IMPORTANT NOTE: THIS DOES NOT WORK ANYMORE WITH THE NEWER, SIMPLIFIED UNIT FORMAT
+                REWRITE WHEN REEVALUATING
+
 Small benchmark for RAM space, in-disk space and conversion / hashing.
 
 Unfortunately, without further intervention, columns with S1-typed arrays get
