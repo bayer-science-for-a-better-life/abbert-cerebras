@@ -54,6 +54,7 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import requests
+import xxhash
 from joblib import Parallel, delayed
 from pyarrow import ArrowInvalid
 from tqdm import tqdm
@@ -87,6 +88,25 @@ def _normalize_oas_species(species):
 
         'rhesus': 'rhesus',
     }.get(species, species)
+
+
+# --- Misc utils
+
+def copy_but_do_not_overwrite(src, dest_path, *, num_rows_header=-1, overwrite=False):
+    if not src.is_file():
+        return
+    dest = dest_path / src.name
+    if dest.is_file() and not overwrite:
+        raise Exception(f'Path already exists and will not overwrite ({dest})')
+    dest_path.mkdir(parents=True, exist_ok=True)
+    if num_rows_header < 0:
+        shutil.copy(src, dest)
+    else:
+        # this should be used just for the CSV
+        with open(src, 'rt') as reader:
+            with open(dest, 'wt') as writer:
+                for line in islice(reader, num_rows_header):
+                    writer.write(line)
 
 
 # --- Convenient abstractions over the dataset
@@ -242,6 +262,58 @@ class OAS:
             df[int_column] = df[int_column].astype(pd.Int64Dtype())
 
         return df
+
+    # --- More file management
+
+    def copy_to(self,
+                dest_path: Path = Path.home() / 'oas-copy',
+                include_paired: bool = True,
+                include_unpaired: bool = True,
+                include_subset_meta: bool = False,
+                include_summaries: bool = False,
+                include_sequences: bool = False,
+                include_original_csv: bool = False,
+                include_stats: bool = False,
+                max_num_sequences: int = -1,
+                unit_probability: float = 1,
+                overwrite: bool = False):
+
+        def copy_subset(oas_subset: str):
+
+            # --- Subset online collected metadata
+            if include_subset_meta:
+                for path in (self.oas_path / oas_subset).glob('bulk_download*'):
+                    subset_path = dest_path / oas_subset
+                    subset_path.mkdir(parents=True, exist_ok=True)
+                    copy_but_do_not_overwrite(path, dest_path=subset_path, overwrite=overwrite)
+
+            # --- Units
+            for unit in self.units_in_disk(oas_subset=oas_subset):
+                if 0 < unit_probability < 1:
+                    seed = xxhash.xxh32_intdigest('_'.join(unit.id))
+                    if np.random.RandomState(seed=seed).uniform() > unit_probability:
+                        continue  # unselected
+                if unit.has_sequences:
+                    print(f'COPYING {unit.id}')
+                    unit.copy_to(dest_path,
+                                 include_sequences=include_sequences,
+                                 include_original_csv=include_original_csv,
+                                 include_stats=include_stats,
+                                 max_num_sequences=max_num_sequences,
+                                 overwrite=overwrite)
+
+            # --- Summaries
+            if include_summaries:
+                summaries_path = dest_path / 'summaries'
+                for path in (self.oas_path / 'summaries').glob('*'):
+                    copy_but_do_not_overwrite(path, dest_path=summaries_path, overwrite=overwrite)
+
+            print(f'Find your OAS dump in {dest_path}')
+
+        if include_paired:
+            copy_subset(oas_subset='paired')
+        if include_unpaired:
+            copy_subset(oas_subset='unpaired')
 
 
 @total_ordering
@@ -779,29 +851,13 @@ class Unit:
 
         dest_path = oas_path / self.oas_subset / self.study_id / self.unit_id
 
-        def copy_but_do_not_overwrite(src, num_rows_header=-1):
-            if not src.is_file():
-                return
-            dest = dest_path / src.name
-            if dest.is_file() and not overwrite:
-                raise Exception(f'Path already exists and will not overwrite ({dest})')
-            dest_path.mkdir(parents=True, exist_ok=True)
-            if num_rows_header < 0:
-                shutil.copy(src, dest)
-            else:
-                # this should be used just for the CSV
-                with open(self.original_csv_path, 'rt') as reader:
-                    with open(dest, 'wt') as writer:
-                        for line in islice(reader, num_rows_header):
-                            writer.write(line)
-
         # copy metadata
-        copy_but_do_not_overwrite(self.metadata_path)
+        copy_but_do_not_overwrite(self.metadata_path, dest_path, overwrite=overwrite)
 
         # copy processed sequences
         if include_sequences and self.has_sequences:
             if max_num_sequences < 0:
-                copy_but_do_not_overwrite(self.sequences_path)
+                copy_but_do_not_overwrite(self.sequences_path, dest_path, overwrite=overwrite)
             else:
                 dest = dest_path / self.sequences_path.name
                 if dest.is_file() and not overwrite:
@@ -810,17 +866,20 @@ class Unit:
                 df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
                 to_parquet(df, dest)
         if include_sequences:
-            copy_but_do_not_overwrite(self.processing_logs_file)
-            copy_but_do_not_overwrite(self.processing_error_logs_file)
+            copy_but_do_not_overwrite(self.processing_logs_file, dest_path, overwrite=overwrite)
+            copy_but_do_not_overwrite(self.processing_error_logs_file, dest_path, overwrite=overwrite)
 
         # copy original csv
         if include_original_csv:
             # +2: unit metadata and column names
-            copy_but_do_not_overwrite(self.original_csv_path, num_rows_header=max_num_sequences + 2)
+            copy_but_do_not_overwrite(self.original_csv_path,
+                                      dest_path,
+                                      num_rows_header=max_num_sequences + 2,
+                                      overwrite=overwrite)
 
         # copy processed stats (N.B., without recomputing for subsets)
         if include_stats:
-            copy_but_do_not_overwrite(self.stats_path)
+            copy_but_do_not_overwrite(self.stats_path, dest_path, overwrite=overwrite)
 
 
 # --- Entry points
