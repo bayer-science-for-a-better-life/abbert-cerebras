@@ -10,23 +10,28 @@ def populate_metadata_jsons(oas_path: Optional[Union[str, Path]] = None):
 
 
 def copy(oas_path: Optional[Union[str, Path]] = None,
-         dest_path: Path = Path.home() / 'oas-processed',
+         dest_path: Path = Path.home() / 'oas-copy',
+         no_paired: bool = False,
+         no_unpaired: bool = False,
+         include_subset_meta: bool = False,
+         include_summaries: bool = False,
          include_sequences: bool = False,
          include_original_csv: bool = False,
          include_stats: bool = False,
          max_num_sequences: int = -1,
+         unit_probability: float = 1,
          overwrite: bool = False):
-    oas = OAS(oas_path=oas_path)
-    for unit in oas.units_in_disk():
-        if unit.has_sequences:
-            print(f'COPYING {unit.id}')
-            unit.copy_to(dest_path,
-                         include_sequences=include_sequences,
-                         include_original_csv=include_original_csv,
-                         include_stats=include_stats,
-                         max_num_sequences=max_num_sequences,
-                         overwrite=overwrite)
-    print(f'Find your OAS dump in {dest_path}')
+    OAS(oas_path=oas_path).copy_to(dest_path,
+                                   include_paired=not no_paired,
+                                   include_unpaired=not no_unpaired,
+                                   include_subset_meta=include_subset_meta,
+                                   include_summaries=include_summaries,
+                                   include_sequences=include_sequences,
+                                   include_original_csv=include_original_csv,
+                                   include_stats=include_stats,
+                                   max_num_sequences=max_num_sequences,
+                                   unit_probability=unit_probability,
+                                   overwrite=overwrite)
 
 
 def main():
