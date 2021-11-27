@@ -287,10 +287,12 @@ FILTERS = {
         NoUnsupportedCDR3Length(),
         NoUnusualResidues(),
         NoMissingConservedCysteine(),
-        NoKappaGap21()
+        NoKappaGap21(),
+        MergeRedundant(),
     ),
 
     'most-strict': (
+        MergeRedundant(),
         CountThreshold(threshold=3),
         OnlyProductive(),
         NoShortFWR1(threshold=20),
@@ -300,7 +302,7 @@ FILTERS = {
         NoUnsupportedCDR3Length(),
         NoUnusualResidues(),
         NoMissingConservedCysteine(),
-        NoKappaGap21()
+        NoKappaGap21(),
     ),
 }
 
