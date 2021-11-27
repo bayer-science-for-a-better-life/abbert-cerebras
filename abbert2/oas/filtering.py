@@ -2,7 +2,9 @@
 import time
 from typing import Tuple, Sequence, Optional
 
+import numpy as np
 import pandas as pd
+import xxhash
 
 from abbert2.oas import OAS, Unit
 
@@ -284,6 +286,43 @@ class NoNaive(Filter):
         raise NotImplementedError
 
 
+class NoDuplicates(Filter):
+    """
+    An online duplicate filter.
+
+    N.B. will build a giagantic inefficient index in memory and needs that all happens in one process...
+
+    To avoid, precompute and redistribute to workers.
+    Map in this case to unit_hash, sequence_hash for the chosen sequence.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._num_shards = 256
+        self._shards = [{} for _ in range(self._num_shards)]
+        self._total = 0
+        self._current = 0
+
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        no_duplicate = np.ones(len(df), dtype=bool)
+        for i, sequence in enumerate(df['sequence_aa']):
+            self._total += 1
+            if not sequence:  # some rogue paired antibody without this type of chain
+                continue
+            # noinspection PyArgumentList
+            hash0 = xxhash.xxh3_64_intdigest(sequence, seed=0)
+            # noinspection PyArgumentList
+            hash1 = xxhash.xxh3_64_intdigest(sequence, seed=1)
+            shard = self._shards[int(hash0 % self._num_shards)]
+            if hash1 not in shard:
+                shard[hash1] = 1
+                self._current += 1
+            else:
+                shard[hash1] += 1
+                no_duplicate[i] = False
+        return df[no_duplicate]
+
+
 FILTERS = {
 
     'no-filters': (),
@@ -298,6 +337,7 @@ FILTERS = {
         NoMissingConservedCysteine(),
         NoKappaGap21(),
         MergeRedundant(),
+        NoDuplicates(),
     ),
 
     'most-strict': (
@@ -312,6 +352,7 @@ FILTERS = {
         NoUnusualResidues(),
         NoMissingConservedCysteine(),
         NoKappaGap21(),
+        NoDuplicates(),
     ),
 }
 
@@ -339,7 +380,8 @@ if __name__ == '__main__':
         oas.unit('unpaired', 'Gidoni_2019', 'ERR2567201_Heavy_IGHD'),
         oas.unit('unpaired', 'Greiff_2017', 'ERR1759628_Heavy_Bulk'),
         oas.unit('paired', 'Alsoiussi_2020', 'SRR11528761_paired'),
-        oas.unit('paired', 'Goldstein_2019', 'SRR9179276_paired')
+        oas.unit('paired', 'Goldstein_2019', 'SRR9179276_paired'),
+        oas.unit('paired', 'Goldstein_2019', 'SRR9179276_paired'),
     )
 
     UNITS = TEST_UNITS if only_test else oas.units_in_disk(oas_subset='unpaired')
