@@ -768,9 +768,9 @@ class Unit:
     def copy_to(self,
                 oas_path: Union[str, Path],
                 include_sequences: bool = True,
-                max_num_sequences: Optional[int] = None,
                 include_original_csv: bool = False,
                 include_stats: bool = False,
+                max_num_sequences: Optional[int] = None,
                 overwrite: bool = False):
 
         oas_path = Path(oas_path)
@@ -832,15 +832,20 @@ def populate_metadata_jsons(oas_path: Path = None):
 
 def extract_processed_oas(oas_path: Optional[Union[str, Path]] = None,
                           dest_path: Path = Path.home() / 'oas-processed',
+                          include_sequences: bool = False,
+                          include_original_csv: bool = False,
+                          include_stats: bool = False,
+                          max_num_sequences: int = -1,
                           overwrite: bool = False):
     oas = OAS(oas_path=oas_path)
     for unit in oas.units_in_disk():
         if unit.has_sequences:
             print(f'COPYING {unit.id}')
             unit.copy_to(dest_path,
-                         include_sequences=True,
-                         max_num_sequences=None,
-                         include_original_csv=False,
+                         include_sequences=include_sequences,
+                         include_original_csv=include_original_csv,
+                         include_stats=include_stats,
+                         max_num_sequences=max_num_sequences,
                          overwrite=overwrite)
     print(f'Find your OAS dump in {dest_path}')
 
