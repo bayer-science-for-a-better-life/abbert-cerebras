@@ -48,7 +48,7 @@ from functools import cached_property, total_ordering
 from itertools import chain, zip_longest, islice
 from json import JSONDecodeError
 from pathlib import Path
-from typing import Tuple, Union, Iterator, Optional, List, Callable
+from typing import Tuple, Union, Iterator, Optional, List, Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -275,7 +275,13 @@ class OAS:
                 include_stats: bool = False,
                 max_num_sequences: int = -1,
                 unit_probability: float = 1,
+                filtering_strategy: str = 'none',
                 overwrite: bool = False):
+
+        # Avoid circular import
+        from abbert2.oas.filtering import create_filters_from_name
+        # Global filter states for the whole run
+        filters = create_filters_from_name(filtering_strategy)
 
         def copy_subset(oas_subset: str):
 
@@ -299,6 +305,7 @@ class OAS:
                                  include_original_csv=include_original_csv,
                                  include_stats=include_stats,
                                  max_num_sequences=max_num_sequences,
+                                 filters=filters,
                                  overwrite=overwrite)
 
             # --- Summaries
@@ -821,7 +828,10 @@ class Unit:
                 include_original_csv: bool = False,
                 include_stats: bool = False,
                 max_num_sequences: int = -1,
+                filters: Sequence[Callable] = None,
                 overwrite: bool = False):
+
+        from abbert2.oas.filtering import filter_df
 
         oas_path = Path(oas_path)
         if oas_path == self.oas_path:
@@ -834,14 +844,18 @@ class Unit:
 
         # copy processed sequences
         if include_sequences and self.has_sequences:
-            if max_num_sequences < 0:
+            if max_num_sequences < 0 and not filters:
                 copy_but_do_not_overwrite(self.sequences_path, dest_path, overwrite=overwrite)
             else:
                 dest = dest_path / self.sequences_path.name
                 if dest.is_file() and not overwrite:
                     raise Exception(f'Path already exists and will not overwrite ({dest})')
                 df = self.sequences_df()
-                df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
+                if max_num_sequences:
+                    df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
+                if filters:
+                    # noinspection PyTypeChecker
+                    df, logs = filter_df(df, unit=unit, filters=filters, keep_df_history=False)
                 to_parquet(df, dest)
         if include_sequences:
             copy_but_do_not_overwrite(self.processing_logs_file, dest_path, overwrite=overwrite)

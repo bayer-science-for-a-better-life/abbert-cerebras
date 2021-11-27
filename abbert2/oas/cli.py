@@ -20,6 +20,7 @@ def copy(oas_path: Optional[Union[str, Path]] = None,
          include_stats: bool = False,
          max_num_sequences: int = -1,
          unit_probability: float = 1.0,
+         filtering_strategy: str = 'none',
          overwrite: bool = False):
     OAS(oas_path=oas_path).copy_to(dest_path,
                                    include_paired=not no_paired,
@@ -31,6 +32,7 @@ def copy(oas_path: Optional[Union[str, Path]] = None,
                                    include_stats=include_stats,
                                    max_num_sequences=max_num_sequences,
                                    unit_probability=unit_probability,
+                                   filtering_strategy=filtering_strategy,
                                    overwrite=overwrite)
 
 
