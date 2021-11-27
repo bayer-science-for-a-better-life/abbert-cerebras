@@ -17,10 +17,10 @@ def unique_experiment():
     start = time.perf_counter()
 
     for unit in oas.units_in_disk():
-        df = unit.sequences_df(columns=[f'sequence_aa'])
+        df = unit.sequences_df(columns=['sequence_aa'])
         if df is None:
             continue
-        for sequence in df[f'sequence_aa']:
+        for sequence in df['sequence_aa']:
             total += 1
             if not sequence:  # some rogue antibody without this type of chain
                 continue
