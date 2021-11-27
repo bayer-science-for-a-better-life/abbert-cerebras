@@ -1,6 +1,5 @@
 import time
 
-import pandas as pd
 import xxhash
 
 from abbert2.oas import OAS
@@ -15,28 +14,32 @@ def unique_experiment():
     total = 0
     index = 0
 
-    start = time.time()
+    start = time.perf_counter()
 
     for unit in oas.units_in_disk():
-        for chain in ('heavy', 'light'):
-            df = unit.sequences_df(columns=[f'sequence_aa_{chain}'])
-            if df is None:
+        df = unit.sequences_df(columns=[f'sequence_aa'])
+        if df is None:
+            continue
+        for sequence in df[f'sequence_aa']:
+            total += 1
+            if not sequence:  # some rogue antibody without this type of chain
                 continue
-            for sequence in df[f'sequence_aa_{chain}']:
-                total += 1
-                if not sequence:  # some rogue antibody without this type of chain
-                    continue
-                sequence = sequence.astype('S1').tobytes().decode('utf-8')
-                h = xxhash.xxh3_64_intdigest(sequence)
-                shard = shards[h % num_shards]
-                if h not in shard:
-                    shard[h] = index
-                    index += 1
-                if total % 100_000 == 0:
-                    print(f'{total} ({index} unique) {total / (time.time() - start):.2f} sequences / s')
-    pd.to_pickle(shards, oas.oas_path / 'uniques.pickle')
+            # noinspection PyArgumentList
+            hash0 = xxhash.xxh3_64_intdigest(sequence, seed=0)
+            # noinspection PyArgumentList
+            hash1 = xxhash.xxh3_64_intdigest(sequence, seed=1)
+            shard = shards[hash0 % num_shards]
+            if hash1 not in shard:
+                shard[hash1] = index
+                index += 1
+            if total % 100_000 == 0:
+                print(f'{total} ({index} unique) {int(total / (time.perf_counter() - start))} sequences/s')
 
     #
     # Exact duplicates, with 99% of the dataset processed:
-    #   1_508_100_000 (1_402_842_072 unique) 81000.00 sequences / s
+    #   1_508_100_000 (1_402_842_072 unique) 1_500_000 sequences / s
     #
+
+
+if __name__ == '__main__':
+    unique_experiment()
