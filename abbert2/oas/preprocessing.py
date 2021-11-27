@@ -593,9 +593,9 @@ ANARCI_IMGT_CDR_LENGTHS = {
 }
 
 
-def _preprocess_anarci_data(numbering_data_dict, locus,
+def _preprocess_anarci_data(numbering_data_dict,
+                            locus,
                             *,
-                            expected_sequence=None,
                             expected_cdr3=None,
                             anarci_status=None) -> dict:
     """
@@ -680,62 +680,61 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
     #
 
     regions = (
-        (f'fw{locus.lower()}1', f'fw1'),
-        (f'cdr{locus.lower()}1', f'cdr1'),
-        (f'fw{locus.lower()}2', f'fw2'),
-        (f'cdr{locus.lower()}2', f'cdr2'),
-        (f'fw{locus.lower()}3', f'fw3'),
-        (f'cdr{locus.lower()}3', f'cdr3'),
-        (f'fw{locus.lower()}4', f'fw4'),
+        (f'fw{locus.lower()}1', 'fwr1'),
+        (f'cdr{locus.lower()}1', 'cdr1'),
+        (f'fw{locus.lower()}2', 'fwr2'),
+        (f'cdr{locus.lower()}2', 'cdr2'),
+        (f'fw{locus.lower()}3', 'fwr3'),
+        (f'cdr{locus.lower()}3', 'cdr3'),
+        (f'fw{locus.lower()}4', 'fwr4'),
     )
-
-    heavy_or_light = 'heavy' if locus == 'H' else 'light'
 
     # We will populate all these fields for the current record
     alignment_data = {
         # alignment
-        f'has_insertions_{heavy_or_light}': False,
-        f'fw1_start_{heavy_or_light}': None,
-        f'fw1_length_{heavy_or_light}': None,
-        f'cdr1_start_{heavy_or_light}': None,
-        f'cdr1_length_{heavy_or_light}': None,
-        f'fw2_start_{heavy_or_light}': None,
-        f'fw2_length_{heavy_or_light}': None,
-        f'cdr2_start_{heavy_or_light}': None,
-        f'fw3_start_{heavy_or_light}': None,
-        f'fw3_length_{heavy_or_light}': None,
-        f'cdr2_length_{heavy_or_light}': None,
-        f'cdr3_start_{heavy_or_light}': None,
-        f'cdr3_length_{heavy_or_light}': None,
-        f'fw4_start_{heavy_or_light}': None,
-        f'fw4_length_{heavy_or_light}': None,
-        f'aligned_sequence_{heavy_or_light}': [],
-        f'positions_{heavy_or_light}': [],
-        f'insertions_{heavy_or_light}': [],
+        'sequence_aa': [],
+        'imgt_positions': [],
+        'imgt_insertions': [],
+        'fwr1_start': None,
+        'fwr1_length': None,
+        'cdr1_start': None,
+        'cdr1_length': None,
+        'fwr2_start': None,
+        'fwr2_length': None,
+        'cdr2_start': None,
+        'fwr3_start': None,
+        'fwr3_length': None,
+        'cdr2_length': None,
+        'cdr3_start': None,
+        'cdr3_length': None,
+        'fwr4_start': None,
+        'fwr4_length': None,
         # flags
-        f'has_unexpected_insertions_{heavy_or_light}': False,
-        f'has_mutated_conserved_cysteines_{heavy_or_light}': False,
-        f'has_wrong_sequence_reconstruction_{heavy_or_light}': None,
-        f'has_wrong_cdr3_reconstruction_{heavy_or_light}': None,
-        f'has_kappa_gap_21_{heavy_or_light}': False,
-        f'anarci_deletions_{heavy_or_light}': None,
-        f'anarci_insertions_{heavy_or_light}': None,
-        f'anarci_missing_conserved_cysteine_{heavy_or_light}': False,
-        f'anarci_unusual_residue_{heavy_or_light}': False,
-        f'anarci_fw1_shorter_than_imgt_defined_{heavy_or_light}': False,
-        f'anarci_fw4_shorter_than_imgt_defined_{heavy_or_light}': False,
-        f'anarci_cdr3_is_over_37_aa_long_{heavy_or_light}': False,
+        'has_insertions': False,
+        'has_unexpected_insertions': False,
+        'has_mutated_conserved_cysteines': False,
+        'has_wrong_cdr3_reconstruction': None,
+        'has_kappa_gap_21': False,
+        'anarci_deletions': None,
+        'anarci_insertions': None,
+        'anarci_missing_conserved_cysteine': False,
+        'anarci_unusual_residue': False,
+        'anarci_fwr1_shorter_than_imgt_defined': False,
+        'anarci_fwr4_shorter_than_imgt_defined': False,
+        'anarci_cdr3_is_over_37_aa_long': False,
     }
 
     last_region_end = 0
     for region_key, region in regions:
 
+        # TODO: protect against wrong anarci dictionary
+
         # What AAs do we have in the region?
         aas_in_region = list(numbering_data_dict.get(region_key, {}).items())
 
         # Start and length (None and 0 for not present regions)
-        alignment_data[f'{region}_start_{heavy_or_light}'] = last_region_end if len(aas_in_region) else None
-        alignment_data[f'{region}_length_{heavy_or_light}'] = len(aas_in_region)
+        alignment_data[f'{region}_start'] = last_region_end if len(aas_in_region) else None
+        alignment_data[f'{region}_length'] = len(aas_in_region)
         last_region_end += len(aas_in_region)
 
         # Sort the region AAs
@@ -744,59 +743,52 @@ def _preprocess_anarci_data(numbering_data_dict, locus,
             position, insertion = parse_anarci_position(position)
             insertion_code = anarci_insertion_to_code(insertion)
             # Got insertions
-            if insertion_code != -1:
-                alignment_data[f'has_insertions_{heavy_or_light}'] = True
-            if alignment_data[f'has_insertions_{heavy_or_light}']:
+            if insertion_code:
+                alignment_data['has_insertions'] = True
                 if position not in (111, 112):
-                    alignment_data[f'has_unexpected_insertions_{heavy_or_light}'] = True
+                    alignment_data['has_unexpected_insertions'] = True
             if position in (23, 104) and aa != 'C':
-                alignment_data[f'has_mutated_conserved_cysteines_{heavy_or_light}'] = True
+                alignment_data['has_mutated_conserved_cysteines'] = True
             if locus == 'K' and position == 21 and aa == '-':
-                alignment_data[f'has_kappa_gap_21_{heavy_or_light}'] = True
+                alignment_data['has_kappa_gap_21'] = True
             # Mirroring of inserted residues
             insertion_code_order = insertion_code if position not in (112, 62) else -insertion_code
             region_positions.append((position, insertion_code_order, insertion, aa))
         region_positions = sorted(region_positions)
 
-        alignment_data[f'aligned_sequence_{heavy_or_light}'] += [aa for *_, aa in region_positions]
-        alignment_data[f'positions_{heavy_or_light}'] += [position for position, *_ in region_positions]
-        alignment_data[f'insertions_{heavy_or_light}'] += [insertion for *_, insertion, _ in region_positions]
+        alignment_data['sequence_aa'] += [aa for *_, aa in region_positions]
+        alignment_data['imgt_positions'] += [position for position, *_ in region_positions]
+        alignment_data['imgt_insertions'] += [insertion for *_, insertion, _ in region_positions]
 
     # Make the alignment data a tad more efficient to work with. Still playing...
-    #   - Likely using arrays for aligned sequences is not needed
-    #     (and precludes parquet from better representation?)
-    #     If so, just ''.join() both the sequence and the insertion codes.
-    #   - Probably sparse insertion codes make more sense performancewise,
-    #     they are less practical though.
-    #   - Likely u1 dtype can work for positions (evaluate after collecting stats).
-    alignment_data[f'aligned_sequence_{heavy_or_light}'] = (
-        ''.join(alignment_data[f'aligned_sequence_{heavy_or_light}']))  # FIXME: save as the needed bytes or S1 dtype
-    alignment_data[f'positions_{heavy_or_light}'] = (
-        np.array(alignment_data[f'positions_{heavy_or_light}'], dtype=np.dtype('u2')))
-    alignment_data[f'insertions_{heavy_or_light}'] = (
-        alignment_data[f'insertions_{heavy_or_light}']  # should be dtype S2 when we figure out how to put it in parquet
-        if alignment_data[f'has_insertions_{heavy_or_light}'] else None)
-    if expected_sequence is not None:
-        # noinspection PyUnresolvedReferences
-        alignment_data[f'has_wrong_sequence_reconstruction_{heavy_or_light}'] = (
-                alignment_data[f'aligned_sequence_{heavy_or_light}'] != expected_sequence
-        )
+    #
+    #   - Likely using arrays for aligned sequences is not needed.
+    #     They currently precludes parquet from better representation.
+    #
+    #   - Probably sparse insertion codes make more sense performance-wise.
+    #     They are less practical though.
+    #
+    alignment_data['sequence_aa'] = ''.join(alignment_data['sequence_aa'])  # use only needed bytes or S1 dtype?
+    alignment_data['imgt_positions'] = np.array(alignment_data['imgt_positions'], dtype=np.dtype('u1'))
+    alignment_data['imgt_insertions'] = (
+        alignment_data['imgt_insertions']  # use only needed bytes / S2 dtype / int16 with mapped code?
+        if alignment_data['has_insertions'] else None)
     if expected_cdr3 is not None:
-        if alignment_data[f'cdr3_start_{heavy_or_light}'] is None:
-            alignment_data[f'has_wrong_cdr3_reconstruction_{heavy_or_light}'] = True
+        if alignment_data['cdr3_start'] is None:
+            alignment_data['has_wrong_cdr3_reconstruction'] = True
         else:
-            cdr3_start = alignment_data[f'cdr3_start_{heavy_or_light}']
+            cdr3_start = alignment_data['cdr3_start']
             cdr3_end = (
-                    alignment_data[f'cdr3_start_{heavy_or_light}'] + alignment_data[f'cdr3_length_{heavy_or_light}'])
+                    alignment_data['cdr3_start'] + alignment_data['cdr3_length'])
             # noinspection PyUnresolvedReferences
             aligned_cdr3 = (
-                alignment_data[f'aligned_sequence_{heavy_or_light}'][cdr3_start:cdr3_end])
-            alignment_data[f'has_wrong_cdr3_reconstruction_{heavy_or_light}'] = aligned_cdr3 != expected_cdr3
+                alignment_data['sequence_aa'][cdr3_start:cdr3_end])
+            alignment_data['has_wrong_cdr3_reconstruction'] = aligned_cdr3 != expected_cdr3
 
     # Add ANARCI QA flags
     if anarci_status is not None:
         anarci_status = {
-            f'anarci_{qa_name}_{heavy_or_light}': qa_value
+            f'anarci_{qa_name}': qa_value
             for qa_name, qa_value in parse_anarci_status(anarci_status).items()
         }
         alignment_data.update(anarci_status)
