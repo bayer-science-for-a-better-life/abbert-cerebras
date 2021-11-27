@@ -905,11 +905,11 @@ def _process_sequences_df(df: pd.DataFrame,
             # Add hash (for reproducibility, as it is actually more efficient to always compute on the fly)
             try:
                 # noinspection PyArgumentList
-                record['primary_hash'] = xxhash.xxh64_intdigest(record['sequence_aa'], seed=0)
+                record['hash0'] = xxhash.xxh64_intdigest(record['sequence_aa'], seed=0)
                 # noinspection PyArgumentList
-                record['secondary_hash'] = xxhash.xxh64_intdigest(record['sequence_aa'], seed=1)
+                record['hash1'] = xxhash.xxh64_intdigest(record['sequence_aa'], seed=1)
             except KeyError:
-                record['primary_hash'] = record['secondary_hash'] = None
+                record['hash0'] = record['hash1'] = None
 
             # Add to processed records
             processed_records.append(record)
@@ -952,7 +952,8 @@ def _process_sequences_df(df: pd.DataFrame,
     if 'redundancy' not in df.columns:
         df['redundancy'] = None
     df['redundancy'] = df['redundancy'].astype(pd.UInt32Dtype())
-    df['index_in_unit'] = df['index_in_unit'].astype(pd.UInt64Dtype())
+    for column in ('index_in_unit', 'hash0', 'hash1'):
+        df[column] = df[column].astype(pd.UInt64Dtype())
     for column in ('stop_codon',
                    'vj_in_frame',
                    'v_frameshift',
@@ -996,8 +997,8 @@ def _process_sequences_df(df: pd.DataFrame,
         'junction_aa': None,
         'junction_aa_length': None,
         # hashes
-        'primary_hash': None,
-        'secondary_hash': None,
+        'hash0': None,
+        'hash1': None,
         # regions (at the moment, python intervals)
         'fwr1_start': None,
         'fwr1_length': None,
