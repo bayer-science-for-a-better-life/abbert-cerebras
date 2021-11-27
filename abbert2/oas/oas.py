@@ -779,7 +779,7 @@ class Unit:
 
         dest_path = oas_path / self.oas_subset / self.study_id / self.unit_id
 
-        def copy_but_do_not_overwrite(src, num_rows_header=None):
+        def copy_but_do_not_overwrite(src, num_rows_header=-1):
             if not src.is_file():
                 return
             dest = dest_path / src.name
