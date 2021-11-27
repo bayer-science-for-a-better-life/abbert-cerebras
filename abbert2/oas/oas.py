@@ -705,9 +705,13 @@ class Unit:
 
     # --- Consolidated stats
 
+    @property
+    def stats_path(self) -> Path:
+        return self.path / f'{self.unit_id}.stats.pickle'
+
     def consolidated_stats(self, recompute: bool = False):
 
-        cache_path = self.path / 'stats.pickle'
+        cache_path = self.stats_path
 
         if not recompute:
             try:
@@ -766,6 +770,7 @@ class Unit:
                 include_sequences: bool = True,
                 max_num_sequences: Optional[int] = None,
                 include_original_csv: bool = False,
+                include_stats: bool = False,
                 overwrite: bool = False):
 
         oas_path = Path(oas_path)
@@ -812,6 +817,10 @@ class Unit:
         if include_original_csv:
             # +2: unit metadata and column names
             copy_but_do_not_overwrite(self.original_csv_path, num_rows_header=max_num_sequences + 2)
+
+        # copy processed stats (N.B., without recomputing for subsets)
+        if include_stats:
+            copy_but_do_not_overwrite(self.stats_path)
 
 
 # --- Entry points
