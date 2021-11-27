@@ -978,9 +978,10 @@ def _process_sequences_df(df: pd.DataFrame,
     #
 
     COLUMNS = {
+        # index in CSV file
         'index_in_unit': None,
+        # chain + locus
         'chain': None,
-        # locus
         'locus': None,
         # germlines
         'v_call': None,
