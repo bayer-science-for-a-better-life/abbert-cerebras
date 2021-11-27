@@ -48,7 +48,7 @@ from functools import cached_property, total_ordering
 from itertools import chain, zip_longest, islice
 from json import JSONDecodeError
 from pathlib import Path
-from typing import Tuple, Union, Iterator, Optional, List, Callable, Iterable
+from typing import Tuple, Union, Iterator, Optional, List, Callable
 
 import numpy as np
 import pandas as pd
@@ -57,13 +57,12 @@ import requests
 import xxhash
 from joblib import Parallel, delayed
 from pyarrow import ArrowInvalid
-from tqdm import tqdm
-
 from smart_open import open
+from tqdm import tqdm
 
 from abbert2.common import to_json_friendly, from_parquet, mtime, to_parquet, parse_anarci_position_aa_to_imgt_code, \
     anarci_imgt_code_to_insertion, parse_anarci_position_to_imgt_code
-from abbert2.oas.common import find_oas_path, check_oas_subset, to_chain_independent
+from abbert2.oas.common import find_oas_path, check_oas_subset
 
 
 # --- Some field normalization code
@@ -659,27 +658,6 @@ class Unit:
             return from_parquet(self.sequences_path, columns=columns)
         except (IOError, FileNotFoundError, ArrowInvalid):
             return None
-
-    def tidy_sequences_df(self,
-                          columns=None,
-                          chains=('heavy', 'light'),
-                          add_chain=True,
-                          add_index=True) -> Iterable[Tuple[str, pd.DataFrame]]:
-
-        # Read only the needed columns
-        in_disk_columns = self.in_disk_column_names()
-        if columns is None:
-            columns = list(in_disk_columns)
-        # make columns chain aignostic
-        columns = pd.Series(column if not (column.endswith('_heavy') or column.endswith('_light')) else
-                            column.rpartition('_')[0] for column in columns).drop_duplicates()
-        # and now make them chain aware...
-        for chain in chains:
-            df = self.sequences_df(columns=[f'{column}_{chain}' for column in columns])
-            try:
-                yield next(to_chain_independent(df, chains=chain, add_index=add_index, add_chain=add_chain))
-            except StopIteration:
-                ...
 
     @property
     def sequences_file_size(self) -> Optional[int]:
