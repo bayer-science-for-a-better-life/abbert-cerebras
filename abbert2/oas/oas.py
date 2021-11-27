@@ -857,7 +857,7 @@ class Unit:
                     df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
                 if filters:
                     # noinspection PyTypeChecker
-                    df, logs = filter_df(df, unit=unit, filters=filters, keep_df_history=False)
+                    df, logs = filter_df(df, unit=self, filters=filters, keep_df_history=False)
                 to_parquet(df, dest)
         if include_sequences:
             copy_but_do_not_overwrite(self.processing_logs_file, dest_path, overwrite=overwrite)
