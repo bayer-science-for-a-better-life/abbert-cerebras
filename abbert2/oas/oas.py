@@ -62,7 +62,7 @@ from tqdm import tqdm
 
 from abbert2.common import to_json_friendly, from_parquet, mtime, to_parquet, parse_anarci_position_aa_to_imgt_code, \
     anarci_imgt_code_to_insertion, parse_anarci_position_to_imgt_code
-from abbert2.oas.common import find_oas_path, check_oas_subset
+from abbert2.oas.common import find_oas_path, check_oas_subset, compress_sequences_df
 
 
 # --- Some field normalization code
@@ -858,7 +858,7 @@ class Unit:
                 if filters:
                     # noinspection PyTypeChecker
                     df, logs = filter_df(df, unit=self, filters=filters, keep_df_history=False)
-                to_parquet(df, dest)
+                compress_sequences_df(df=df, path=dest)
         if include_sequences:
             copy_but_do_not_overwrite(self.processing_logs_file, dest_path, overwrite=overwrite)
             copy_but_do_not_overwrite(self.processing_error_logs_file, dest_path, overwrite=overwrite)
