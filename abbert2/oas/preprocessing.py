@@ -1352,7 +1352,7 @@ def process_units(*,
             logs = {'start_time': str(datetime.datetime.now())}
             try:
                 size /= 1024 ** 2
-                print(f'PROCESSING unit {i+1} of {len(sizes_units)} ({size:.2f} MiB) {unit.id}')
+                print(f'PROCESSING unit={unit.id} size={size:.2f} MiB {i + 1} of {len(sizes_units)}')
                 process_logs, df = _process_oas_csv_unit(unit=unit,
                                                          parallel=parallel,
                                                          chunk_size=chunk_size,
@@ -1371,8 +1371,8 @@ def process_units(*,
                 if logs.get('error') is not None:
                     pd.to_pickle(logs['error'], unit.sequences_path.with_suffix('.processing-error.pickle'))
                 processed_size += size
-                print(f'PROCESSED unit {i + 1} ({unit.id}) of {len(sizes_units)} '
-                      f'(total {processed_size:.2f} of {shard_size_mb:.2f} MiB) '
+                print(f'PROCESSED unit={unit.id} size={size:.2f} MiB {i + 1} of {len(sizes_units)} '
+                      f'({processed_size:.2f} of {shard_size_mb:.2f} MiB) '
                       f'in {logs["taken_s"]:.2f}s')
 
 
