@@ -76,7 +76,7 @@ class MergeRedundant(Filter):
         estimated_redundancy = df.groupby('sequence_aa')['redundancy'].sum()
 
         # for the time being, ignore different metadata and keep the first occurrence
-        df = df.drop_duplicates('sequence_aa')
+        df = df.drop_duplicates('sequence_aa').copy()
 
         # and assign the estimated redundancy
         df['redundancy'] = estimated_redundancy.loc[df['sequence_aa']].values
