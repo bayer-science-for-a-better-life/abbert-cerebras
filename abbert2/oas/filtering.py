@@ -13,9 +13,10 @@ class Filter:
 
     def __init__(self) -> None:
         super().__init__()
+        self.num_units_processed = 0
         self.total_taken_s = 0
-        self.num_processed = 0
-        self.num_filtered_out = 0
+        self.num_sequences_processed = 0
+        self.num_sequences_filtered_out = 0
 
     @property
     def name(self):
@@ -31,9 +32,10 @@ class Filter:
             'filtered_out': len(df) - len(new_df),
             'taken_s': time.perf_counter() - start,
         }
+        self.num_units_processed += 1
         self.total_taken_s += log['taken_s']
-        self.num_processed += log['unfiltered_length']
-        self.num_filtered_out += log['filtered_out']
+        self.num_sequences_processed += log['unfiltered_length']
+        self.num_sequences_filtered_out += log['filtered_out']
         return new_df, log
 
     def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
@@ -42,10 +44,11 @@ class Filter:
     def stat_dict(self) -> dict:
         return {
             'name': self.name,
-            'num_processed': self.num_processed,
-            'num_filtered_out': self.num_filtered_out,
+            'num_units_processed': self.num_units_processed,
+            'num_sequences_processed': self.num_sequences_processed,
+            'num_sequences_filtered_out': self.num_sequences_filtered_out,
+            'num_sequences_processed_per_second': self.num_sequences_processed / self.total_taken_s,
             'taken_s': self.total_taken_s,
-            'num_processed_per_second': self.num_processed / self.total_taken_s
         }
 
 
@@ -404,8 +407,9 @@ def filter_df(df: pd.DataFrame,
     print('Accummulated Stats')
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
         print(pd.DataFrame([processor.stat_dict() for processor in filters]).round(2))
-    print(f'Total processed: {filters[0].num_processed}')
-    print(f'Total kept: {filters[-1].num_processed - filters[-1].num_filtered_out}')
+    print(f'Total units processed: {filters[0].num_units_processed}')
+    print(f'Total sequences processed: {filters[0].num_sequences_processed}')
+    print(f'Total sequences kept: {filters[-1].num_sequences_processed - filters[-1].num_sequences_filtered_out}')
     print('-' * 80)
 
     return df, logs
