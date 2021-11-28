@@ -391,6 +391,7 @@ if __name__ == '__main__':
     only_test = True
 
     TEST_UNITS = (
+        oas.unit('unpaired', 'Bender_2020', 'ERR3819135_Light_Bulk'),
         oas.unit('unpaired', 'Gidoni_2019', 'ERR2567201_Heavy_IGHD'),
         oas.unit('unpaired', 'Greiff_2017', 'ERR1759628_Heavy_Bulk'),
         oas.unit('paired', 'Alsoiussi_2020', 'SRR11528761_paired'),
