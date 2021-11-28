@@ -389,14 +389,22 @@ def filter_df(df: pd.DataFrame,
     if isinstance(filters, str):
         filters = create_filters_from_name(filters)
     logs = []
+    filtered_df = df
     for a_filter in filters:
-        df, log = a_filter(df=df, unit=unit)
+        filtered_df, log = a_filter(df=filtered_df, unit=unit)
         if keep_df_history:
-            log['filtered_df'] = df
+            log['filtered_df'] = filtered_df
         logs.append(log)
+
+    print('-' * 80)
     print(f'{unit.id}: from {len(df)} to {len(filtered_df)}')
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
         print(pd.DataFrame(logs)[['name', 'filtered_out', 'taken_s']])
+        print('---')
+        print('Accummulated Stats')
+        print(pd.DataFrame([processor.stat_dict() for processor in filters]))
+    print('-' * 80)
+
     return df, logs
 
 
@@ -424,10 +432,6 @@ if __name__ == '__main__':
             continue
         df = unit.sequences_df()
         filtered_df, logs = filter_df(df, filters=filters, unit=unit, keep_df_history=False)
-        print(f'{unit.id}: from {len(df)} to {len(filtered_df)}')
-        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-            print(pd.DataFrame(logs)[['name', 'filtered_out', 'taken_s']])
-        print('-' * 80)
 
 #
 # ANTIBERTA PAPER:
