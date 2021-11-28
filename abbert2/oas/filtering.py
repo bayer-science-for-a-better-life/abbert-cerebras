@@ -440,6 +440,19 @@ if __name__ == '__main__':
         df = unit.sequences_df()
         filtered_df, logs = filter_df(df, filters=filters, unit=unit, keep_df_history=False)
 
+
+#
+# TODO: Filters like NoDuplicates and, more prominently, MergeRedundant, break the link between Paired VH/VL
+# See: https://github.com/bayer-science-for-a-better-life/abbert-cerebras/issues/7
+#
+# How to deal with this? =>
+# Probably a many to many correspondence between "index_in_csv" of VHs and VLs needs to be kept around.
+#
+# Not important unless we start training against paired VH & VL sequences
+# (e.g., add a self-supervised goal to guess if a pair is real or not alongside
+# training with both chains "concatenated")
+#
+
 #
 # ANTIBERTA PAPER:
 # ---------------
