@@ -804,7 +804,7 @@ class Unit:
                 'aligned_position_counts': dict(aligned_position_counts),
                 'sequence_length_counts': df[f'sequence_aa'].str.len().value_counts().to_dict(),
             }
-            for region in ('fw1', 'cdr1', 'fw2', 'cdr2', 'fw3', 'cdr3', 'fw4'):
+            for region in ('fwr1', 'cdr1', 'fwr2', 'cdr2', 'fwr3', 'cdr3', 'fwr4'):
                 stats[chain][f'{region}_length_counts'] = df[f'{region}_length'].value_counts().to_dict()
             # TODO: collect other stats for things like QA, germlines...
         pd.to_pickle(stats, cache_path)
@@ -931,7 +931,7 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
             'aligned_position_counts': None,
             'sequence_length_counts': None,
         }
-        for region in ('fw1', 'cdr1', 'fw2', 'cdr2', 'fw3', 'cdr3', 'fw4'):
+        for region in ('fwr1', 'cdr1', 'fwr2', 'cdr2', 'fwr3', 'cdr3', 'fwr4'):
             summarized_stats[chain][f'{region}_length_counts'] = None
 
     # Aggregate stats
@@ -959,7 +959,7 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
                         sequence_length_counts.add(summarized_stats[chain]['sequence_length_counts'], fill_value=0)
                     )
                 # --- Length histograms: regions
-                for region in ('fw1', 'cdr1', 'fw2', 'cdr2', 'fw3', 'cdr3', 'fw4'):
+                for region in ('fwr1', 'cdr1', 'fwr2', 'cdr2', 'fwr3', 'cdr3', 'fwr4'):
                     region_length_counts = pd.Series(chain_stats[f'{region}_length_counts'])
                     if summarized_stats[chain][f'{region}_length_counts'] is None:
                         # noinspection PyTypeChecker
@@ -971,7 +971,7 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
 
     # Nice to have:
     #   - aligned aminoacid counts in the right order
-    #   - a small indicator of the region (fw1...)
+    #   - a small indicator of the region (fwr1...)
     for chain in ('heavy', 'light'):
         # The chain aggregated stats
         chain_stats = summarized_stats[chain]
@@ -998,7 +998,7 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
         # Histograms sorted in ascending order
         histograms = ['sequence_length_counts']
         histograms += [f'{region}_length_counts'
-                       for region in ('fw1', 'cdr1', 'fw2', 'cdr2', 'fw3', 'cdr3', 'fw4')]
+                       for region in ('fwr1', 'cdr1', 'fwr2', 'cdr2', 'fwr3', 'cdr3', 'fwr4')]
         for histogram in histograms:
             histogram_series: Optional[pd.Series] = chain_stats[histogram]
             if histogram_series is not None:
@@ -1144,45 +1144,43 @@ def train_validation_test_iterator(
 
     partition = partitioner()
 
-    for chain in chains:
-        used_qa_columns = [
-            # Quality control
-            f'has_mutated_conserved_cysteines_{chain}',
-        ]
-        used_ml_columns = [
-            # To learn over
-            f'fw1_start_{chain}',
-            f'fw1_length_{chain}',
-            f'cdr1_start_{chain}',
-            f'cdr1_length_{chain}',
-            f'fw2_start_{chain}',
-            f'fw2_length_{chain}',
-            f'cdr2_start_{chain}',
-            f'cdr2_length_{chain}',
-            f'fw3_start_{chain}',
-            f'fw3_length_{chain}',
-            f'cdr3_start_{chain}',
-            f'cdr3_length_{chain}',
-            f'fw4_start_{chain}',
-            f'fw4_length_{chain}',
-            f'aligned_sequence_{chain}',
-        ]
-        for ml_subset in ml_subsets:
-            unit: Unit
-            for unit in partition[chain][ml_subset]['unit']:
-                unit_sequences_df = unit.sequences_df(columns=used_ml_columns + used_qa_columns)
-                if unit_sequences_df is None:
-                    continue  # FIXME: this happens when the parquet file is broken beyond the schema
-                try:
-                    if filtering is not None:
-                        unit_sequences_df = filtering(unit_sequences_df, chain)
-                    # Drop QA columns
-                    unit_sequences_df = unit_sequences_df.drop(columns=used_qa_columns)
-                    yield unit, chain, ml_subset, unit_sequences_df
-                except KeyError:
-                    # FIXME: this happens when "has_mutated_conserved_cysteines_light" does not exist
-                    #        observed in one unit, to troubleshoot
-                    ...
+    used_qa_columns = [
+        'has_mutated_conserved_cysteines',
+    ]
+    used_ml_columns = [
+        # To learn over
+        'fwr1_start',
+        'fwr1_length',
+        'cdr1_start',
+        'cdr1_length',
+        'fwr2_start',
+        'fwr2_length',
+        'cdr2_start',
+        'cdr2_length',
+        'fwr3_start',
+        'fwr3_length',
+        'cdr3_start',
+        'cdr3_length',
+        'fwr4_start',
+        'fwr4_length',
+        'sequence_aa',
+    ]
+    for ml_subset in ml_subsets:
+        unit: Unit
+        for unit in partition[chain][ml_subset]['unit']:
+            unit_sequences_df = unit.sequences_df(columns=used_ml_columns + used_qa_columns)
+            if unit_sequences_df is None:
+                continue  # FIXME: this happens when the parquet file is broken beyond the schema
+            try:
+                if filtering is not None:
+                    unit_sequences_df = filtering(unit_sequences_df)
+                # Drop QA columns
+                unit_sequences_df = unit_sequences_df.drop(columns=used_qa_columns)
+                yield unit, chain, ml_subset, unit_sequences_df
+            except KeyError:
+                # FIXME: this happens when "has_mutated_conserved_cysteines_light" does not exist
+                #        observed in one unit, to troubleshoot
+                ...
 
 # --- Maintenance
 
