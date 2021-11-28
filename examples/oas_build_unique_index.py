@@ -21,9 +21,9 @@ def build_unique_index(oas_path: Union[Path, str] = None):
 
     for unit in oas.units_in_disk():
         df = unit.sequences_df(columns=['sequence_aa'])
-        unit_hash = xxhash.xxh3_64_intdigest(','.join(unit.id))
         if df is None:
             continue
+        unit_hash = xxhash.xxh3_64_intdigest(','.join(unit.id))
         for sequence in df['sequence_aa'].unique():
             total += 1
             if not sequence:  # some rogue antibody without this type of chain
