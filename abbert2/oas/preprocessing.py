@@ -15,14 +15,13 @@ from urllib.parse import urlparse, unquote
 
 import numpy as np
 import pandas as pd
-import xxhash
 from joblib import Parallel, delayed, effective_n_jobs
 from more_itertools import distribute
 from requests import HTTPError
 from smart_open import open
 
 from abbert2.common import to_parquet, from_parquet, parse_anarci_position, anarci_insertion_to_code
-from abbert2.oas.common import find_oas_path
+from abbert2.oas.common import find_oas_path, compress_sequences_df
 from abbert2.oas.oas import OAS, Unit
 
 
@@ -902,15 +901,6 @@ def _process_sequences_df(df: pd.DataFrame,
                                                 anarci_status=anarci_status)
             record.update(numbering)
 
-            # Add hash (for reproducibility, as it is actually more efficient to always compute on the fly)
-            try:
-                # noinspection PyArgumentList
-                record['hash0'] = xxhash.xxh64_intdigest(record['sequence_aa'], seed=0)
-                # noinspection PyArgumentList
-                record['hash1'] = xxhash.xxh64_intdigest(record['sequence_aa'], seed=1)
-            except KeyError:
-                record['hash0'] = record['hash1'] = None
-
             # Add to processed records
             processed_records.append(record)
 
@@ -952,7 +942,7 @@ def _process_sequences_df(df: pd.DataFrame,
     if 'redundancy' not in df.columns:
         df['redundancy'] = None
     df['redundancy'] = df['redundancy'].astype(pd.UInt32Dtype())
-    for column in ('index_in_unit', 'hash0', 'hash1'):
+    for column in ('index_in_unit',):
         df[column] = df[column].astype(pd.UInt64Dtype())
     for column in ('stop_codon',
                    'vj_in_frame',
@@ -997,9 +987,6 @@ def _process_sequences_df(df: pd.DataFrame,
         # junction
         'junction_aa': None,
         'junction_aa_length': None,
-        # hashes
-        'hash0': None,
-        'hash1': None,
         # regions (at the moment, python intervals)
         'fwr1_start': None,
         'fwr1_length': None,
@@ -1372,7 +1359,7 @@ def process_units(*,
                                                          verbose=verbose)
                 logs.update(process_logs)
                 if df is not None:
-                    to_parquet(df, unit.sequences_path, preserve_index=False)
+                    compress_sequences_df(df=df, path=unit.sequences_path)
                 else:
                     raise Exception('Workers error')
             except Exception as ex:
