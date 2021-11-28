@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from abbert2.common import to_parquet
+
 # --- Paths
 
 _RELATIVE_DATA_PATH = Path(__file__).parent.parent.parent / 'data'
@@ -55,3 +57,13 @@ def find_oas_path(oas_version='20211114', verbose=False):
 def check_oas_subset(subset: str):
     if subset not in ('paired', 'unpaired'):
         raise ValueError(f'subset should be one of ("paired", "unpaired"), but is {subset}')
+
+
+# --- Storage
+
+def compress_sequences_df(df, path):
+    to_parquet(df.sort_values('sequence_aa'),  # pre-sorting by sequence aa improves compression
+               path,
+               compression='zstd',
+               compression_level=10,
+               preserve_index=False)
