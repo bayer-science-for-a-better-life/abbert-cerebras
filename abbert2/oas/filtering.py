@@ -296,7 +296,7 @@ class NoDuplicates(Filter):
 
     def __init__(self) -> None:
         super().__init__()
-        self._num_shards = 256
+        self._num_shards = 1024
         self._shards = [{} for _ in range(self._num_shards)]
         self._total = 0
         self._current = 0
@@ -309,14 +309,12 @@ class NoDuplicates(Filter):
                 continue
             # noinspection PyArgumentList
             hash0 = xxhash.xxh3_64_intdigest(sequence, seed=0)
-            # noinspection PyArgumentList
-            hash1 = xxhash.xxh3_64_intdigest(sequence, seed=1)
-            shard = self._shards[int(hash0 % self._num_shards)]
-            if hash1 not in shard:
-                shard[hash1] = 1
+            shard = self._shards[hash0 % self._num_shards]
+            if hash0 not in shard:
+                shard[hash0] = 1
                 self._current += 1
             else:
-                shard[hash1] += 1
+                shard[hash0] += 1
                 no_duplicate[i] = False
         return df[no_duplicate]
 
