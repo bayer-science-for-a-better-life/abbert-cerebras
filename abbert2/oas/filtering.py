@@ -1,4 +1,75 @@
-"""Selecting antibodies across the OAS dataset."""
+"""
+Selecting antibodies across the OAS dataset.
+
+Literature
+==========
+
+OAS Update Paper
+----------------
+From: Observed Antibody Space:
+      A diverse database of cleaned, annotated, and translated unpaired and paired antibody sequence
+https://onlinelibrary.wiley.com/doi/10.1002/pro.4205
+
+For each sequence, the IMGT numbering scheme was added using antibody numbering and
+antigen receptor classIfication (ANARCI) April 23, 2020.
+Any sequence that ANARCI could not process was removed.
+This step predominantly removes sequences that contain a stop codon.
+An ANARCI status highlighting potential problems for each sequence
+is retained in the database. This status contains comments regarding unusual residues,
+lack of conserved cysteines, deletions and insertions outside of the CDRs,
+truncation of frameworks 1 or 4, and if the CDR3 is longer than 37 residues.
+Finally, sequences were grouped into units sharing the same metadata,
+the same chain (e.g., heavy, light, or paired), and isotype.
+---------------
+
+
+Hu-mAb PAPER
+------------
+From: Humanization of antibodies using a machine learning approach on large-scale repertoire data
+https://academic.oup.com/bioinformatics/article/37/22/4041/6295884
+https://www.biorxiv.org/content/10.1101/2021.01.08.425894v2.full
+
+All IgG VH and VL sequences were downloaded from the OAS database (August 2020),
+totaling over 500 million sequences in the IMGT format. Human sequences were
+split by their V gene type - for example, V1 to V7 for VH sequences.
+Redundant sequences, sequences with cysteine errors (18) and sequences
+with missing framework 1 residues (residues preceding CDR1) were removed.
+The total dataset included over 65 million non-redundant sequences (SI section 1A).
+------------
+
+
+BIOPHI / SAPIENS PAPER
+----------------------
+From: BioPhi: A platform for antibody design, humanization and humanness evaluation
+      based on natural antibody repertoires and deep learning
+https://www.biorxiv.org/content/10.1101/2021.08.08.455394v1.full
+
+Unaligned variable region amino acid sequences were downloaded from OAS database (accessed Nov 2019).
+A heavy chain training set was extracted by sampling 20 million unaligned redundant amino acid
+sequences from all 38 human heavy chain OAS studies from 2011-2017. The training sequences
+originated from 24% unsorted, 10% IGHA, 1% IGHD, 1% IGHE, 35% IGHG and 30% IGHM isotypes.
+A validation set was extracted by sampling 20 million sequences from all 5 human heavy chain studies
+from 2018. The validation sequences originated from 33% unsorted, 16% IGHA, 1% IGHD, 1% IGHE,
+20% IGHG and 28% IGHM isotypes. A light chain training set was extracted
+by taking all 19,054,615 sequences from all 14 human light chain OAS studies from 2011-2017.
+A validation set was extracted by taking all 33,133,386 sequences from both 2 human light
+chain OAS studies from 2018. Studies from 2019 were left out to enable future comparison
+with new methods on an independent test set.
+----------------------
+
+
+ANTIBERTA PAPER
+---------------
+From: Deciphering the language of antibodies using self-supervised learning
+https://www.biorxiv.org/content/10.1101/2021.11.10.468064v1
+
+Antibody sequences were first filtered out for any sequencing errors, as indicated by OAS.
+Sequences were also required to have at least 20 residues before the CDR1, and 10 residues
+following the CDR3. The entire collection of 71.98 million unique sequences
+(52.89 million unpaired heavy chains and 19.09 million unpaired light chains)
+was then split into disjoint training, validation, and test sets using an 80%:10%:10% ratio.
+---------------
+"""
 import time
 from typing import Tuple, Sequence, Optional, Union
 
@@ -451,29 +522,4 @@ if __name__ == '__main__':
 # Not important unless we start training against paired VH & VL sequences
 # (e.g., add a self-supervised goal to guess if a pair is real or not alongside
 # training with both chains "concatenated")
-#
-
-#
-# ANTIBERTA PAPER:
-# ---------------
-# Antibody sequences were first filtered out for any sequencing errors, as indicated by OAS.
-# Sequences were also required to have at least 20 residues before the CDR1, and 10 residues
-# following the CDR3. The entire collection of 71.98 million unique sequences
-# (52.89 million unpaired heavy chains and 19.09 million unpaired light chains)
-# was then split into disjoint training, validation, and test sets using an 80%:10%:10% ratio.
-# ---------------
-#
-# OAS Update Paper
-# ---------------
-# For each sequence, the IMGT numbering scheme was added using antibody numbering and
-# antigen receptor classIfication (ANARCI) April 23, 2020.
-# Any sequence that ANARCI could not process was removed.
-# This step predominantly removes sequences that contain a stop codon.
-# An ANARCI status highlighting potential problems for each sequence
-# is retained in the database. This status contains comments regarding unusual residues,
-# lack of conserved cysteines, deletions and insertions outside of the CDRs,
-# truncation of frameworks 1 or 4, and if the CDR3 is longer than 37 residues.
-# Finally, sequences were grouped into units sharing the same metadata,
-# the same chain (e.g., heavy, light, or paired), and isotype.
-# ---------------
 #
