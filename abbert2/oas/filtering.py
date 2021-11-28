@@ -400,9 +400,12 @@ def filter_df(df: pd.DataFrame,
     print(f'{unit.id}: from {len(df)} to {len(filtered_df)}')
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
         print(pd.DataFrame(logs)[['name', 'filtered_out', 'taken_s']])
-        print('---')
-        print('Accummulated Stats')
-        print(pd.DataFrame([processor.stat_dict() for processor in filters]))
+    print('---')
+    print('Accummulated Stats')
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        print(pd.DataFrame([processor.stat_dict() for processor in filters]).round(2))
+    print(f'Total processed: {filters[0].num_processed}')
+    print(f'Total kept: {filters[-1].num_processed - filters[-1].num_filtered_out}')
     print('-' * 80)
 
     return df, logs
