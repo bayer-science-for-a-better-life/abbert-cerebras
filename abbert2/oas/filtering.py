@@ -39,6 +39,15 @@ class Filter:
     def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         raise NotImplementedError
 
+    def stat_dict(self) -> dict:
+        return {
+            'name': self.name,
+            'num_processed': self.num_processed,
+            'num_filtered_out': self.num_filtered_out,
+            'taken_s': self.total_taken_s,
+            'num_processed_per_second': self.num_processed / self.total_taken_s
+        }
+
 
 class Identity(Filter):
     def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
@@ -316,6 +325,11 @@ class NoDuplicates(Filter):
             else:
                 no_duplicate[i] = False
         return df[no_duplicate]
+
+    def stat_dict(self) -> dict:
+        d = super().stat_dict()
+        d['num_unique'] = self._unique
+        return d
 
 
 class SimplifySchema(Filter):
