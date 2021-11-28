@@ -1064,21 +1064,7 @@ def print_count_stats():
 # --- Data partitioning and filtering examples
 
 def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
-    """
-    From: https://www.biorxiv.org/content/10.1101/2021.08.08.455394v1.full
-
-    Unaligned variable region amino acid sequences were downloaded from OAS database (accessed Nov 2019).
-    A heavy chain training set was extracted by sampling 20 million unaligned redundant amino acid
-    sequences from all 38 human heavy chain OAS studies from 2011-2017. The training sequences
-    originated from 24% unsorted, 10% IGHA, 1% IGHD, 1% IGHE, 35% IGHG and 30% IGHM isotypes.
-    A validation set was extracted by sampling 20 million sequences from all 5 human heavy chain studies
-    from 2018. The validation sequences originated from 33% unsorted, 16% IGHA, 1% IGHD, 1% IGHE,
-    20% IGHG and 28% IGHM isotypes. A light chain training set was extracted
-    by taking all 19,054,615 sequences from all 14 human light chain OAS studies from 2011-2017.
-    A validation set was extracted by taking all 33,133,386 sequences from both 2 human light
-    chain OAS studies from 2018. Studies from 2019 were left out to enable future comparison
-    with new methods on an independent test set.
-    """
+    """Partition into train / val / test ala Sapiens."""
 
     # Let's maybe select using a dataframe, instead of looping through the units
     units_df = OAS(oas_path).nice_unit_meta_df(normalize_species=True)
@@ -1104,33 +1090,19 @@ def sapiens_like_train_val_test(oas_path: Union[str, Path] = None) -> dict:
     return train_test_validation_dfs
 
 
-def humab_like_filtering(sequences_df: pd.DataFrame,
-                         chain: str = 'heavy') -> pd.DataFrame:
-    """
-    Filtering example ala Hu-mAb
-    From:
-     https://www.biorxiv.org/content/10.1101/2021.01.08.425894v2.full
+def humab_like_filtering(sequences_df: pd.DataFrame) -> pd.DataFrame:
+    """Antibody filtering ala Hu-mAb."""
 
-    All IgG VH and VL sequences were downloaded from the OAS database (August 2020),
-    totaling over 500 million sequences in the IMGT format. Human sequences were
-    split by their V gene type - for example, V1 to V7 for VH sequences.
-    Redundant sequences, sequences with cysteine errors (18) and sequences
-    with missing framework 1 residues (residues preceding CDR1) were removed.
-    The total dataset included over 65 million non-redundant sequences (SI section 1A).
-    """
-
-    # Filter out sequences without fw1
-    sequences_df = sequences_df.query(f'fw1_length_{chain} > 0')
+    # Filter out sequences without fwr1
+    sequences_df = sequences_df.query('fwr1_length > 0')
 
     # Filter out sequences with mutations in conserved cysteines
-    has_mutated_conserved_cysteines = sequences_df[f'has_mutated_conserved_cysteines_{chain}'].apply(
+    has_mutated_conserved_cysteines = sequences_df['has_mutated_conserved_cysteines'].apply(
         lambda x: x is not None and x  # account for both False and missing (but need to revisit the missing case)
     )
     sequences_df = sequences_df[~has_mutated_conserved_cysteines]
     # Check aboss / anarci annotations and original paper to make sure this is correct
     # https://www.jimmunol.org/content/201/12/3694?ijkey=24817c8d879730cb4a170e371cfadd768703b0ed&keytype2=tf_ipsecsha
-    # SANTI COME HERE AND REACTIVATE THE FILTER FOR LIGHT?
-    # SANTI COME HERE AND ACTIVATE NUMBER OF READS FILTER ALA SANOFI (>3)
 
     return sequences_df
 
