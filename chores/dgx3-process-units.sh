@@ -1,40 +1,40 @@
-oas process-units --shard 1 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-1-120-dgx3.log &
+oas process-units --shard 0 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-0-90-dgx3.log &
 disown
-oas process-units --shard 9 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-9-120-dgx3.log &
+oas process-units --shard 11 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-11-90-dgx3.log &
 disown
-oas process-units --shard 10 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-10-120-dgx3.log &
+oas process-units --shard 13 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-13-90-dgx3.log &
 disown
-oas process-units --shard 26 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-26-120-dgx3.log &
+oas process-units --shard 16 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-16-90-dgx3.log &
 disown
-oas process-units --shard 32 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-32-120-dgx3.log &
+oas process-units --shard 18 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-18-90-dgx3.log &
 disown
-oas process-units --shard 35 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-35-120-dgx3.log &
+oas process-units --shard 25 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-25-90-dgx3.log &
 disown
-oas process-units --shard 46 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-46-120-dgx3.log &
+oas process-units --shard 26 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-26-90-dgx3.log &
 disown
-oas process-units --shard 50 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-50-120-dgx3.log &
+oas process-units --shard 28 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-28-90-dgx3.log &
 disown
-oas process-units --shard 54 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-54-120-dgx3.log &
+oas process-units --shard 34 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-34-90-dgx3.log &
 disown
-oas process-units --shard 56 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-56-120-dgx3.log &
+oas process-units --shard 40 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-40-90-dgx3.log &
 disown
-oas process-units --shard 57 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-57-120-dgx3.log &
+oas process-units --shard 43 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-43-90-dgx3.log &
 disown
-oas process-units --shard 62 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-62-120-dgx3.log &
+oas process-units --shard 46 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-46-90-dgx3.log &
 disown
-oas process-units --shard 63 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-63-120-dgx3.log &
+oas process-units --shard 47 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-47-90-dgx3.log &
 disown
-oas process-units --shard 71 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-71-120-dgx3.log &
+oas process-units --shard 60 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-60-90-dgx3.log &
 disown
-oas process-units --shard 83 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-83-120-dgx3.log &
+oas process-units --shard 66 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-66-90-dgx3.log &
 disown
-oas process-units --shard 91 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-91-120-dgx3.log &
+oas process-units --shard 69 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-69-90-dgx3.log &
 disown
-oas process-units --shard 105 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-105-120-dgx3.log &
+oas process-units --shard 76 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-76-90-dgx3.log &
 disown
-oas process-units --shard 109 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-109-120-dgx3.log &
+oas process-units --shard 78 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-78-90-dgx3.log &
 disown
-oas process-units --shard 112 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-112-120-dgx3.log &
+oas process-units --shard 83 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-83-90-dgx3.log &
 disown
-oas process-units --shard 117 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-117-120-dgx3.log &
+oas process-units --shard 87 --n-shards 90 --n-jobs 8 --chunk-size 8000 &>shard-87-90-dgx3.log &
 disown
