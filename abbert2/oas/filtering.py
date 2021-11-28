@@ -380,6 +380,9 @@ def filter_df(df: pd.DataFrame,
         if keep_df_history:
             log['filtered_df'] = df
         logs.append(log)
+    print(f'{unit.id}: from {len(df)} to {len(filtered_df)}')
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        print(pd.DataFrame(logs)[['name', 'filtered_out', 'taken_s']])
     return df, logs
 
 
