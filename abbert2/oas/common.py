@@ -42,10 +42,13 @@ def find_oas_path(oas_version='20211114', verbose=False):
         if candidate_path is None:
             continue
         candidate_path = Path(candidate_path)
-        if candidate_path.is_dir():
-            if verbose:
-                print(f'OAS data dir: {candidate_path}')
-            return candidate_path
+        try:
+            if candidate_path.is_dir():
+                if verbose:
+                    print(f'OAS data dir: {candidate_path}')
+                return candidate_path
+        except PermissionError:
+            ...
 
     raise FileNotFoundError(f'Could not find the OAS root.'
                             f'\nPlease define the OAS_PATH environment variable '
