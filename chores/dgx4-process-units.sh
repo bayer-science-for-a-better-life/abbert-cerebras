@@ -1,56 +1,80 @@
-oas process-units --shard 0 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-0-48-dgx4.log &
+oas process-units --shard 2 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-2-120-dgx4.log &
 disown
-oas process-units --shard 1 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-1-48-dgx4.log &
+oas process-units --shard 3 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-3-120-dgx4.log &
 disown
-oas process-units --shard 8 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-8-48-dgx4.log &
+oas process-units --shard 4 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-4-120-dgx4.log &
 disown
-oas process-units --shard 10 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-10-48-dgx4.log &
+oas process-units --shard 5 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-5-120-dgx4.log &
 disown
-oas process-units --shard 11 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-11-48-dgx4.log &
+oas process-units --shard 12 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-12-120-dgx4.log &
 disown
-oas process-units --shard 17 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-17-48-dgx4.log &
+oas process-units --shard 15 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-15-120-dgx4.log &
 disown
-oas process-units --shard 18 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-18-48-dgx4.log &
+oas process-units --shard 18 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-18-120-dgx4.log &
 disown
-oas process-units --shard 19 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-19-48-dgx4.log &
+oas process-units --shard 20 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-20-120-dgx4.log &
 disown
-oas process-units --shard 20 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-20-48-dgx4.log &
+oas process-units --shard 21 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-21-120-dgx4.log &
 disown
-oas process-units --shard 22 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-22-48-dgx4.log &
+oas process-units --shard 22 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-22-120-dgx4.log &
 disown
-oas process-units --shard 24 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-24-48-dgx4.log &
+oas process-units --shard 23 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-23-120-dgx4.log &
 disown
-oas process-units --shard 25 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-25-48-dgx4.log &
+oas process-units --shard 30 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-30-120-dgx4.log &
 disown
-oas process-units --shard 26 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-26-48-dgx4.log &
+oas process-units --shard 31 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-31-120-dgx4.log &
 disown
-oas process-units --shard 28 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-28-48-dgx4.log &
+oas process-units --shard 42 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-42-120-dgx4.log &
 disown
-oas process-units --shard 29 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-29-48-dgx4.log &
+oas process-units --shard 47 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-47-120-dgx4.log &
 disown
-oas process-units --shard 31 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-31-48-dgx4.log &
+oas process-units --shard 48 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-48-120-dgx4.log &
 disown
-oas process-units --shard 32 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-32-48-dgx4.log &
+oas process-units --shard 53 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-53-120-dgx4.log &
 disown
-oas process-units --shard 33 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-33-48-dgx4.log &
+oas process-units --shard 55 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-55-120-dgx4.log &
 disown
-oas process-units --shard 34 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-34-48-dgx4.log &
+oas process-units --shard 60 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-60-120-dgx4.log &
 disown
-oas process-units --shard 35 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-35-48-dgx4.log &
+oas process-units --shard 61 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-61-120-dgx4.log &
 disown
-oas process-units --shard 37 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-37-48-dgx4.log &
+oas process-units --shard 65 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-65-120-dgx4.log &
 disown
-oas process-units --shard 38 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-38-48-dgx4.log &
+oas process-units --shard 68 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-68-120-dgx4.log &
 disown
-oas process-units --shard 39 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-39-48-dgx4.log &
+oas process-units --shard 69 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-69-120-dgx4.log &
 disown
-oas process-units --shard 40 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-40-48-dgx4.log &
+oas process-units --shard 70 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-70-120-dgx4.log &
 disown
-oas process-units --shard 42 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-42-48-dgx4.log &
+oas process-units --shard 72 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-72-120-dgx4.log &
 disown
-oas process-units --shard 43 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-43-48-dgx4.log &
+oas process-units --shard 74 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-74-120-dgx4.log &
 disown
-oas process-units --shard 44 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-44-48-dgx4.log &
+oas process-units --shard 76 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-76-120-dgx4.log &
 disown
-oas process-units --shard 46 --n-shards 48 --n-jobs 8 --chunk-size 8000 &>shard-46-48-dgx4.log &
+oas process-units --shard 77 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-77-120-dgx4.log &
+disown
+oas process-units --shard 82 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-82-120-dgx4.log &
+disown
+oas process-units --shard 87 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-87-120-dgx4.log &
+disown
+oas process-units --shard 95 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-95-120-dgx4.log &
+disown
+oas process-units --shard 97 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-97-120-dgx4.log &
+disown
+oas process-units --shard 100 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-100-120-dgx4.log &
+disown
+oas process-units --shard 101 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-101-120-dgx4.log &
+disown
+oas process-units --shard 106 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-106-120-dgx4.log &
+disown
+oas process-units --shard 107 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-107-120-dgx4.log &
+disown
+oas process-units --shard 108 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-108-120-dgx4.log &
+disown
+oas process-units --shard 110 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-110-120-dgx4.log &
+disown
+oas process-units --shard 116 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-116-120-dgx4.log &
+disown
+oas process-units --shard 118 --n-shards 120 --n-jobs 8 --chunk-size 8000 &>shard-118-120-dgx4.log &
 disown

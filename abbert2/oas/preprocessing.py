@@ -1380,10 +1380,10 @@ def _processing_clis():
     num_jobs = 8
     chunk_size = 8000
     machine_shards = {
-        # 'dgx1': 8,
+        'dgx1': 20,
         'dgx2': 40,
-        # 'dgx3': 10,
-        # 'dgx4': 28,
+        'dgx3': 20,
+        'dgx4': 40,
     }
     total_shards = sum(machine_shards.values())
     machines = list(chain(*[[machine] * num_shards for machine, num_shards in machine_shards.items()]))
