@@ -319,6 +319,21 @@ class NoDuplicates(Filter):
         return df[no_duplicate]
 
 
+class SimplifySchema(Filter):
+
+    def __init__(self, schema='default') -> None:
+        super().__init__()
+        self.schema = schema
+
+    @property
+    def name(self):
+        return f'SimplifySchema(schema={self.schema})'
+
+    def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
+        raise NotImplementedError
+        # Likely this we can defer to dataset iterators / aggregators
+
+
 def create_filters_from_name(name: str = 'none') -> Sequence[Filter]:
     return {
         'none': (),
