@@ -1365,7 +1365,7 @@ def process_units(*,
             logs = {'start_time': str(datetime.datetime.now())}
             try:
                 size /= 1024 ** 2
-                print(f'PROCESSING unit {i+1} of {len(sizes_units)} ({size:.2f} MiB)')
+                print(f'PROCESSING unit {i+1} of {len(sizes_units)} ({size:.2f} MiB) {unit.id}')
                 process_logs, df = _process_oas_csv_unit(unit=unit,
                                                          parallel=parallel,
                                                          chunk_size=chunk_size,
