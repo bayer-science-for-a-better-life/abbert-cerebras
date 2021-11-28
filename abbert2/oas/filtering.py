@@ -297,9 +297,9 @@ class NoDuplicates(Filter):
     def __init__(self) -> None:
         super().__init__()
         self._num_shards = 1024
-        self._shards = [{} for _ in range(self._num_shards)]
+        self._shards = [set() for _ in range(self._num_shards)]
         self._total = 0
-        self._current = 0
+        self._unique = 0
 
     def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         no_duplicate = np.ones(len(df), dtype=bool)
@@ -311,10 +311,9 @@ class NoDuplicates(Filter):
             hash0 = xxhash.xxh3_64_intdigest(sequence, seed=0)
             shard = self._shards[hash0 % self._num_shards]
             if hash0 not in shard:
-                shard[hash0] = 1
-                self._current += 1
+                shard.add(hash0)
+                self._unique += 1
             else:
-                shard[hash0] += 1
                 no_duplicate[i] = False
         return df[no_duplicate]
 
