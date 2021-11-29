@@ -39,7 +39,7 @@ def copy(oas_path: Optional[Union[str, Path]] = None,
                        filtering_strategy=filtering_strategy,
                        overwrite=overwrite,
                        verbose=verbose)
-    pd.to_pickle(logs, oas.oas_path / 'copy-logs.pickle')
+    pd.to_pickle(logs, Path(dest_path) / 'copy-logs.pickle')
 
 
 def main():
