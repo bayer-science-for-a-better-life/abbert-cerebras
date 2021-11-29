@@ -26,7 +26,8 @@ def copy(oas_path: Optional[Union[str, Path]] = None,
          overwrite: bool = False,
          verbose: bool = False):
     oas = OAS(oas_path=oas_path)
-    logs = oas.copy_to(dest_path / f'filters={filtering_strategy}',
+    dest_path = Path(dest_path) / f'filters={filtering_strategy}'
+    logs = oas.copy_to(dest_path=dest_path,
                        include_paired=not no_paired,
                        include_unpaired=not no_unpaired,
                        include_subset_meta=include_subset_meta,
