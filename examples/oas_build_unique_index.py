@@ -42,7 +42,8 @@ def build_unique_index(oas_path: Union[Path, str] = None):
 
     dest_path = oas.oas_path / 'indices'
     dest_path.mkdir(parents=True, exist_ok=True)
-    pd.to_pickle(shards, dest_path / 'duplicates.pickle.xz')
+    for i, shard in enumerate(shards):
+        pd.to_pickle(shard, dest_path / f'duplicates-shard={i}.pickle.xz')
 
     #
     # Exact duplicates, with 99% of the dataset processed:
