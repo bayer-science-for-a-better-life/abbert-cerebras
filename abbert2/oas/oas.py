@@ -279,14 +279,19 @@ class OAS:
                 max_num_sequences: int = -1,
                 unit_probability: float = 1,
                 filtering_strategy: str = 'none',
-                overwrite: bool = False):
+                overwrite: bool = False,
+                verbose: bool = False) -> List[dict]:
 
         # Avoid circular import
         from abbert2.oas.filtering import create_filters_from_name
         # Global filter states for the whole run
         filters = create_filters_from_name(filtering_strategy)
 
+        logs = []
+
         def copy_subset(oas_subset: str):
+
+            global logs
 
             # --- Subset online collected metadata
             if include_subset_meta:
@@ -294,22 +299,22 @@ class OAS:
                     subset_path = dest_path / oas_subset
                     subset_path.mkdir(parents=True, exist_ok=True)
                     copy_but_do_not_overwrite(path, dest_path=subset_path, overwrite=overwrite)
-
             # --- Units
             for unit in self.units_in_disk(oas_subset=oas_subset):
                 if 0 < unit_probability < 1:
-                    seed = xxhash.xxh32_intdigest('_'.join(unit.id))
+                    seed = xxhash.xxh32_intdigest(unit.id_string)
                     if np.random.RandomState(seed=seed).uniform() > unit_probability:
                         continue  # unselected
                 if unit.has_sequences:
                     print(f'COPYING {unit.id}')
-                    unit.copy_to(dest_path,
-                                 include_sequences=include_sequences,
-                                 include_original_csv=include_original_csv,
-                                 include_stats=include_stats,
-                                 max_num_sequences=max_num_sequences,
-                                 filters=filters,
-                                 overwrite=overwrite)
+                    logs += unit.copy_to(dest_path,
+                                         include_sequences=include_sequences,
+                                         include_original_csv=include_original_csv,
+                                         include_stats=include_stats,
+                                         max_num_sequences=max_num_sequences,
+                                         filters=filters,
+                                         overwrite=overwrite,
+                                         verbose=verbose)
 
             # --- Summaries
             if include_summaries:
@@ -323,6 +328,8 @@ class OAS:
             copy_subset(oas_subset='paired')
         if include_unpaired:
             copy_subset(oas_subset='unpaired')
+
+        return logs
 
 
 @total_ordering
@@ -857,7 +864,8 @@ class Unit:
         copy_but_do_not_overwrite(self.metadata_path, dest_path, overwrite=overwrite)
         logs.append({
             'name': 'CopyUnitMetadata',
-            'taken_s': time.perf_counter() - start
+            'taken_s': time.perf_counter() - start,
+            'unit': self.unit_id
         })
 
         # copy processed sequences
@@ -867,7 +875,8 @@ class Unit:
                 copy_but_do_not_overwrite(self.sequences_path, dest_path, overwrite=overwrite)
                 logs.append({
                     'name': 'CopyUnitSequences',
-                    'taken_s': time.perf_counter() - start
+                    'taken_s': time.perf_counter() - start,
+                    'unit': self.unit_id
                 })
             else:
                 dest = dest_path / self.sequences_path.name
@@ -878,7 +887,8 @@ class Unit:
                 logs.append({
                     'name': 'ReadSequencesFromDisk',
                     'unfiltered_length': len(df),
-                    'taken_s': time.perf_counter() - start
+                    'taken_s': time.perf_counter() - start,
+                    'unit': self.unit_id
                 })
                 if max_num_sequences >= 0:
                     start = time.perf_counter()
@@ -887,7 +897,8 @@ class Unit:
                         'name': 'SubsampleSequences',
                         'unfiltered_length': logs[-1]['unfiltered_length'],
                         'filtered_length': len(df),
-                        'taken_s': time.perf_counter() - start
+                        'taken_s': time.perf_counter() - start,
+                        'unit': self.unit_id
                     })
                 if filters:
                     start = time.perf_counter()
@@ -902,14 +913,16 @@ class Unit:
                         'name': 'ApplyFilters',
                         'unfiltered_length': logs[-1]['unfiltered_length'],
                         'filtered_length': len(df),
-                        'taken_s': time.perf_counter() - start
+                        'taken_s': time.perf_counter() - start,
+                        'unit': self.unit_id
                     })
                 start = time.perf_counter()
                 compress_sequences_df(df=df, path=dest)
                 logs.append({
                     'name': 'WriteSequencesToDisk',
                     'unfiltered_length': logs[-1]['unfiltered_length'],
-                    'taken_s': time.perf_counter() - start
+                    'taken_s': time.perf_counter() - start,
+                    'unit': self.unit_id
                 })
         if include_sequences:
             start = time.perf_counter()
