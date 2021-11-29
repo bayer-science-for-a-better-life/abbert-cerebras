@@ -287,11 +287,9 @@ class OAS:
         # Global filter states for the whole run
         filters = create_filters_from_name(filtering_strategy)
 
-        logs = []
-
         def copy_subset(oas_subset: str):
 
-            global logs
+            logs = []
 
             # --- Subset online collected metadata
             if include_subset_meta:
@@ -324,10 +322,25 @@ class OAS:
 
             print(f'Find your OAS dump in {dest_path}')
 
+            return logs
+
+        logs = []
+
         if include_paired:
-            copy_subset(oas_subset='paired')
+            logs += copy_subset(oas_subset='paired')
         if include_unpaired:
-            copy_subset(oas_subset='unpaired')
+            logs += copy_subset(oas_subset='unpaired')
+
+        if verbose:
+            print('=' * 80)
+            print(f'Finished copying {self.oas_path} to {dest_path}')
+            with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+                logs_df = pd.DataFrame(logs)
+                for column in ('unfiltered_length', 'filtered_length', 'filtered_out'):
+                    if column in logs_df:
+                        logs_df[column] = logs_df[column].astype(pd.Int64Dtype())
+                print(logs_df.round(2))
+            print('=' * 80)
 
         return logs
 
