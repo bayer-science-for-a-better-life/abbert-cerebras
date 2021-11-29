@@ -1109,20 +1109,20 @@ def print_count_stats():
         # cdr1:	num_positions=030 num_tokens=24
         # cdr2:	num_positions=034 num_tokens=24
         # cdr3:	num_positions=065 num_tokens=24
-        # fr1:	num_positions=186 num_tokens=24
-        # fr2:	num_positions=233 num_tokens=24
-        # fr3:	num_positions=623 num_tokens=24
-        # fr4:	num_positions=068 num_tokens=24
+        # fwr1:	num_positions=186 num_tokens=24
+        # fwr2:	num_positions=233 num_tokens=24
+        # fwr3:	num_positions=623 num_tokens=24
+        # fwr4:	num_positions=068 num_tokens=24
         # sequence:	num_positions=001 num_tokens=24
         #
         # LIGHT:
         # cdr1:	num_positions=028 num_tokens=23
         # cdr2:	num_positions=029 num_tokens=23
         # cdr3:	num_positions=026 num_tokens=23
-        # fr1:	num_positions=169 num_tokens=23
-        # fr2:	num_positions=219 num_tokens=23
-        # fr3:	num_positions=405 num_tokens=23
-        # fr4:	num_positions=027 num_tokens=23
+        # fwr1:	num_positions=169 num_tokens=23
+        # fwr2:	num_positions=219 num_tokens=23
+        # fwr3:	num_positions=405 num_tokens=23
+        # fwr4:	num_positions=027 num_tokens=23
         #
 
         # Build a logo plot and a stacked plot for different regions
@@ -1178,8 +1178,7 @@ def humab_like_filtering(sequences_df: pd.DataFrame) -> pd.DataFrame:
 
 def train_validation_test_iterator(
         partitioner: Callable[[], dict] = sapiens_like_train_val_test,
-        filtering: Optional[Callable[[pd.DataFrame, str], pd.DataFrame]] = humab_like_filtering,
-        chains: Tuple[str, ...] = ('heavy', 'light'),
+        filtering: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = humab_like_filtering,
         ml_subsets: Tuple[str, ...] = ('train', 'validation', 'test'),
 ) -> Iterator[Tuple[Unit, str, str, pd.DataFrame]]:
 
@@ -1211,17 +1210,12 @@ def train_validation_test_iterator(
         for unit in partition[chain][ml_subset]['unit']:
             unit_sequences_df = unit.sequences_df(columns=used_ml_columns + used_qa_columns)
             if unit_sequences_df is None:
-                continue  # FIXME: this happens when the parquet file is broken beyond the schema
-            try:
-                if filtering is not None:
-                    unit_sequences_df = filtering(unit_sequences_df)
-                # Drop QA columns
-                unit_sequences_df = unit_sequences_df.drop(columns=used_qa_columns)
-                yield unit, chain, ml_subset, unit_sequences_df
-            except KeyError:
-                # FIXME: this happens when "has_mutated_conserved_cysteines_light" does not exist
-                #        observed in one unit, to troubleshoot
-                ...
+                continue
+            if filtering is not None:
+                unit_sequences_df = filtering(unit_sequences_df)
+            # Drop QA columns
+            unit_sequences_df = unit_sequences_df.drop(columns=used_qa_columns)
+            yield unit, chain, ml_subset, unit_sequences_df
 
 # --- Maintenance
 
