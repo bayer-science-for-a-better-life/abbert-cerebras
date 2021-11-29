@@ -483,7 +483,7 @@ def filter_df(df: pd.DataFrame,
     print(f'Total sequences kept: {filters[-1].num_sequences_processed - filters[-1].num_sequences_filtered_out}')
     print('-' * 80)
 
-    return df, logs
+    return filtered_df, logs
 
 
 if __name__ == '__main__':
