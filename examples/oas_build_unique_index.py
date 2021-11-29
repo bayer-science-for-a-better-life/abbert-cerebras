@@ -2,6 +2,7 @@ import time
 from pathlib import Path
 from typing import Union
 
+import pandas as pd
 import xxhash
 
 from abbert2.oas import OAS
@@ -38,6 +39,10 @@ def build_unique_index(oas_path: Union[Path, str] = None):
                 shard[hash0] += unit_hash,
             if total % 100_000 == 0:
                 print(f'{total} ({unique} unique) {int(total / (time.perf_counter() - start))} sequences/s')
+
+    dest_path = oas.oas_path / 'indices'
+    dest_path.mkdir(parents=True, exist_ok=True)
+    pd.to_pickle(shards, dest_path / 'duplicates.pickle.xz')
 
     #
     # Exact duplicates, with 99% of the dataset processed:
