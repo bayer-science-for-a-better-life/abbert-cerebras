@@ -4,6 +4,14 @@ Selecting antibodies across the OAS dataset.
 Literature
 ==========
 
+Here it follows a few scerpts from papers relevant to us (one can also check who is citing
+the two OAS papers to broaden a bit this view).
+
+There are, of course, other unublished works by Pharma, startups and academia alike
+that include other filtering criteria. Of importance is to threshold by redundancy
+(e.g., remove all sequences under 3 counts in the same study). We could also extend
+this to include redundancy across studies (i.e., add count in our redundancy map).
+
 OAS Update Paper
 ----------------
 From: Observed Antibody Space:
