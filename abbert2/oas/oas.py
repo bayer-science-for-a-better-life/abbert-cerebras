@@ -354,11 +354,18 @@ class Unit:
         self._oas_path = Path(oas_path)
         self._oas = oas
 
+        # Precompute id-based unit hash
+        self.unit_hash = xxhash.xxh3_64_intdigest(self.id_string)
+
     # --- Unit coordinates
 
     @property
     def id(self) -> Tuple[str, str, str]:
         return self.oas_subset, self.study_id, self.unit_id
+
+    @property
+    def id_string(self) -> str:
+        return ','.join(self.id)
 
     @property
     def oas_subset(self) -> str:
