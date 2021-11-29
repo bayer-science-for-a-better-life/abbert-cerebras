@@ -110,6 +110,7 @@ class Filter:
             'filtered_length': len(new_df),
             'filtered_out': len(df) - len(new_df),
             'taken_s': time.perf_counter() - start,
+            'unit': unit.id,
         }
         self.num_units_processed += 1
         self.total_taken_s += log['taken_s']
@@ -467,7 +468,8 @@ def filter_df(df: pd.DataFrame,
               unit: Unit = None,
               *,
               filters: Union[str, Sequence[Filter]] = 'default',
-              keep_df_history: bool = False):
+              keep_df_history: bool = False,
+              verbose: bool = True):
     if isinstance(filters, str):
         filters = create_filters_from_name(filters)
     logs = []
@@ -478,6 +480,13 @@ def filter_df(df: pd.DataFrame,
             log['filtered_df'] = filtered_df
         logs.append(log)
 
+    if verbose:
+        print_filtering_logs(df, unit, filters, filtered_df, logs)
+
+    return filtered_df, logs
+
+
+def print_filtering_logs(df, unit, filters, filtered_df, logs):
     print('-' * 80)
     print(f'{unit.id}: from {len(df)} to {len(filtered_df)}')
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
@@ -490,8 +499,6 @@ def filter_df(df: pd.DataFrame,
     print(f'Total sequences processed: {filters[0].num_sequences_processed}')
     print(f'Total sequences kept: {filters[-1].num_sequences_processed - filters[-1].num_sequences_filtered_out}')
     print('-' * 80)
-
-    return filtered_df, logs
 
 
 if __name__ == '__main__':
