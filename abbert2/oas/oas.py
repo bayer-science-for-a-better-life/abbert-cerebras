@@ -42,6 +42,7 @@ UPDATE 2021/09
 """
 import json
 import shutil
+import time
 from builtins import IOError
 from collections import defaultdict
 from functools import cached_property, total_ordering
@@ -838,9 +839,12 @@ class Unit:
                 include_stats: bool = False,
                 max_num_sequences: int = -1,
                 filters: Sequence[Callable] = None,
-                overwrite: bool = False):
+                overwrite: bool = False,
+                verbose: bool = True) -> Sequence[dict]:
 
         from abbert2.oas.filtering import filter_df
+
+        logs = []
 
         oas_path = Path(oas_path)
         if oas_path == self.oas_path:
@@ -849,38 +853,96 @@ class Unit:
         dest_path = oas_path / self.oas_subset / self.study_id / self.unit_id
 
         # copy metadata
+        start = time.perf_counter()
         copy_but_do_not_overwrite(self.metadata_path, dest_path, overwrite=overwrite)
+        logs.append({
+            'name': 'CopyUnitMetadata',
+            'taken_s': time.perf_counter() - start
+        })
 
         # copy processed sequences
         if include_sequences and self.has_sequences:
             if max_num_sequences < 0 and not filters:
+                start = time.perf_counter()
                 copy_but_do_not_overwrite(self.sequences_path, dest_path, overwrite=overwrite)
+                logs.append({
+                    'name': 'CopyUnitSequences',
+                    'taken_s': time.perf_counter() - start
+                })
             else:
                 dest = dest_path / self.sequences_path.name
                 if dest.is_file() and not overwrite:
                     raise Exception(f'Path already exists and will not overwrite ({dest})')
+                start = time.perf_counter()
                 df = self.sequences_df()
+                logs.append({
+                    'name': 'ReadSequencesFromDisk',
+                    'unfiltered_length': len(df),
+                    'taken_s': time.perf_counter() - start
+                })
                 if max_num_sequences >= 0:
+                    start = time.perf_counter()
                     df = df.sample(n=min(max_num_sequences, len(df)), random_state=19)
+                    logs.append({
+                        'name': 'SubsampleSequences',
+                        'unfiltered_length': logs[-1]['unfiltered_length'],
+                        'filtered_length': len(df),
+                        'taken_s': time.perf_counter() - start
+                    })
                 if filters:
+                    start = time.perf_counter()
                     # noinspection PyTypeChecker
-                    df, logs = filter_df(df, unit=self, filters=filters, keep_df_history=False)
+                    df, filtering_logs = filter_df(df,
+                                                   unit=self,
+                                                   filters=filters,
+                                                   keep_df_history=False,
+                                                   verbose=verbose)
+                    logs += filtering_logs
+                    logs.append({
+                        'name': 'ApplyFilters',
+                        'unfiltered_length': logs[-1]['unfiltered_length'],
+                        'filtered_length': len(df),
+                        'taken_s': time.perf_counter() - start
+                    })
+                start = time.perf_counter()
                 compress_sequences_df(df=df, path=dest)
+                logs.append({
+                    'name': 'WriteSequencesToDisk',
+                    'unfiltered_length': logs[-1]['unfiltered_length'],
+                    'taken_s': time.perf_counter() - start
+                })
         if include_sequences:
+            start = time.perf_counter()
             copy_but_do_not_overwrite(self.processing_logs_file, dest_path, overwrite=overwrite)
             copy_but_do_not_overwrite(self.processing_error_logs_file, dest_path, overwrite=overwrite)
+            logs.append({
+                'name': 'CopyLogs',
+                'taken_s': time.perf_counter() - start
+            })
 
         # copy original csv
         if include_original_csv:
+            start = time.perf_counter()
             # +2: unit metadata and column names
             copy_but_do_not_overwrite(self.original_csv_path,
                                       dest_path,
                                       num_rows_header=max_num_sequences + 2,
                                       overwrite=overwrite)
+            logs.append({
+                'name': 'CopyOriginalCSV',
+                'taken_s': time.perf_counter() - start
+            })
 
         # copy processed stats (N.B., without recomputing for subsets)
         if include_stats:
+            start = time.perf_counter()
             copy_but_do_not_overwrite(self.stats_path, dest_path, overwrite=overwrite)
+            logs.append({
+                'name': 'CopyStats',
+                'taken_s': time.perf_counter() - start
+            })
+
+        return logs
 
 
 # --- Entry points
