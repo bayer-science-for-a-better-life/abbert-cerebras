@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Optional, Union
 
+import pandas as pd
+
 from abbert2.oas.oas import consolidate_all_units_stats, summarize_count_stats, diagnose, OAS
 from abbert2.oas.preprocessing import cache_units_meta, process_units, download_units, parse_all_anarci_status
 
@@ -21,19 +23,23 @@ def copy(oas_path: Optional[Union[str, Path]] = None,
          max_num_sequences: int = -1,
          unit_probability: float = 1.0,
          filtering_strategy: str = 'none',
-         overwrite: bool = False):
-    OAS(oas_path=oas_path).copy_to(dest_path / f'filters={filtering_strategy}',
-                                   include_paired=not no_paired,
-                                   include_unpaired=not no_unpaired,
-                                   include_subset_meta=include_subset_meta,
-                                   include_summaries=include_summaries,
-                                   include_sequences=include_sequences,
-                                   include_original_csv=include_original_csv,
-                                   include_stats=include_stats,
-                                   max_num_sequences=max_num_sequences,
-                                   unit_probability=unit_probability,
-                                   filtering_strategy=filtering_strategy,
-                                   overwrite=overwrite)
+         overwrite: bool = False,
+         verbose: bool = False):
+    oas = OAS(oas_path=oas_path)
+    logs = oas.copy_to(dest_path / f'filters={filtering_strategy}',
+                       include_paired=not no_paired,
+                       include_unpaired=not no_unpaired,
+                       include_subset_meta=include_subset_meta,
+                       include_summaries=include_summaries,
+                       include_sequences=include_sequences,
+                       include_original_csv=include_original_csv,
+                       include_stats=include_stats,
+                       max_num_sequences=max_num_sequences,
+                       unit_probability=unit_probability,
+                       filtering_strategy=filtering_strategy,
+                       overwrite=overwrite,
+                       verbose=verbose)
+    pd.to_pickle(logs, oas.oas_path / 'copy-logs.pickle')
 
 
 def main():
