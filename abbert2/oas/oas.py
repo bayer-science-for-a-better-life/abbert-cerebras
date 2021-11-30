@@ -747,6 +747,8 @@ class Unit:
             return self._pq().metadata.num_rows
         return None
 
+    num_sequences = sequences_num_records
+
     @property
     def sequences_miss_processing(self) -> bool:
         num_records = self.sequences_num_records
