@@ -529,7 +529,7 @@ class Unit:
             'theoretical_num_sequences_unique', 'theoretical_num_sequences_total',
             'original_url', 'has_original_csv', 'original_local_csv_mdate', 'download_error', 'needs_redownload',
             'sequences_file_size', 'has_broken_sequences_file', 'sequences_num_records', 'sequences_miss_processing',
-            'has_heavy_sequences', 'has_light_sequences', 'heavy_cdr3_max_length'
+            'num_heavy_sequences', 'num_light_sequences', 'heavy_cdr3_max_length'
         )
         return {field: getattr(self, field) for field in fields}
 
@@ -729,17 +729,11 @@ class Unit:
 
     @property
     def has_heavy_sequences(self) -> bool:
-        schema = self._schema_arrow()
-        if schema is not None:
-            return -1 != schema.get_field_index('sequence_aa_heavy')
-        return False
+        return self.num_heavy_sequences > 0
 
     @property
     def has_light_sequences(self) -> bool:
-        schema = self._schema_arrow()
-        if schema is not None:
-            return -1 != schema.get_field_index('sequence_aa_light')
-        return False
+        return self.num_light_sequences > 0
 
     @property
     def sequences_num_records(self) -> Optional[int]:
@@ -748,6 +742,20 @@ class Unit:
         return None
 
     num_sequences = sequences_num_records
+
+    def _num_chain_sequences(self, chain):
+        df = self.sequences_df(columns='chain')
+        if df is None:
+            return 0
+        return len(df.query(f'chain == "{chain}"'))
+
+    @cached_property
+    def num_heavy_sequences(self):
+        return self._num_chain_sequences(chain='heavy')
+
+    @cached_property
+    def num_light_sequences(self):
+        return self._num_chain_sequences(chain='light')
 
     @property
     def sequences_miss_processing(self) -> bool:
@@ -766,7 +774,7 @@ class Unit:
                 if column_index != -1:
                     return max(pq.metadata.row_group(row_group).column(column_index).statistics.max
                                for row_group in range(pq.metadata.num_row_groups))
-            df = self.sequences_df(columns=['chain', f'{region}_length']).query('chain == "{chain}"')
+            df = self.sequences_df(columns=['chain', f'{region}_length']).query(f'chain == "{chain}"')
             if df is not None and len(df):
                 return df[f'{region}_length'].max()
         return None
