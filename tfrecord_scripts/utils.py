@@ -3,7 +3,6 @@ import tensorflow as tf
 import numpy as np
 
 
-
 def create_bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
     if isinstance(value, type(tf.constant(0))):
