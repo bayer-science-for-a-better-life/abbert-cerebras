@@ -149,9 +149,9 @@ class OAS:
             raise Exception(f'Cannot find metadata for unit ({oas_subset}, {study_id}, {unit_id})')
         return df.iloc[0].to_dict()
 
-    def populate_metadata_jsons(self, update: bool = False):
+    def populate_metadata_jsons(self, recompute: bool = False):
         for unit in self.units_in_meta():
-            if update:
+            if recompute:
                 unit.update_metadata()
             else:
                 _ = unit.metadata  # side effects FTW
@@ -1355,12 +1355,12 @@ def compare_new_schemas():
     print(len(sorted(column_sets)))
 
 
-def diagnose():
+def diagnose(recompute=False):
     """Shows some diagnose information, for example, what units have failed processing."""
 
     oas = OAS()
-    oas.populate_metadata_jsons()
-    df = oas.nice_unit_meta_df(recompute=False, normalize_species=True)
+    oas.populate_metadata_jsons(recompute=recompute)
+    df = oas.nice_unit_meta_df(recompute=recompute, normalize_species=True)
 
     units_to_redownload = sorted(unit.original_url for unit in df.query('needs_redownload').unit)
     print(f'{len(units_to_redownload)} units to redownload')
