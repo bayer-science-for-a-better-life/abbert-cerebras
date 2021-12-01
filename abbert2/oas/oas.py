@@ -121,12 +121,42 @@ class OAS:
         super().__init__()
         if oas_path is None:
             oas_path = find_oas_path()
-        self._oas_path = Path(oas_path)
+            self._oas_path = Path(oas_path)
+
+        else:
+            # Added by aarti-cerebras
+            # print("IN ELSE")
+            oas_path = Path(oas_path)
+            if oas_path.is_file():
+                *oas_path_dir, oas_subset, study_id, unit_id, _ = oas_path.parts
+            else:
+                *oas_path_dir, oas_subset, study_id, unit_id = oas_path.parts
+
+            self._oas_path = Path(*oas_path_dir)
+            self._oas_subset = oas_subset
+            self._study_id = study_id
+            self._unit_id = unit_id
+
 
     @property
     def oas_path(self) -> Path:
         """Returns the path to the OAS dataset."""
         return self._oas_path
+    
+    @property
+    def oas_subset(self) -> str:
+        # Added by aarti-cerebras
+        return self._oas_subset
+
+    @property
+    def study_id(self) -> str:
+        # Added by aarti-cerebras
+        return self._study_id
+
+    @property
+    def unit_id(self) -> str:
+        # Added by aarti-cerebras
+        return self._unit_id
 
     @cached_property
     def unit_metadata_df(self) -> pd.DataFrame:
@@ -204,6 +234,15 @@ class OAS:
         for oas_subset, study_id, unit_id in zip(df['oas_subset'], df['study_id'], df['unit_id']):
             yield self.unit(oas_subset=oas_subset, study_id=study_id, unit_id=unit_id)
 
+    def units_in_path(self):
+        # Added by aarti-cerebras
+        check_oas_subset(self.oas_subset)
+
+        unit_path = (self.oas_path / self.oas_subset / self.study_id / self.unit_id)
+        if unit_path.is_dir():
+            # print(f"-----units_in_new study_path {self.oas_subset}, {self.study_id}, {unit_path.stem}")
+            yield self.unit(self.oas_subset, self.study_id, unit_path.stem)
+
     def remove_units_not_in_meta(self, dry_run: bool = True):
         """Removes all the units in disk that are not in meta."""
         paths_in_disk = set(unit.path for unit in self.units_in_disk())
@@ -226,12 +265,13 @@ class OAS:
                       zip(df['oas_subset'], df['study_id'], df['unit_id'])]
         return df
 
+
     def nice_unit_meta_df(self,
                           recompute: bool = False,
                           normalize_species: bool = True,
                           add_units: bool = True) -> pd.DataFrame:
 
-        cache_path = self.oas_path / 'summaries' / 'nice_unit_meta_df.parquet'
+        cache_path = self.oas_path / 'summaries' / self.oas_subset / self.study_id / self.unit_id / 'nice_unit_meta_df.parquet'
 
         df = None
 
@@ -242,7 +282,10 @@ class OAS:
                 ...
 
         if df is None:
-            df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_disk()])
+            # Added by aarti-cerebras
+            # df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_disk()])
+            df = pd.DataFrame([unit.nice_metadata for unit in self.units_in_path()])
+
             to_parquet(df, cache_path)
 
         # add units for full access to the data
