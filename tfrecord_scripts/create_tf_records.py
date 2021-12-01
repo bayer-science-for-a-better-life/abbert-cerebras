@@ -14,6 +14,7 @@ import argparse
 import sys
 import numpy as np
 import pandas as pd
+from itertools import combinations
 
 def create_arg_parser():
     """
@@ -137,6 +138,8 @@ def partition_df(df, split, seed=1204):
 
     assert sum(list(split.values())) == 1
 
+    print(f"len heavy: {len(heavy_df)}")
+    print(f"len light: {len(light_df)}")
 
     heavy_mask = np.random.rand(len(heavy_df))
     light_mask = np.random.rand(len(light_df))
@@ -155,6 +158,15 @@ def partition_df(df, split, seed=1204):
         out[f"{split_type}_{val}_df"] = pd.concat([split_heavy_df, split_light_df])
 
         prev_val = val
+
+    # Check if no overlap in train test and val data
+    for combo in combinations(list(out.keys()), 2):
+        key1, key2 = combo
+        df_1 = out[key1]
+        df_2 = out[key2]
+
+        intersect_df = pd.merge(df_1, df_2, 'inner')
+        assert intersect_df.empty
 
     return out
 
@@ -187,6 +199,10 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
 
 
     for key, subset_df in partitions.items():
+
+        # Shuffle again
+        subset_df = subset_df.sample(frac=1)
+
         out_tfrecord_name, out_stats_file_name = get_output_file_names(dest_tfrecs_fldr, unit_id, prefix=key)
 
         len_df = len(subset_df)
