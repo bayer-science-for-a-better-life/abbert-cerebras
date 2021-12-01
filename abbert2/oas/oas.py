@@ -821,7 +821,7 @@ class Unit:
             for sequence, positions, insertions in zip(chain_df['sequence_aa'],
                                                        chain_df['imgt_positions'],
                                                        chain_df['imgt_insertions']):
-                if not isinstance(sequence, np.ndarray):
+                if pd.isnull(sequence):
                     continue
                 insertions = () if not isinstance(insertions, np.ndarray) else insertions
                 # TODO this is a really tight loop we should move out python...
