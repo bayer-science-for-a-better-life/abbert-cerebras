@@ -29,9 +29,14 @@ def assign_ml_subset_by_sequence_hashing(sequence: str,
                                          train_pct: int = 80,
                                          val_pct: int = 10,
                                          test_pct: int = 10):
-    assert (train_pct + val_pct + test_pct) == 100
+
+    if (train_pct + val_pct + test_pct) != 100:
+        raise ValueError(f'train_pct + val_pct + test_pct must equal 100, '
+                         f'but it is {(train_pct + val_pct + test_pct)}')
+
     if pd.isnull(sequence):
         return None
+
     # noinspection PyArgumentList
     bucket = xxhash.xxh32_intdigest(sequence, seed=seed) % 100
     if bucket < train_pct:
