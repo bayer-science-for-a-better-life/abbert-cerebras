@@ -252,10 +252,6 @@ class OAS:
         if normalize_species:
             df['species'] = df['species'].apply(_normalize_oas_species)
 
-        # TODO: ask everyone to update the cache and remove this
-        #       study_year was buggy...
-        df['study_year'] = df['unit'].apply(lambda unit: unit.study_year)
-
         for int_column in ('online_csv_size_bytes',
                            'study_year',
                            'theoretical_num_sequences_unique',
