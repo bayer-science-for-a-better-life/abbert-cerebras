@@ -1270,7 +1270,7 @@ def download_units(oas_path=None,
                    clean_not_in_meta: bool = False,
                    ignore_with_caches: bool = False,
                    n_jobs: int = 1,
-                   update: bool = False,
+                   redownload: bool = False,
                    dry_run: bool = False,
                    no_drop_caches: bool = False,
                    no_resume: bool = False):
@@ -1294,7 +1294,7 @@ def download_units(oas_path=None,
     for unit in oas.units_in_meta():
         if ignore_with_caches and unit.has_sequences:
             continue
-        if update or unit.needs_redownload:
+        if redownload or unit.needs_redownload:
             units_to_download.append(unit)
 
     size_to_download = sum(unit.online_csv_size_bytes for unit in units_to_download)
@@ -1302,7 +1302,7 @@ def download_units(oas_path=None,
 
     # Do the download
     Parallel(n_jobs=n_jobs, backend='threading')(
-        delayed(lambda unit: unit.download(force=update,
+        delayed(lambda unit: unit.download(force=redownload,
                                            dry_run=dry_run,
                                            drop_caches=not no_drop_caches,
                                            resume=not no_resume))

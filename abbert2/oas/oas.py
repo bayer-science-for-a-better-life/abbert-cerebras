@@ -981,20 +981,20 @@ class Unit:
 
 # --- Entry points
 
-def _consolidate_unit_stats(unit: Unit, overwrite=False):
+def _consolidate_unit_stats(unit: Unit, recompute=False):
     if unit.has_sequences:
         print(f'Consolidating stats for {unit.id}')
-        unit.consolidated_stats(recompute=overwrite)
+        unit.consolidated_stats(recompute=recompute)
 
 
 def consolidate_all_units_stats(oas_path: Optional[Union[str, Path]] = None,
-                                overwrite: bool = False,
+                                recompute: bool = False,
                                 n_jobs=-1):
     oas = OAS(oas_path=oas_path)
     Parallel(n_jobs=n_jobs)(
         delayed(_consolidate_unit_stats)(
             unit=unit,
-            overwrite=overwrite,
+            recompute=recompute,
         )
         for unit in oas.units_in_disk()
     )

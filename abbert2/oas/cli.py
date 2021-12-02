@@ -11,12 +11,12 @@ def populate_metadata(oas_path: Optional[Union[str, Path]] = None,
                       no_jsons: bool = False,
                       no_nice_unit_meta: bool = False,
                       no_normalize_species: bool = False,
-                      overwrite: bool = False):
+                      recompute: bool = False):
     oas = OAS(oas_path=oas_path)
     if not no_jsons:
-        oas.populate_metadata_jsons(recompute=overwrite)
+        oas.populate_metadata_jsons(recompute=recompute)
     if not no_nice_unit_meta:
-        oas.nice_unit_meta_df(recompute=overwrite, normalize_species=not no_normalize_species)
+        oas.nice_unit_meta_df(recompute=recompute, normalize_species=not no_normalize_species)
 
 
 def copy(oas_path: Optional[Union[str, Path]] = None,
@@ -31,7 +31,7 @@ def copy(oas_path: Optional[Union[str, Path]] = None,
          max_num_sequences: int = -1,
          unit_probability: float = 1.0,
          filtering_strategy: str = 'none',
-         overwrite: bool = False,
+         recompute: bool = False,
          verbose: bool = False):
     oas = OAS(oas_path=oas_path)
     dest_path = Path(dest_path) / f'filters={filtering_strategy}'
@@ -46,7 +46,7 @@ def copy(oas_path: Optional[Union[str, Path]] = None,
                        max_num_sequences=max_num_sequences,
                        unit_probability=unit_probability,
                        filtering_strategy=filtering_strategy,
-                       overwrite=overwrite,
+                       overwrite=recompute,
                        verbose=verbose)
     pd.to_pickle(logs, Path(dest_path) / 'copy-logs.pickle')
 
@@ -74,7 +74,7 @@ def main():
         # This prints reports on the units
         diagnose,
         # This attemps to parse all collected anarci status
-        parse_all_anarci_status,
+        # parse_all_anarci_status,
 
         # --- Analysis commands
         # This will consolidate stats for all units (e.g., frequences of amino acids on numbered sequences)
