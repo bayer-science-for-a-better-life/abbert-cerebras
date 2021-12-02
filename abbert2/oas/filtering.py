@@ -311,6 +311,10 @@ class NoUnsupportedCDR3Length(Filter):
 
 
 class NoMissingConservedCysteine(Filter):
+
+    # Check aboss / anarci annotations and original paper to make sure this is correct
+    # https://www.jimmunol.org/content/201/12/3694?ijkey=24817c8d879730cb4a170e371cfadd768703b0ed&keytype2=tf_ipsecsha
+
     def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         return df.query(f'not anarci_missing_conserved_cysteine')
 
