@@ -27,12 +27,12 @@ SUBSET_TEST = 'test'
 def assign_ml_subset_by_sequence_hashing(sequence: str,
                                          seed: int = 0,
                                          train_pct: int = 80,
-                                         val_pct: int = 10,
+                                         validation_pct: int = 10,
                                          test_pct: int = 10):
 
-    if (train_pct + val_pct + test_pct) != 100:
+    if (train_pct + validation_pct + test_pct) != 100:
         raise ValueError(f'train_pct + val_pct + test_pct must equal 100, '
-                         f'but it is {(train_pct + val_pct + test_pct)}')
+                         f'but it is {(train_pct + validation_pct + test_pct)}')
 
     if pd.isnull(sequence):
         return None
@@ -41,6 +41,6 @@ def assign_ml_subset_by_sequence_hashing(sequence: str,
     bucket = xxhash.xxh32_intdigest(sequence, seed=seed) % 100
     if bucket < train_pct:
         return SUBSET_TRAIN
-    if bucket < (train_pct + val_pct):
+    if bucket < (train_pct + validation_pct):
         return SUBSET_VALIDATION
     return SUBSET_TEST
