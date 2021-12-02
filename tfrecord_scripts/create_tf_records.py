@@ -36,15 +36,15 @@ def create_arg_parser():
     return parser
 
 
-def _preprocess_df(df):
+def _preprocess_df(df, seed=1204):
 
-    # Drop rows with NaNs
-    df = df.dropna()
+    # # Drop rows with NaNs
+    # df = df.dropna()
 
     # Check for negative values ?
 
     # shuffle dataframe rows
-    df = df.sample(frac=1, random_state=1204)
+    df = df.sample(frac=1, random_state=seed)
 
     return df
 
@@ -166,7 +166,7 @@ def partition_df(df, split, seed=1204):
 
     return out
 
-def create_tfrecords(src_input_folder, out_tf_records_fldr):
+def create_tfrecords(src_input_folder, out_tf_records_fldr, seed=1204):
     """
     src_input_folder: ex: /cb/ml/aarti/bayer_sample/paired/Eccles_2020/SRR10358525_paired
     """
@@ -187,17 +187,17 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
 
     df = unit.sequences_df()
     print(df)
-    # df = _preprocess_df(df)
+    df = _preprocess_df(df, seed=seed)
     metadata = unit.nice_metadata
 
     split = {"train": 0.8, "val": 0.1, "test": 0.1}
 
-    partitions = partition_df(df, split)
+    partitions = partition_df(df, split, seed=seed)
 
     for key, subset_df in partitions.items():
 
         # Shuffle again
-        subset_df = subset_df.sample(frac=1, random_state=1204)
+        subset_df = subset_df.sample(frac=1, random_state=seed)
 
         out_tfrecord_name, out_stats_file_name = get_output_file_names(dest_tfrecs_fldr, unit_id, prefix=key)
 
@@ -237,11 +237,9 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr):
             json_dict = {
                 "tfrec_filename": out_tfrecord_name, 
                 "num_examples": num_examples, 
-                "max_aligned_sequence_length": max_length
+                "max_sequence_aa": max_length
                 }
             json.dump(json_dict, stats_fh)
-
-
 
 
 def main():
@@ -256,4 +254,5 @@ def main():
 if __name__ == "__main__":
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
     # main()
-    create_tfrecords("/cb/ml/aarti/bayer_sample_new_datasets/unpaired/Banerjee_2017/SRR5060321_Heavy_Bulk", out_tf_records_fldr="/cb/ml/aarti/bayer_sample_filter_tfrecs")
+    # create_tfrecords("/cb/ml/aarti/bayer_sample_new_datasets/unpaired/Banerjee_2017/SRR5060321_Heavy_Bulk", out_tf_records_fldr="/cb/ml/aarti/bayer_sample_filter_tfrecs")
+    create_tfrecords("/cb/ml/aarti/bayer_sample_new_datasets/paired/Alsoiussi_2020/SRR11528761_paired", out_tf_records_fldr="/cb/ml/aarti/bayer_sample_filter_tfrecs")
