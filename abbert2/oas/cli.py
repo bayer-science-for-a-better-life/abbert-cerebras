@@ -7,8 +7,16 @@ from abbert2.oas.oas import consolidate_all_units_stats, summarize_count_stats, 
 from abbert2.oas.preprocessing import cache_units_meta, process_units, download_units, parse_all_anarci_status
 
 
-def populate_metadata_jsons(oas_path: Optional[Union[str, Path]] = None):
-    OAS(oas_path=oas_path).populate_metadata_jsons()
+def populate_metadata(oas_path: Optional[Union[str, Path]] = None,
+                      no_jsons: bool = False,
+                      no_nice_unit_meta: bool = False,
+                      no_normalize_species: bool = False,
+                      overwrite: bool = False):
+    oas = OAS(oas_path=oas_path)
+    if not no_jsons:
+        oas.populate_metadata_jsons(recompute=overwrite)
+    if not no_nice_unit_meta:
+        oas.nice_unit_meta_df(recompute=overwrite, normalize_species=not no_normalize_species)
 
 
 def copy(oas_path: Optional[Union[str, Path]] = None,
@@ -52,11 +60,13 @@ def main():
         # Step 1: Run this to cache units metadata from the web
         cache_units_meta,
         # Step 2: Run this to populate individual unit metadata
-        populate_metadata_jsons,
+        populate_metadata,
         # Step 3: Download the units (will take quite a while)
         download_units,
         # Step 4: Convert the CSVs to more efficient representations (will take a lot of time)
         process_units,
+        # Step 5: Run this again to populate unit metadata with processed sequences info
+        # populate_metadata,
 
         # --- Maintenance commands
         # This allows to extract a copy of the processed units (e.g., to create tars)
