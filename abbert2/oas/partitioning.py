@@ -1,4 +1,6 @@
 """Partitioning strategies for machine learning evaluation."""
+from typing import Optional
+
 import pandas as pd
 import xxhash
 
@@ -28,7 +30,7 @@ def assign_ml_subset_by_sequence_hashing(sequence: str,
                                          seed: int = 0,
                                          train_pct: int = 80,
                                          validation_pct: int = 10,
-                                         test_pct: int = 10):
+                                         test_pct: int = 10) -> Optional[str]:
 
     if (train_pct + validation_pct + test_pct) != 100:
         raise ValueError(f'train_pct + val_pct + test_pct must equal 100, '
