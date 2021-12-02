@@ -228,7 +228,8 @@ class OAS:
 
     def nice_unit_meta_df(self,
                           recompute: bool = False,
-                          normalize_species: bool = True) -> pd.DataFrame:
+                          normalize_species: bool = True,
+                          add_units: bool = True) -> pd.DataFrame:
 
         cache_path = self.oas_path / 'summaries' / 'nice_unit_meta_df.parquet'
 
@@ -245,7 +246,8 @@ class OAS:
             to_parquet(df, cache_path)
 
         # add units for full access to the data
-        self._add_units_to_df(df)
+        if add_units:
+            self._add_units_to_df(df)
 
         if normalize_species:
             df['species'] = df['species'].apply(_normalize_oas_species)
