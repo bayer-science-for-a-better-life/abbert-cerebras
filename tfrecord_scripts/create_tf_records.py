@@ -331,7 +331,7 @@ def main():
 
 if __name__ == "__main__":
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
-    # main()
+    main()
 
 
     
@@ -341,4 +341,4 @@ if __name__ == "__main__":
     # create_tfrecords("/cb/customers/bayer/new_datasets/filters_default/unpaired/Halliley_2015/SRR2088756_1_Heavy_IGHA", out_tf_records_fldr="/cb/home/aarti/ws/code/bayer_tfrecs_filtering/tfrecord_scripts", hash_partition=0)
 
     
-    create_tfrecords("/cb/customers/bayer/updated_dataset/filters_default_20211202/unpaired/Bender_2020/ERR3664761_Heavy_Bulk", out_tf_records_fldr="/cb/home/aarti/ws/code/bayer_tfrecs_filtering/tfrecord_scripts", hash_partition=0)
+    # create_tfrecords("/cb/customers/bayer/updated_dataset/filters_default_20211202/unpaired/Bender_2020/ERR3664761_Heavy_Bulk", out_tf_records_fldr="/cb/home/aarti/ws/code/bayer_tfrecs_filtering/tfrecord_scripts", hash_partition=0)
