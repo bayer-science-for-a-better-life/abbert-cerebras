@@ -13,8 +13,8 @@
 # limitations under the License.
 
 input_folder=${1}
-output_folder="/cb/ml/language/datasets/bayer_20211202/bayer_filter_default_20211202"
-hash_partition="0"
+output_folder="/cb/ml/language/datasets/bayer_20211202/bayer_filter_default_20211202_tfrecs_hash"
+hash_partition="1"
 # output_folder="/cb/ml/aarti/datasets/bayer_tfrecords_filter_default"
 
 echo "input_folder: " ${input_folder}

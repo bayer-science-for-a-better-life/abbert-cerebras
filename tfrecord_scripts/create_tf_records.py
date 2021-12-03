@@ -82,7 +82,7 @@ def get_sequence(oas_path):
     
     return unit[0]
 
-def create_examples(df, study_year, normalized_species, oas_subset, study_id, unit_id):
+def create_examples(df, study_year, species, oas_subset, study_id, unit_id, subject):
 
     feature = {}
     for _, row in df.iterrows():
@@ -92,14 +92,19 @@ def create_examples(df, study_year, normalized_species, oas_subset, study_id, un
             feature["cdr_length"] = [int(row[f"cdr1_length"]), int(row[f"cdr2_length"]), int(row[f"cdr3_length"])]
             feature["fw_start"] = [int(row[f"fwr1_start"]), int(row[f"fwr2_start"]), int(row[f"fwr3_start"]), int(row[f"fwr4_start"])]
             feature["fw_length"] = [int(row[f"fwr1_length"]), int(row[f"fwr2_length"]), int(row[f"fwr3_length"]), int(row[f"fwr4_length"])]
+            
             feature["chain"] = row["chain"]
             feature["index_in_unit"] = row["index_in_unit"]
+            feature["v_call"] = row["v_call"]
+            feature["j_call"] = row["j_call"]
 
             feature["study_year"] = study_year
             feature["oas_subset"] = oas_subset
-            feature["normalized_species"] = normalized_species
+            feature["species"] = species
             feature["unit_id"] = unit_id
             feature["study_id"] = study_id
+            feature["subject"] = subject
+
             
 
             tf_example = create_unmasked_tokens_example(feature)
@@ -122,12 +127,15 @@ def create_unmasked_tokens_example(feature):
     context_features_dict = {}
     context_features_dict["study_year"] = create_int_feature([feature["study_year"]])
     context_features_dict["oas_subset"] = create_bytes_feature(feature["oas_subset"].encode())
-    context_features_dict["normalized_species"] = create_bytes_feature(feature["normalized_species"].encode())
+    context_features_dict["species"] = create_bytes_feature(feature["species"].encode())
     context_features_dict["unit_id"] = create_bytes_feature(feature["unit_id"].encode())
     context_features_dict["study_id"] = create_bytes_feature(feature["study_id"].encode())
     context_features_dict["index_in_unit"] = create_int_feature([feature["index_in_unit"]])
     context_features_dict["chain"] = create_bytes_feature(feature["chain"].encode())
-    
+    context_features_dict["v_call"] = create_bytes_feature(feature["v_call"].encode())
+    context_features_dict["j_call"] = create_bytes_feature(feature["j_call"].encode())
+    context_features_dict["subject"] = create_bytes_feature(feature["subject"].encode())
+
     context_features_dict["cdr_start"] = create_int_feature(feature["cdr_start"])
     context_features_dict["cdr_length"] = create_int_feature(feature["cdr_length"])
     context_features_dict["fw_start"] = create_int_feature(feature["fw_start"])
@@ -297,7 +305,9 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr, hash_partition, seed
         writer_index = 0
         num_examples = 0
         max_length = float("-inf")
-        for tf_example, len_tokens in create_examples(subset_df, unit.study_year, unit.normalized_species, unit.oas_subset, unit.study_id, unit.unit_id):
+
+        ex_generator = create_examples(subset_df, unit.study_year, unit.species, unit.oas_subset, unit.study_id, unit.unit_id, unit.subject)
+        for tf_example, len_tokens in ex_generator:
             if tf_example is not None and len_tokens is not None:
                     writers[writer_index].write(tf_example.SerializeToString())
                     writer_index = (writer_index + 1) % len(writers)
@@ -334,11 +344,9 @@ if __name__ == "__main__":
     main()
 
 
-    
     # create_tfrecords("/cb/ml/aarti/bayer_sample_new_datasets/unpaired/Banerjee_2017/SRR5060321_Heavy_Bulk", out_tf_records_fldr="/cb/ml/aarti/bayer_sample_filter_tfrecs")
     # create_tfrecords("/cb/customers/bayer/new_datasets/filters_default/unpaired/Li_2017/SRR3544217_Heavy_Bulk", out_tf_records_fldr="/cb/home/aarti/ws/code/bayer_tfrecs_filtering/tfrecord_scripts")
 
     # create_tfrecords("/cb/customers/bayer/new_datasets/filters_default/unpaired/Halliley_2015/SRR2088756_1_Heavy_IGHA", out_tf_records_fldr="/cb/home/aarti/ws/code/bayer_tfrecs_filtering/tfrecord_scripts", hash_partition=0)
-
     
     # create_tfrecords("/cb/customers/bayer/updated_dataset/filters_default_20211202/unpaired/Bender_2020/ERR3664761_Heavy_Bulk", out_tf_records_fldr="/cb/home/aarti/ws/code/bayer_tfrecs_filtering/tfrecord_scripts", hash_partition=0)
