@@ -13,13 +13,16 @@
 # limitations under the License.
 
 input_folder=${1}
-output_folder="/cb/ml/language/datasets/bayer_tfrecords_filter_default"
+output_folder="/cb/ml/aarti/bayer_small_new/bayer_tfrecords_filter_default"
+hash_partition="0"
 # output_folder="/cb/ml/aarti/datasets/bayer_tfrecords_filter_default"
 
 echo "input_folder: " ${input_folder}
 echo "output_folder: " ${output_folder}
+echo "hash_partition: " ${hash_partition}
 
 
 /cb/home/aarti/miniconda3/envs/bayer_filter/bin/python /cb/home/aarti/ws/code/bayer_tfrecs_filtering/tfrecord_scripts/create_tf_records.py \
    --src_input_folder=${input_folder} \
    --out_tf_records_fldr=${output_folder} \
+   --hash_partition=${hash_partition} \
