@@ -58,7 +58,7 @@ def assign_ml_subsets(
     return df
 
 
-def aggregate_stats(
+def aggregate_counts(
         unit: Unit,
         partitioner: Callable[[str], Optional[str]] = assign_ml_subset_by_sequence_hashing,
         groupers: Sequence[str] = ('normalized_species', 'chain', 'v_call', 'ml_subset',)
@@ -66,18 +66,28 @@ def aggregate_stats(
     df = assign_ml_subsets(unit=unit, partitioner=partitioner)
     if df is None:
         return None
-    return df.groupby(list(groupers) + ['ml_subset']).size().to_frame('num_sequences')
+    return df.groupby(list(groupers)).size().astype(pd.Int64Dtype()).rename('num_sequences')
 
 
 if __name__ == '__main__':
 
-    # collect stats
-    units_counts: List[pd.Series] = Parallel(n_jobs=1)(
-        delayed(aggregate_stats)(
+    # collect counts
+    units_counts: List[pd.Series] = Parallel(n_jobs=-1)(
+        delayed(aggregate_counts)(
             unit=unit,
             partitioner=assign_ml_subset_by_sequence_hashing
         )
         for unit in OAS().units_in_disk()
     )
-
     units_counts = [unit_counts for unit_counts in units_counts if unit_counts is not None]
+
+    if units_counts:
+        # aggregate counts
+        aggregated_counts = units_counts[0]
+        for unit_counts in units_counts[1:]:
+            aggregated_counts = sum(aggregated_counts.align(unit_counts, axis='index', join='outer', fill_value=0))
+
+        # report proportions
+        for grouper in ('normalized_species', 'chain', 'v_call'):
+            with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+                print(aggregated_counts.groupby([grouper, 'ml_subset']).sum())
