@@ -13,7 +13,7 @@
 # limitations under the License.
 
 input_folder=${1}
-output_folder="/cb/ml/aarti/bayer_small_new/bayer_tfrecords_filter_default"
+output_folder="/cb/ml/language/datasets/bayer_20211202/bayer_filter_default_20211202"
 hash_partition="0"
 # output_folder="/cb/ml/aarti/datasets/bayer_tfrecords_filter_default"
 
