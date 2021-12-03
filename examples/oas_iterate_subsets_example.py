@@ -62,7 +62,7 @@ def aggregate_counts(
         unit: Unit,
         partitioner: Callable[[str], Optional[str]] = assign_ml_subset_by_sequence_hashing,
         groupers: Sequence[str] = ('normalized_species', 'chain', 'v_call', 'ml_subset',)
-) -> Optional[pd.DataFrame]:
+) -> Optional[pd.Series]:
     df = assign_ml_subsets(unit=unit, partitioner=partitioner)
     if df is None:
         return None
@@ -87,7 +87,7 @@ if __name__ == '__main__':
         for unit_counts in units_counts[1:]:
             aggregated_counts = sum(aggregated_counts.align(unit_counts, axis='index', join='outer', fill_value=0))
 
-        # report proportions
+        # report counts across groups
         for grouper in ('normalized_species', 'chain', 'v_call'):
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
                 print(aggregated_counts.groupby([grouper, 'ml_subset']).sum())
