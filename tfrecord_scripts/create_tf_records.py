@@ -44,9 +44,30 @@ def create_arg_parser():
 def _preprocess_df(df, seed=1204):
 
     # # Drop rows with NaNs
-    # df = df.dropna()
+    df = df.dropna(subset=[
+        "sequence_aa", 
+        "cdr1_start", 
+        "cdr2_start", 
+        "cdr3_start",
+        "cdr1_length", 
+        "cdr2_length", 
+        "cdr3_length",
+        "fwr1_start", 
+        "fwr2_start", 
+        "fwr3_start", 
+        "fwr4_start", 
+        "fwr1_length", 
+        "fwr2_length", 
+        "fwr3_length", 
+        "fwr4_length"])
 
-    # Check for negative values ?
+    # Check for negative values 
+    df = df[(df["cdr1_start"] >= 0) & (df["cdr2_start"] >= 0) & (df["cdr3_start"] >= 0)]
+    df = df[(df["cdr1_length"] >= 0) & (df["cdr2_length"] >= 0) & (df["cdr3_length"] >= 0)]
+    df = df[(df["fwr1_start"] >= 0) & (df["fwr2_start"] >= 0) & (df["fwr3_start"] >= 0) & (df["fwr4_start"] >= 0)]
+    df = df[(df["fwr1_length"] >= 0) & (df["fwr2_length"] >= 0) & (df["fwr3_length"] >= 0) & (df["fwr4_length"] >= 0)]
+
+     
 
     # shuffle dataframe rows
     df = df.sample(frac=1, random_state=seed)
@@ -183,8 +204,8 @@ def partition_df(df, split, seed=1204):
 
     assert sum(list(split.values())) == 1
 
-    print(f"len heavy: {len(heavy_df)}")
-    print(f"len light: {len(light_df)}")
+    print(f"-- len heavy in original: {len(heavy_df)}")
+    print(f"-- len light in original: {len(light_df)}")
 
     prev_heavy = 0
     prev_light = 0
@@ -194,7 +215,7 @@ def partition_df(df, split, seed=1204):
 
     out = {}
     stats = {}
-    print(f"len of original: {len(df)}")
+    print(f"-- len of original: {len(df)}")
     for split_type, pct in split.items():
 
         boundary_heavy = round(pct * len_heavy)
@@ -228,7 +249,7 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr, hash_partition, seed
 
     
     df = unit.sequences_df()
-    print(f"---total_length : {len(df)}")
+    print(f"--- total_length BEFORE preprocessing: {len(df)}")
 
 
     if df.empty:
@@ -240,6 +261,7 @@ def create_tfrecords(src_input_folder, out_tf_records_fldr, hash_partition, seed
         os.makedirs(dest_tfrecs_fldr)
     
     df = _preprocess_df(df, seed=seed)
+    print(f"--- total_length AFTER preprocessing: {len(df)}")
 
     if hash_partition:
         partitions, stats_partitions = assign_mlsubset_by_sequence_hashing(df, seed=seed)
@@ -309,7 +331,7 @@ def main():
 
 if __name__ == "__main__":
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
-    main()
+    # main()
 
 
     
@@ -318,3 +340,5 @@ if __name__ == "__main__":
 
     # create_tfrecords("/cb/customers/bayer/new_datasets/filters_default/unpaired/Halliley_2015/SRR2088756_1_Heavy_IGHA", out_tf_records_fldr="/cb/home/aarti/ws/code/bayer_tfrecs_filtering/tfrecord_scripts", hash_partition=0)
 
+    
+    create_tfrecords("/cb/customers/bayer/updated_dataset/filters_default_20211202/unpaired/Bender_2020/ERR3664761_Heavy_Bulk", out_tf_records_fldr="/cb/home/aarti/ws/code/bayer_tfrecs_filtering/tfrecord_scripts", hash_partition=0)
