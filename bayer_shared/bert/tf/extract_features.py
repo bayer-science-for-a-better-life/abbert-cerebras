@@ -34,19 +34,27 @@ def to_parquet(df, path, compression='zstd', compression_level=20, **write_table
 class ExtractEmbeddingsFromBert:
 
     def __init__(self, params, model_dir, checkpoint_path=None):
+        """
+        Main object to initialize model, create input fn for estimator and extract embeddings
+        :param params: parameters read from yaml file used to initialize model
+        :param model_dir: filepath where the extracted embeddings are stored
+        :checkpoint_path: full path to the checkpoint being used to extract embeddings
+            For ex: `<>/model.ckpt-300000`
+            If None, the model is initialized with random values.
+        """
         self.params = params
         self.model_dir = model_dir
         self.args = args
         
         if self.params["runconfig"].get("mode") != "predict":
             tf.compat.v1.logging.info(f" Mode must be `predict` when extracting embeddings. Setting mode to `predict`")
-
             self.params["runconfig"]["mode"] = "predict"
+        
         self.params["runconfig"]["validate_only"] = False
         self.params["runconfig"]["compile_only"] = False
         self.params["runconfig"]["checkpoint_path"] = checkpoint_path
         
-        tf.compat.v1.logging.info(self.params)
+        tf.compat.v1.logging.info(f"params used: {self.params}")
 
         (
             self.vocab_word_to_id_dict,
@@ -62,7 +70,7 @@ class ExtractEmbeddingsFromBert:
         )
         
         self.max_sequence_length = params["predict_input"]["max_sequence_length"]
-        self.output_type_shapes = self.get_output_type_shapes(self.max_sequence_length)
+        self.output_type_shapes = self._get_output_type_shapes(self.max_sequence_length)
 
     def _get_special_token_ids(self, special_tokens, tokenizer):
         """
@@ -79,11 +87,14 @@ class ExtractEmbeddingsFromBert:
             special_tokens_word_id_dict[key] = tokenizer.check_word_and_get_id(
                 key
             )
-
         return special_tokens_word_id_dict
 
 
-    def build_predict_input_fn(self, data):
+    def _build_predict_input_fn(self, data):
+        """
+        Helper function to build `predict_input_fn` to be used by CSEstimator
+        :param data: List of strings which represent aminoacid sequences and whose embeddings are to be extracted
+        """
 
         def _generator_fn(data):
 
@@ -140,10 +151,10 @@ class ExtractEmbeddingsFromBert:
 
 
     def predict_input_fn(self, params, input_context=None):
-        return self.build_predict_input_fn(self.data)
+        return self._build_predict_input_fn(self.data)
 
     
-    def get_output_type_shapes(self, max_sequence_length):
+    def _get_output_type_shapes(self, max_sequence_length):
         # process for output shapes and types
         output = {
             "input_ids": {"output_type": "int32", "shape": [max_sequence_length],},
@@ -152,7 +163,11 @@ class ExtractEmbeddingsFromBert:
 
         return output
     
-    def get_embeddings(self, data):
+    def extract_embeddings(self, data):
+        """
+        Function to extract encoder outputs from BERT model
+        :param data: List of strings which represent aminoacid sequences and whose embeddings are to be extracted
+        """
 
         self.data = data
         self.params["runconfig"]["predict_steps"] = len(data)
@@ -195,7 +210,7 @@ class ExtractEmbeddingsFromBert:
                     parquet_file_path = os.path.join(predict_output_dir, f"extracted_features_{fileidx}.parquet")   
                 else:
                     predictions = next(model_output)
-                    tf.compat.v1.logging.info(f"prediction_output:{predictions}")
+                    # tf.compat.v1.logging.info(f"prediction_output:{predictions}")
                     for key, val in predictions.items():
                         if key.startswith("encoder"):
                             predictions[key] = val.flatten().astype(np.float32)
@@ -209,23 +224,25 @@ class ExtractEmbeddingsFromBert:
                 print(df.info())
                 break
 
-        pass
 
-
-
-def main(params_file_path, model_dir, data, checkpoint_path=None):
+def main(params_file_path, model_dir, data_file_path, checkpoint_path=None):
     """
     Main function
     """
+
+    with open(data_file_path, "r") as fh:
+        data = fh.readlines()
+    data = [x.strip() for x in data]
+
     # tf.compat.v1.disable_eager_execution()
     params = get_params(params_file_path)
 
     embed_obj = ExtractEmbeddingsFromBert(params, model_dir, checkpoint_path)
 
-    # dataset = embed_obj.build_predict_input_fn(data)
+    ######## FOR DEBUG - Run through data being fed to the Estimator ########
+    # dataset = embed_obj._build_predict_input_fn(data)
     # it = tf.compat.v1.data.make_initializable_iterator(dataset)
     # next_batch = it.get_next()
-
     # with tf.compat.v1.Session() as sess:
     #     sess.run(tf.compat.v1.global_variables_initializer())
     #     sess.run(tf.compat.v1.tables_initializer())
@@ -237,8 +254,9 @@ def main(params_file_path, model_dir, data, checkpoint_path=None):
                 
     #         data_batch = sess.run(next_batch)
     #         print(data_batch)
+    ####################################################################
 
-    embed_obj.get_embeddings(data)
+    embed_obj.extract_embeddings(data)
 
 
 
@@ -272,10 +290,16 @@ if __name__ == "__main__":
         default=None,
         help="Checkpoint to initialize weights from.",
     )
+    parser.add_argument(
+        "--data_file_path",
+        default=None,
+        help="Data filepath to extract embeddings for",
+    )
+    
 
     args = parser.parse_args(sys.argv[1:])
 
     data = ["MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG","KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPNAAEEHLKALARKGVIEIVSGASRGIRLLQEE",
     ]
-
-    main(args.params, args.model_dir, data, args.checkpoint_path)
+    
+    main(args.params, args.model_dir, args.data_file_path, args.checkpoint_path)
