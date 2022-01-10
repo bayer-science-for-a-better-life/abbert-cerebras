@@ -49,6 +49,8 @@ class ExtractEmbeddingsFromBert:
         #########
 
         self.params["runconfig"]["checkpoint_path"] = checkpoint_path
+
+        self.use_segment_embedding = self.params["predict_input"]["use_segment_embedding"]
         
         tf.compat.v1.logging.info(f"params used: {self.params}")
 
@@ -115,6 +117,9 @@ class ExtractEmbeddingsFromBert:
                 features["input_ids"] = input_ids
                 features["input_mask"] = np.array(input_mask, dtype=np.int32)
 
+                if self.use_segment_embedding:
+                    features["segment_ids"] = np.array([0] * self.max_sequence_length, dtype=np.int32)
+
                 yield features, np.int32(np.empty(1)[0])
 
         # get actual tensorflow types
@@ -156,6 +161,9 @@ class ExtractEmbeddingsFromBert:
             "input_ids": {"output_type": "int32", "shape": [max_sequence_length],},
             "input_mask": {"output_type": "int32", "shape": [max_sequence_length],},
         }
+
+        if self.use_segment_embedding:
+            output["segment_ids"] = {"output_type": "int32", "shape": [max_sequence_length]}
 
         return output
     

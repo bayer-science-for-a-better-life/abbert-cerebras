@@ -78,6 +78,11 @@ def get_params(params_file, mode=None):
     params["predict_input"]["mixed_precision"] = params["model"].get(
         "mixed_precision", False
     )
+    if params["model"]["use_segment_embedding"]:
+        params["predict_input"]["use_segment_embedding"] = True
+    else:
+        params["predict_input"]["use_segment_embedding"] = False
+
 
     set_bert_defaults(params, mode=mode)
 
