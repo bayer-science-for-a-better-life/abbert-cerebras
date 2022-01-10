@@ -5,9 +5,6 @@ Tokenization classes and functions.
 import tensorflow as tf
 from tensorflow.keras.preprocessing.text import Tokenizer
 
-from modelzoo.transformers.bert.tf.input.data_processing.utils import convert_to_unicode
-
-
 
 class BaseTokenizer:
     """

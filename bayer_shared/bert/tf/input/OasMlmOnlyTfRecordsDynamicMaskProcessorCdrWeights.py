@@ -11,7 +11,7 @@ from bayer_shared.bert.tf.input.Tokenization import BaseTokenizer
 from bayer_shared.bert.tf.utils import get_oas_vocab
 
 
-class OasMlmOnlyTfRecordsDynamicMaskProcessor:
+class OasMlmOnlyTfRecordsDynamicMaskProcessorCdrWeights:
     def __init__(self, params):
         self.data_dir = params["data_dir"]
         self.batch_size = params["batch_size"]
@@ -63,6 +63,7 @@ class OasMlmOnlyTfRecordsDynamicMaskProcessor:
         self.fw_masked_lm_prob = params["fw_masked_lm_prob"]
         self.cdr_masked_lm_prob = params["cdr_masked_lm_prob"]
         self.use_segment_embedding = params["use_segment_embedding"]
+        self.cdr3_loss_scale = params.get("cdr3_loss_scale", 2)
 
         self.species = params["species"]
         self.chain = params["chain"]
@@ -297,6 +298,7 @@ class OasMlmOnlyTfRecordsDynamicMaskProcessor:
             masked_lm_positions,
             masked_lm_ids,
             segment_ids,
+            cdr3_weights,
         ) = tf.numpy_function(
             self._create_mlm_input_features,
             [
@@ -306,11 +308,12 @@ class OasMlmOnlyTfRecordsDynamicMaskProcessor:
                 features["fw_start"],
                 features["fw_length"],
             ],
-            [tf.int32, tf.int32, tf.int32, tf.int32],
+            [tf.int32, tf.int32, tf.int32, tf.int32, tf.int32],
         )
         input_ids.set_shape(self.max_sequence_length)
         masked_lm_positions.set_shape(self.max_predictions_per_seq)
         masked_lm_ids.set_shape(self.max_predictions_per_seq)
+        cdr3_weights.set_shape(self.max_predictions_per_seq)
         input_mask = tf.cast(
             tf.equal(input_ids, self.vocab_word_to_id_dict["[PAD]"]), tf.int32
         )
@@ -323,6 +326,7 @@ class OasMlmOnlyTfRecordsDynamicMaskProcessor:
             "masked_lm_ids": masked_lm_ids,
             "masked_lm_positions": masked_lm_positions,
             "masked_lm_weights": masked_lm_weights,
+            "cdr3_weights": cdr3_weights
         }
 
         if self.use_segment_embedding:
@@ -459,14 +463,24 @@ class OasMlmOnlyTfRecordsDynamicMaskProcessor:
         masked_lm_padding = [0] * (
             self.max_predictions_per_seq - len(masked_lm_positions)
         )
+
+        cdr3_weights = []
+        for val in masked_lm_positions:
+            if (val >= cdr_start[2]) and (val < cdr_start[2] + cdr_length[2]):
+                cdr3_weights.append(1)
+            else:
+                cdr3_weights.append(0)
+        
         masked_lm_positions += masked_lm_padding
         masked_lm_ids += masked_lm_padding
+        cdr3_weights += masked_lm_padding
 
         return (
             np.int32(input_ids),
             np.int32(masked_lm_positions),
             np.int32(masked_lm_ids),
             np.int32(segment_ids),
+            np.int32(cdr3_weights)
         )
 
     def _get_region_masked_lm_positions(
@@ -644,4 +658,8 @@ class OasMlmOnlyTfRecordsDynamicMaskProcessor:
             features["masked_lm_weights"] = tf.cast(
                 mlm_weights * scale, self.mp_type
             )
+
+            features["cdr3_weights"] = tf.cast(tf.where(features["cdr3_weights"]>0, self.cdr3_loss_scale, 1), self.mp_type)
+            features["masked_lm_weights"] = tf.cast(features["masked_lm_weights"] * features["cdr3_weights"], self.mp_type)
+
         return features, label

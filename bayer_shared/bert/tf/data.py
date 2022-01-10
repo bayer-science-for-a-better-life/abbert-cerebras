@@ -5,6 +5,10 @@ from bayer_shared.bert.tf.input.OasMlmOnlyTfRecordsDynamicMaskProcessor import (
     OasMlmOnlyTfRecordsDynamicMaskProcessor,
 )
 
+from bayer_shared.bert.tf.input.OasMlmOnlyTfRecordsDynamicMaskProcessorCdrWeights import (
+    OasMlmOnlyTfRecordsDynamicMaskProcessorCdrWeights,
+)
+
 def train_input_fn(params, input_context=None):
     return getattr(
         sys.modules[__name__], params["train_input"]["data_processor"]

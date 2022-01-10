@@ -1,12 +1,7 @@
 import os
 import sys
-from typing import Sequence
-
 import tensorflow as tf
-import matplotlib.pyplot as plt
 import argparse
-import itertools
-import io
 import numpy as np
 import pandas as pd
 import pyarrow as pa
@@ -18,7 +13,7 @@ from functools import partial
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
 from bayer_shared.bert.tf.model import model_fn
 from bayer_shared.bert.tf.utils import get_params
-from bayer_shared.bert.tf.run import create_arg_parser, run
+from bayer_shared.bert.tf.run import run
 from bayer_shared.bert.tf.utils import get_oas_vocab
 from bayer_shared.bert.tf.input.Tokenization import BaseTokenizer
 
@@ -33,17 +28,17 @@ def to_parquet(df, path, compression='zstd', compression_level=20, **write_table
 
 class ExtractEmbeddingsFromBert:
 
-    def __init__(self, params, model_dir, checkpoint_path=None):
+    def __init__(self, params, output_dir, checkpoint_path=None):
         """
         Main object to initialize model, create input fn for estimator and extract embeddings
         :param params: parameters read from yaml file used to initialize model
-        :param model_dir: filepath where the extracted embeddings are stored
+        :param output_dir: filepath where the extracted embeddings are stored
         :checkpoint_path: full path to the checkpoint being used to extract embeddings
             For ex: `<>/model.ckpt-300000`
             If None, the model is initialized with random values.
         """
         self.params = params
-        self.model_dir = model_dir
+        self.output_dir = output_dir
         self.args = args
         
         if self.params["runconfig"].get("mode") != "predict":
@@ -52,6 +47,7 @@ class ExtractEmbeddingsFromBert:
         
         self.params["runconfig"]["validate_only"] = False
         self.params["runconfig"]["compile_only"] = False
+        self.params["runconfig"]["model_dir"] = output_dir
         self.params["runconfig"]["checkpoint_path"] = checkpoint_path
         
         tf.compat.v1.logging.info(f"params used: {self.params}")
@@ -60,7 +56,7 @@ class ExtractEmbeddingsFromBert:
             self.vocab_word_to_id_dict,
             self.min_aa_id,
             self.max_aa_id,
-        ) = get_oas_vocab(self.params["predict_input"].get("vocab_file"), self.params["predict_input"].get("dummy_vocab_size"))
+        ) = get_oas_vocab(self.params["predict_input"].get("vocab_type"), self.params["predict_input"].get("dummy_vocab_size"))
         self.vocab_words = list(self.vocab_word_to_id_dict.keys())
 
         self.tokenizer = BaseTokenizer(self.vocab_word_to_id_dict)
@@ -172,7 +168,7 @@ class ExtractEmbeddingsFromBert:
         self.data = data
         self.params["runconfig"]["predict_steps"] = len(data)
 
-        model_output = run(
+        model_output_generator = run(
         args=self.args,
         params=self.params,
         model_fn=model_fn,
@@ -181,22 +177,19 @@ class ExtractEmbeddingsFromBert:
         predict_input_fn=self.predict_input_fn,
         cs1_modes=["train", "eval", "predict"])
 
-        vocab, _, _ = get_oas_vocab(self.params["predict_input"].get("vocab_file"), self.params["predict_input"].get("dummy_vocab_size"))
-
-        if model_output:
-            predict_output_dir = os.path.join(self.model_dir, "predict")
+        vocab, _, _ = get_oas_vocab(self.params["predict_input"].get("vocab_type"), self.params["predict_input"].get("dummy_vocab_size"))
         
-        if not os.path.exists(predict_output_dir):
-            os.makedirs(predict_output_dir)
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
-        vocab_file = os.path.join(self.model_dir, "predict", "vocab_file.json")
+        vocab_file = os.path.join(self.output_dir, "vocab_file.json")
         with open(vocab_file, "w") as fh:
             json.dump(vocab, fh)
 
         file_content = []
         len_file_content = 0
         fileidx = 0
-        parquet_file_path = os.path.join(predict_output_dir, f"extracted_features_{fileidx}.parquet")
+        parquet_file_path = os.path.join(self.output_dir, f"extracted_features_{fileidx}.parquet")
         while True:
             try:
                 if len_file_content == 100000:
@@ -207,9 +200,9 @@ class ExtractEmbeddingsFromBert:
                     fileidx += 1
                     file_content = []
                     len_file_content = 0
-                    parquet_file_path = os.path.join(predict_output_dir, f"extracted_features_{fileidx}.parquet")   
+                    parquet_file_path = os.path.join(self.output_dir, f"extracted_features_{fileidx}.parquet")   
                 else:
-                    predictions = next(model_output)
+                    predictions = next(model_output_generator)
                     # tf.compat.v1.logging.info(f"prediction_output:{predictions}")
                     for key, val in predictions.items():
                         if key.startswith("encoder"):
@@ -225,19 +218,20 @@ class ExtractEmbeddingsFromBert:
                 break
 
 
-def main(params_file_path, model_dir, data_file_path, checkpoint_path=None):
+def main(params_file_path, output_dir, data_file_path, checkpoint_path=None):
     """
     Main function
     """
 
-    with open(data_file_path, "r") as fh:
-        data = fh.readlines()
-    data = [x.strip() for x in data]
+    # with open(data_file_path, "r") as fh:
+    #     data = fh.readlines()
+    # data = [x.strip() for x in data]
+    data = data_file_path
 
     # tf.compat.v1.disable_eager_execution()
     params = get_params(params_file_path)
 
-    embed_obj = ExtractEmbeddingsFromBert(params, model_dir, checkpoint_path)
+    embed_obj = ExtractEmbeddingsFromBert(params, output_dir, checkpoint_path)
 
     ######## FOR DEBUG - Run through data being fed to the Estimator ########
     # dataset = embed_obj._build_predict_input_fn(data)
@@ -259,16 +253,14 @@ def main(params_file_path, model_dir, data_file_path, checkpoint_path=None):
     embed_obj.extract_embeddings(data)
 
 
-
-
 if __name__ == "__main__":
     """
     Example usage
     """
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
-    default_model_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "model_dir"
+    default_output_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "output_dir"
     )
 
     parser = argparse.ArgumentParser()
@@ -280,10 +272,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-o",
-        "--model_dir",
-        default=default_model_dir,
-        help="Model directory where embeddings will be stored. "
-        + "If directory exists, weights are loaded from the checkpoint file.",
+        "--output_dir",
+        default=default_output_dir,
+        help="Output directory where embeddings will be stored. ",
     )
     parser.add_argument(
         "--checkpoint_path",
@@ -300,6 +291,8 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
 
     data = ["MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG","KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPNAAEEHLKALARKGVIEIVSGASRGIRLLQEE",
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     ]
     
-    main(args.params, args.model_dir, args.data_file_path, args.checkpoint_path)
+    # main(args.params, args.output_dir, args.data_file_path, args.checkpoint_path)
+    main(args.params, args.output_dir, data, args.checkpoint_path)
