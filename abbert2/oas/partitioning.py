@@ -12,7 +12,7 @@ SUBSET_TEST = 'test'
 
 
 #
-# --- Sequence based hashing
+# --- Sequence hashing based partitions
 #
 # Pros:
 #   - Simple
@@ -22,7 +22,6 @@ SUBSET_TEST = 'test'
 # Cons:
 #   - Sensitive to possible batch effects
 #     (sequencing run AKA unit, subject, study)
-#   - No cross-val
 #
 
 
