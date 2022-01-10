@@ -4,7 +4,7 @@ from typing import Optional, Union
 import pandas as pd
 
 from abbert2.oas.oas import consolidate_all_units_stats, summarize_count_stats, diagnose, OAS
-from abbert2.oas.preprocessing import cache_units_meta, process_units, download_units, parse_all_anarci_status
+from abbert2.oas.preprocessing import cache_units_meta, process_units, download_units
 
 
 def populate_metadata(oas_path: Optional[Union[str, Path]] = None,
