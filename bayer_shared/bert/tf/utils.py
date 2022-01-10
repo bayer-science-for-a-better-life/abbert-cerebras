@@ -64,7 +64,7 @@ def get_params(params_file, mode=None):
     params["eval_input"]["chain"] = params["eval_input"].get("chain", None)
 
     if "predict_input" in params:
-        vocab, min_aa_id, max_aa_id = get_oas_vocab(params["predict_input"]["vocab_type"], params["predict_input"].get("dummy_vocab_size"))
+        vocab, min_aa_id, max_aa_id = get_oas_vocab(params["predict_input"].get("vocab_type"), params["predict_input"].get("dummy_vocab_size"))
         params["predict_input"]["vocab_size"] = len(vocab)
     else:
         params["predict_input"] = deepcopy(params["train_input"])
@@ -73,6 +73,7 @@ def get_params(params_file, mode=None):
     # predict_input required parameters
     params["predict_input"]["shuffle"] = params["predict_input"].get("shuffle", False)
     params["predict_input"]["repeat"] = params["predict_input"].get("repeat", False)
+    params["predict_input"]["batch_size"] = 1
 
     params["predict_input"]["mixed_precision"] = params["model"].get(
         "mixed_precision", False

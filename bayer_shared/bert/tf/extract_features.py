@@ -27,27 +27,27 @@ def to_parquet(df, path, compression='zstd', compression_level=20, **write_table
 
 
 class ExtractEmbeddingsFromBert:
-
-    def __init__(self, params, output_dir, checkpoint_path=None):
+    def __init__(self, params, checkpoint_path=None):
         """
         Main object to initialize model, create input fn for estimator and extract embeddings
         :param params: parameters read from yaml file used to initialize model
-        :param output_dir: filepath where the extracted embeddings are stored
         :checkpoint_path: full path to the checkpoint being used to extract embeddings
             For ex: `<>/model.ckpt-300000`
             If None, the model is initialized with random values.
         """
         self.params = params
-        self.output_dir = output_dir
         self.args = args
         
         if self.params["runconfig"].get("mode") != "predict":
             tf.compat.v1.logging.info(f" Mode must be `predict` when extracting embeddings. Setting mode to `predict`")
             self.params["runconfig"]["mode"] = "predict"
         
+        #### Setting flags to ensure compatibility ###
         self.params["runconfig"]["validate_only"] = False
         self.params["runconfig"]["compile_only"] = False
-        self.params["runconfig"]["model_dir"] = output_dir
+        self.params["runconfig"]["model_dir"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model_dir")
+        #########
+
         self.params["runconfig"]["checkpoint_path"] = checkpoint_path
         
         tf.compat.v1.logging.info(f"params used: {self.params}")
@@ -168,7 +168,7 @@ class ExtractEmbeddingsFromBert:
         self.data = data
         self.params["runconfig"]["predict_steps"] = len(data)
 
-        model_output_generator = run(
+        predictions_generator = run(
         args=self.args,
         params=self.params,
         model_fn=model_fn,
@@ -177,45 +177,7 @@ class ExtractEmbeddingsFromBert:
         predict_input_fn=self.predict_input_fn,
         cs1_modes=["train", "eval", "predict"])
 
-        vocab, _, _ = get_oas_vocab(self.params["predict_input"].get("vocab_type"), self.params["predict_input"].get("dummy_vocab_size"))
-        
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
-
-        vocab_file = os.path.join(self.output_dir, "vocab_file.json")
-        with open(vocab_file, "w") as fh:
-            json.dump(vocab, fh)
-
-        file_content = []
-        len_file_content = 0
-        fileidx = 0
-        parquet_file_path = os.path.join(self.output_dir, f"extracted_features_{fileidx}.parquet")
-        while True:
-            try:
-                if len_file_content == 100000:
-                    df = pd.DataFrame(file_content)
-                    print(df.head())
-                    print(df.info())
-                    to_parquet(df, parquet_file_path)
-                    fileidx += 1
-                    file_content = []
-                    len_file_content = 0
-                    parquet_file_path = os.path.join(self.output_dir, f"extracted_features_{fileidx}.parquet")   
-                else:
-                    predictions = next(model_output_generator)
-                    # tf.compat.v1.logging.info(f"prediction_output:{predictions}")
-                    for key, val in predictions.items():
-                        if key.startswith("encoder"):
-                            predictions[key] = val.flatten().astype(np.float32)
-                    file_content.append(predictions)
-                    len_file_content += 1
-
-            except StopIteration:
-                df = pd.DataFrame(file_content)
-                to_parquet(df, parquet_file_path)
-                print(df.head())
-                print(df.info())
-                break
+        return predictions_generator
 
 
 def main(params_file_path, output_dir, data_file_path, checkpoint_path=None):
@@ -228,12 +190,12 @@ def main(params_file_path, output_dir, data_file_path, checkpoint_path=None):
     # data = [x.strip() for x in data]
     data = data_file_path
 
-    # tf.compat.v1.disable_eager_execution()
     params = get_params(params_file_path)
 
-    embed_obj = ExtractEmbeddingsFromBert(params, output_dir, checkpoint_path)
+    embed_obj = ExtractEmbeddingsFromBert(params, checkpoint_path)
 
     ######## FOR DEBUG - Run through data being fed to the Estimator ########
+    # tf.compat.v1.disable_eager_execution()
     # dataset = embed_obj._build_predict_input_fn(data)
     # it = tf.compat.v1.data.make_initializable_iterator(dataset)
     # next_batch = it.get_next()
@@ -250,7 +212,42 @@ def main(params_file_path, output_dir, data_file_path, checkpoint_path=None):
     #         print(data_batch)
     ####################################################################
 
-    embed_obj.extract_embeddings(data)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    file_content = []
+    len_file_content = 0
+    fileidx = 0
+    parquet_file_path = os.path.join(output_dir, f"extracted_features_{fileidx}.parquet")
+
+    predictions_generator = embed_obj.extract_embeddings(data)
+
+    while True:
+        try:
+            if len_file_content == 100000:
+                df = pd.DataFrame(file_content)
+                print(df.head())
+                print(df.info())
+                to_parquet(df, parquet_file_path)
+                fileidx += 1
+                file_content = []
+                len_file_content = 0
+                parquet_file_path = os.path.join(output_dir, f"extracted_features_{fileidx}.parquet")   
+            else:
+                predictions = next(predictions_generator)
+                for key, val in predictions.items():
+                    if key.startswith("encoder"):
+                        predictions[key] = val.flatten().astype(np.float32)
+                file_content.append(predictions)
+                len_file_content += 1
+
+        except StopIteration:
+            df = pd.DataFrame(file_content)
+            to_parquet(df, parquet_file_path)
+            print(df.head())
+            print(df.info())
+            break
+    
 
 
 if __name__ == "__main__":
