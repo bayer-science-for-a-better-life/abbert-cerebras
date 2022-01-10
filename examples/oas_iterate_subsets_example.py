@@ -51,7 +51,7 @@ def assign_ml_subsets(
 ) -> Optional[pd.DataFrame]:
     df = unit.sequences_df(columns=ML_USED_SEQUENCE_COLUMNS)
     if df is None:
-        return None  # FIXME: return empty dataframe with the right schema
+        return None
     df['ml_subset'] = df['sequence_aa'].apply(partitioner)
     for column in ML_USED_UNIT_COLUMNS:
         df[column] = getattr(unit, column)
