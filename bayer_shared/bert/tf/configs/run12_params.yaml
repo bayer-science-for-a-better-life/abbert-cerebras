@@ -1,0 +1,103 @@
+#RoBERTa-Base
+
+### Input
+train_input:
+    data_processor: OasMlmOnlyTfRecordsDynamicMaskProcessor
+    data_dir: [
+        "/cb/customers/poc/bayer_data/bayer_20211202/bayer_filter_default_20211202_tfrecs_hash/paired/*train_80*.tfrecord",
+        "/cb/customers/poc/bayer_data/bayer_20211202/bayer_filter_default_20211202_tfrecs_hash/unpaired/*train_80*.tfrecord"
+    ]
+    max_sequence_length: 182
+    max_predictions_per_seq: 28
+    shuffle: True
+    shuffle_seed: 0
+    repeat: True
+    batch_size: 1024
+    dummy_vocab_size: 32
+    shuffle_buffer: 500000
+
+
+eval_input:
+    data_processor: OasMlmOnlyTfRecordsDynamicMaskProcessor
+    data_dir: [
+        "/cb/customers/poc/bayer_data/bayer_20211202/bayer_filter_default_20211202_tfrecs_hash/paired/*val_10*.tfrecord",
+        "/cb/customers/poc/bayer_data/bayer_20211202/bayer_filter_default_20211202_tfrecs_hash/unpaired/*val_10*.tfrecord"
+    ]
+    #### Test dataset:
+    # data_dir: [
+    #     "/cb/customers/poc/bayer_data/bayer_20211202/bayer_filter_default_20211202_tfrecs_hash/paired/*test_10*.tfrecord",
+    #     "/cb/customers/poc/bayer_data/bayer_20211202/bayer_filter_default_20211202_tfrecs_hash/unpaired/*test_10*.tfrecord"
+    # ]
+    max_sequence_length: 182
+    max_predictions_per_seq: 28
+    batch_size: 1024
+    dummy_vocab_size: 32
+    shuffle_buffer: 500000
+
+
+predict_input:
+    max_sequence_length: 182
+    dummy_vocab_size: 32
+    vocab_type: "vocab_25"
+
+
+model:
+    # Embedding
+    hidden_size: 768
+    use_position_embedding: True
+    use_segment_embedding: False
+    position_embedding_type: 'learned' # {'learned', 'fixed'}
+    max_position_embeddings: 512
+    share_embedding_weights: True
+
+    # Encoder
+    num_hidden_layers: 12
+    dropout_rate: 0.1
+    layer_norm_epsilon: 1e-5
+
+    # Encoder - Attention
+    num_heads: 12
+    attention_dropout_rate: 0.1
+
+    # Encoder - ffn
+    filter_size: 3072
+    encoder_nonlinearity: 'gelu'
+    use_ffn_bias: True
+
+    # Task-specific
+    disable_nsp: True
+    mlm_loss_weight: 1
+
+    use_vsl: False
+    mixed_precision: True
+    boundary_casting: False
+    tf_summary: False
+    all_encoder_outputs: True
+
+### Optimization
+optimizer:
+    optimizer_type: "adamw" # {"sgd", "momentum", "adam", "adamw"}
+    weight_decay_rate: 0.01
+    epsilon: 1e-6
+    max_gradient_norm: 1.0
+    disable_lr_steps_reset: False
+    learning_rate:
+        - steps: 58516
+          scheduler: "Linear"
+          initial_learning_rate: 0.0
+          end_learning_rate: 0.0001
+        - scheduler: "Linear"
+          initial_learning_rate: 0.0001
+          end_learning_rate: 0.0
+          steps: 1111810
+    loss_scaling_factor: "dynamic"
+    log_summaries: True
+
+### Cerebras parameters
+runconfig:
+    max_steps: 1170326
+    save_summary_steps: 100
+    save_checkpoints_steps: 100000
+    keep_checkpoint_max: 0
+    tf_random_seed: 1235
+    enable_distributed: False
