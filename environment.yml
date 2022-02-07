@@ -3,9 +3,11 @@ name: abbert2
 channels:
   - conda-forge
   - nodefaults
+  - bioconda
 
 dependencies:
   - python
+  - abnumber
   - pip
   - numpy
   - pandas
