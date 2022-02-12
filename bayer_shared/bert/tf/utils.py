@@ -1,7 +1,6 @@
 import yaml
-import collections
-import tensorflow as tf 
-from modelzoo.transformers.bert.tf.utils import set_defaults as set_bert_defaults
+import tensorflow as tf
+from abbert2.vendored.cerebras_modelzoo.transformers.bert.tf.utils import set_defaults as set_bert_defaults
 from copy import deepcopy
 
 def get_oas_vocab(vocab_type="vocab_25", dummy_vocab_size=None):
@@ -28,7 +27,7 @@ def get_oas_vocab(vocab_type="vocab_25", dummy_vocab_size=None):
     if dummy_vocab_size and dummy_vocab_size > len(vocab):
         extra_ids = dummy_vocab_size - len(vocab)
         for i in range(extra_ids):
-            extra_key = "extra_id_"+ str(i)
+            extra_key = "extra_id_" + str(i)
             vocab[extra_key] = i + len_vocab
     
     tf.compat.v1.logging.info(f"----vocab: {vocab}, len(vocab): {len(vocab)}")
@@ -41,14 +40,14 @@ def get_params(params_file, mode=None):
     with open(params_file, "r") as stream:
         params = yaml.safe_load(stream)
 
-    vocab_size = len(get_oas_vocab(params["train_input"].get("vocab_type"), params["train_input"].get("dummy_vocab_size"))[0])
+    vocab_size = len(get_oas_vocab(params["train_input"].get("vocab_type"),
+                                   params["train_input"].get("dummy_vocab_size"))[0])
 
     params["train_input"]["vocab_size"] = vocab_size
 
     if "eval_input" in params:
         params["eval_input"]["vocab_size"] = vocab_size
     
-
     params["model"]["all_encoder_outputs"] = params["model"].get("all_encoder_outputs", False)
 
     params["train_input"]["fw_masked_lm_prob"] = params["train_input"].get("fw_masked_lm_prob", None)
@@ -64,11 +63,12 @@ def get_params(params_file, mode=None):
     params["eval_input"]["chain"] = params["eval_input"].get("chain", None)
 
     if "predict_input" in params:
-        vocab, min_aa_id, max_aa_id = get_oas_vocab(params["predict_input"].get("vocab_type"), params["predict_input"].get("dummy_vocab_size"))
+        vocab, min_aa_id, max_aa_id = get_oas_vocab(
+            params["predict_input"].get("vocab_type"), params["predict_input"].get("dummy_vocab_size")
+        )
         params["predict_input"]["vocab_size"] = len(vocab)
     else:
         params["predict_input"] = deepcopy(params["train_input"])
-
 
     # predict_input required parameters
     params["predict_input"]["shuffle"] = params["predict_input"].get("shuffle", False)
@@ -83,7 +83,6 @@ def get_params(params_file, mode=None):
     else:
         params["predict_input"]["use_segment_embedding"] = False
 
-
     set_bert_defaults(params, mode=mode)
 
     params["train_input"]["use_segment_embedding"] = params["model"].get(
@@ -94,7 +93,6 @@ def get_params(params_file, mode=None):
     )
 
     return params
-
 
 
 def vocab_25():
@@ -178,5 +176,3 @@ def vocab_30():
 # 'rat': 'rat',
 # 'rhesus': 'rhesus',
 # }
-
-
