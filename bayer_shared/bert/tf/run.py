@@ -22,9 +22,10 @@ import pandas as pd
 
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
-from modelzoo.common.estimator.tf.cs_estimator import CerebrasEstimator
-from modelzoo.common.estimator.tf.run_config import CSRunConfig
-from modelzoo.common.run_utils import (
+
+from abbert2.vendored.cerebras_modelzoo.common.estimator.tf.cs_estimator import CerebrasEstimator
+from abbert2.vendored.cerebras_modelzoo.common.estimator.tf.run_config import CSRunConfig
+from abbert2.vendored.cerebras_modelzoo.common.run_utils import (
     check_env,
     create_warm_start_settings,
     get_csconfig,
@@ -36,7 +37,7 @@ from modelzoo.common.run_utils import (
 )
 from bayer_shared.bert.tf.data import eval_input_fn, train_input_fn
 from bayer_shared.bert.tf.model import model_fn
-from modelzoo.transformers.bert.tf.utils import (
+from abbert2.vendored.cerebras_modelzoo.transformers.bert.tf.utils import (
     get_custom_stack_params,
 )
 from bayer_shared.bert.tf.utils import get_params
