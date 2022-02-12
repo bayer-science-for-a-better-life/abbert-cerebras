@@ -1,7 +1,7 @@
 import os
 
 from abbert2.oas.oas import OAS, Unit
-from tfrecord_scripts.utils import (
+from abbert2.vendored.tfrecord_scripts.utils import (
     create_bytes_feature,
     create_int_feature,
 )
