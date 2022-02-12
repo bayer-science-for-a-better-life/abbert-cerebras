@@ -10,12 +10,11 @@ import pyarrow as pa
 import tensorflow as tf
 from pyarrow import parquet as pq
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
-from bayer_shared.bert.tf.model import model_fn
-from bayer_shared.bert.tf.utils import get_params
-from bayer_shared.bert.tf.run import run
-from bayer_shared.bert.tf.utils import get_oas_vocab
-from bayer_shared.bert.tf.input.Tokenization import BaseTokenizer
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.model import model_fn
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.utils import get_params
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.run import run
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.utils import get_oas_vocab
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.input.Tokenization import BaseTokenizer
 
 
 def to_parquet(df, path, compression='zstd', compression_level=20, **write_table_kwargs):

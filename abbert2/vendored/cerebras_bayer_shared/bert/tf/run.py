@@ -16,14 +16,12 @@ import argparse
 import os
 import sys
 
-import tensorflow as tf
 import numpy as np
-import pandas as pd
+import tensorflow as tf
 
-
-# SANTI: this is not needed any more
-# sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
-
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.data import eval_input_fn, train_input_fn
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.model import model_fn
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.utils import get_params
 from abbert2.vendored.cerebras_modelzoo.common.estimator.tf.cs_estimator import CerebrasEstimator
 from abbert2.vendored.cerebras_modelzoo.common.estimator.tf.run_config import CSRunConfig
 from abbert2.vendored.cerebras_modelzoo.common.run_utils import (
@@ -33,15 +31,11 @@ from abbert2.vendored.cerebras_modelzoo.common.run_utils import (
     get_csrunconfig_dict,
     is_cs,
     save_params,
-    save_predictions,
     update_params_from_args,
 )
-from bayer_shared.bert.tf.data import eval_input_fn, train_input_fn
-from bayer_shared.bert.tf.model import model_fn
 from abbert2.vendored.cerebras_modelzoo.transformers.bert.tf.utils import (
     get_custom_stack_params,
 )
-from bayer_shared.bert.tf.utils import get_params
 
 CS1_MODES = ["train", "eval"]
 

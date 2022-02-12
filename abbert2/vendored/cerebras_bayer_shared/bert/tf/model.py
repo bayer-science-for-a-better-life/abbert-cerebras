@@ -14,7 +14,7 @@
 
 import tensorflow as tf
 
-from bayer_shared.bert.tf.BayerBertModel import BayerBertModel
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.BayerBertModel import BayerBertModel
 from abbert2.vendored.cerebras_modelzoo.common.estimator.tf.cs_estimator_spec import CSEstimatorSpec
 from abbert2.vendored.cerebras_modelzoo.common.hooks.grad_accum_hooks import get_grad_accum_hooks
 

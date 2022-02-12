@@ -7,8 +7,8 @@ import numpy as np
 import tensorflow as tf
 from abbert2.vendored.cerebras_modelzoo.common.input.utils import transform_dataset
 from abbert2.vendored.cerebras_modelzoo.common.model_utils.shard_dataset import shard_dataset
-from bayer_shared.bert.tf.input.Tokenization import BaseTokenizer
-from bayer_shared.bert.tf.utils import get_oas_vocab
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.input.Tokenization import BaseTokenizer
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.utils import get_oas_vocab
 
 
 class OasMlmOnlyTfRecordsDynamicMaskProcessorCdrWeights:

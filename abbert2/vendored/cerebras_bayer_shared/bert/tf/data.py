@@ -1,13 +1,7 @@
-import tensorflow as tf
 import sys
 
-from bayer_shared.bert.tf.input.OasMlmOnlyTfRecordsDynamicMaskProcessor import (
-    OasMlmOnlyTfRecordsDynamicMaskProcessor,
-)
+import tensorflow as tf
 
-from bayer_shared.bert.tf.input.OasMlmOnlyTfRecordsDynamicMaskProcessorCdrWeights import (
-    OasMlmOnlyTfRecordsDynamicMaskProcessorCdrWeights,
-)
 
 def train_input_fn(params, input_context=None):
     return getattr(

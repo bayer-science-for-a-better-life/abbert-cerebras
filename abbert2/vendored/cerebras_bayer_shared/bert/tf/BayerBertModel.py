@@ -14,6 +14,7 @@
 
 import tensorflow as tf
 
+from abbert2.vendored.cerebras_bayer_shared.bert.tf.layers.Encoder import Encoder
 from abbert2.vendored.cerebras_modelzoo.common.BaseModel import BaseModel
 from abbert2.vendored.cerebras_modelzoo.common.layers.tf.CrossEntropyFromLogitsLayer import (
     CrossEntropyFromLogitsLayer,
@@ -27,7 +28,6 @@ from abbert2.vendored.cerebras_modelzoo.common.layers.tf.LayerNormalizationLayer
 )
 from abbert2.vendored.cerebras_modelzoo.common.metrics.perplexity import perplexity_metric
 from abbert2.vendored.cerebras_modelzoo.common.metrics.utils import (
-    aggregate_across_replicas,
     streaming_confusion_matrix,
 )
 from abbert2.vendored.cerebras_modelzoo.common.model_utils.create_initializer import create_initializer
@@ -35,11 +35,9 @@ from abbert2.vendored.cerebras_modelzoo.common.optimizers.Trainer import Trainer
 from abbert2.vendored.cerebras_modelzoo.transformers.bert.tf.layers.CLSLayer import CLSLayer
 from abbert2.vendored.cerebras_modelzoo.transformers.bert.tf.layers.MLMLayer import MLMLayer
 from abbert2.vendored.cerebras_modelzoo.transformers.bert.tf.layers.MLMLossLayer import MLMLossLayer
-
 from abbert2.vendored.cerebras_modelzoo.transformers.common.transformer_utils import (
     create_embedding_layers,
 )
-from bayer_shared.bert.tf.layers.Encoder import Encoder
 
 
 class BayerBertModel(BaseModel):
