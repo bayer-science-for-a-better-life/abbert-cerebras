@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from modelzoo.common.layers.tf.AddLayer import AddLayer
-from modelzoo.common.layers.tf.AttentionLayer import SelfAttentionLayer
-from modelzoo.common.layers.tf.BaseLayer import BaseLayer
-from modelzoo.common.layers.tf.DropoutLayer import DropoutLayer
-from modelzoo.common.layers.tf.FeedForwardNetwork import FeedForwardNetwork
-from modelzoo.common.layers.tf.LayerNormalizationLayer import (
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.AddLayer import AddLayer
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.AttentionLayer import SelfAttentionLayer
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.BaseLayer import BaseLayer
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.DropoutLayer import DropoutLayer
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.FeedForwardNetwork import FeedForwardNetwork
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.LayerNormalizationLayer import (
     LayerNormalizationLayer,
 )
-from modelzoo.common.layers.tf.PrePostProcessWrapper import (
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.PrePostProcessWrapper import (
     PrePostProcessWrapper,
 )
 
