@@ -21,7 +21,8 @@ import numpy as np
 import pandas as pd
 
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
+# SANTI: this is not needed any more
+# sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
 
 from abbert2.vendored.cerebras_modelzoo.common.estimator.tf.cs_estimator import CerebrasEstimator
 from abbert2.vendored.cerebras_modelzoo.common.estimator.tf.run_config import CSRunConfig
