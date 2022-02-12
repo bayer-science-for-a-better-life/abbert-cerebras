@@ -14,29 +14,29 @@
 
 import tensorflow as tf
 
-from modelzoo.common.BaseModel import BaseModel
-from modelzoo.common.layers.tf.CrossEntropyFromLogitsLayer import (
+from abbert2.vendored.cerebras_modelzoo.common.BaseModel import BaseModel
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.CrossEntropyFromLogitsLayer import (
     CrossEntropyFromLogitsLayer,
 )
-from modelzoo.common.layers.tf.DenseLayer import DenseLayer
-from modelzoo.common.layers.tf.DropoutLayer import DropoutLayer
-from modelzoo.common.layers.tf.EmbeddingLayer import EmbeddingLayer
-from modelzoo.common.layers.tf.Input import SetupInputTensor
-from modelzoo.common.layers.tf.LayerNormalizationLayer import (
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.DenseLayer import DenseLayer
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.DropoutLayer import DropoutLayer
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.EmbeddingLayer import EmbeddingLayer
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.Input import SetupInputTensor
+from abbert2.vendored.cerebras_modelzoo.common.layers.tf.LayerNormalizationLayer import (
     LayerNormalizationLayer,
 )
-from modelzoo.common.metrics.perplexity import perplexity_metric
-from modelzoo.common.metrics.utils import (
+from abbert2.vendored.cerebras_modelzoo.common.metrics.perplexity import perplexity_metric
+from abbert2.vendored.cerebras_modelzoo.common.metrics.utils import (
     aggregate_across_replicas,
     streaming_confusion_matrix,
 )
-from modelzoo.common.model_utils.create_initializer import create_initializer
-from modelzoo.common.optimizers.Trainer import Trainer
-from modelzoo.transformers.bert.tf.layers.CLSLayer import CLSLayer
-from modelzoo.transformers.bert.tf.layers.MLMLayer import MLMLayer
-from modelzoo.transformers.bert.tf.layers.MLMLossLayer import MLMLossLayer
+from abbert2.vendored.cerebras_modelzoo.common.model_utils.create_initializer import create_initializer
+from abbert2.vendored.cerebras_modelzoo.common.optimizers.Trainer import Trainer
+from abbert2.vendored.cerebras_modelzoo.transformers.bert.tf.layers.CLSLayer import CLSLayer
+from abbert2.vendored.cerebras_modelzoo.transformers.bert.tf.layers.MLMLayer import MLMLayer
+from abbert2.vendored.cerebras_modelzoo.transformers.bert.tf.layers.MLMLossLayer import MLMLossLayer
 
-from modelzoo.transformers.common.transformer_utils import (
+from abbert2.vendored.cerebras_modelzoo.transformers.common.transformer_utils import (
     create_embedding_layers,
 )
 from bayer_shared.bert.tf.layers.Encoder import Encoder
