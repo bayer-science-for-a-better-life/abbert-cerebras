@@ -13,7 +13,7 @@ git clone git@github.com:Cerebras/modelzoo.git
 
 ### 2. Create conda environment for inference on GPU
 
-Please refer to the file [`bayer_conda_env.yml`](../../../bayer_conda_env.yml)
+Please refer to the file [`bayer_conda_env.yml`](../../../cerebras_bayer_conda_env.yml)
 
 ```bash
 conda env create -f ./abbert-cerebras/bayer_conda_env.yml
