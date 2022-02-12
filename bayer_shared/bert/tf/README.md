@@ -25,11 +25,13 @@ pip install -e .
 
 After generating TFrecords, we need to modify the config yamls with the correct path 
 
-Please edit the files `predict_input/data_dir` part of config yamls located [here](./configs/feature_extract). A sample config file is provided for your reference - [gpu_params_roberta_base_heavy_sequence_small_dataset_predict.yaml](./configs/gpu_params_roberta_base_heavy_sequence_small_dataset_predict.yaml)
+Please edit the files `predict_input/data_dir` part of config yamls located [here](./configs/feature_extract).
+A sample config file is provided for your reference - [gpu_params_roberta_base_heavy_sequence_small_dataset_predict.yaml](./configs/gpu_params_roberta_base_heavy_sequence_small_dataset_predict.yaml)
 
 The config files provided are for the various runs that were performed on CS-1
 
 ### 5. Download trained model checkpoints
+
 The trained model checkpoint folders are uploaded to the S3 bucket and their corresponding yaml config files are present [here](./configs/feature_extract)
 
 
@@ -50,12 +52,3 @@ python run_feature_extract.py --mode=predict --params=./configs/feature_extract/
 ```
 
 `model_dir` contains generated parquet files which have the features extracted from all encoder layers.
-
-
-
-
-
-
-
-
-
