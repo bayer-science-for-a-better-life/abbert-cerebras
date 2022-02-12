@@ -1,14 +1,14 @@
+import argparse
 import os
 import sys
-import tensorflow as tf
-import argparse
+from functools import partial
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import tensorflow as tf
 from pyarrow import parquet as pq
-from pathlib import Path
-import json
-from functools import partial
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
 from bayer_shared.bert.tf.model import model_fn
@@ -37,11 +37,11 @@ class ExtractEmbeddingsFromBert:
         """
         self.params = params
         self.args = args
-        
+
         if self.params["runconfig"].get("mode") != "predict":
             tf.compat.v1.logging.info(f" Mode must be `predict` when extracting embeddings. Setting mode to `predict`")
             self.params["runconfig"]["mode"] = "predict"
-        
+
         #### Setting flags to ensure compatibility ###
         self.params["runconfig"]["validate_only"] = False
         self.params["runconfig"]["compile_only"] = False
@@ -51,14 +51,15 @@ class ExtractEmbeddingsFromBert:
         self.params["runconfig"]["checkpoint_path"] = checkpoint_path
 
         self.use_segment_embedding = self.params["predict_input"]["use_segment_embedding"]
-        
+
         tf.compat.v1.logging.info(f"params used: {self.params}")
 
         (
             self.vocab_word_to_id_dict,
             self.min_aa_id,
             self.max_aa_id,
-        ) = get_oas_vocab(self.params["predict_input"].get("vocab_type"), self.params["predict_input"].get("dummy_vocab_size"))
+        ) = get_oas_vocab(self.params["predict_input"].get("vocab_type"),
+                          self.params["predict_input"].get("dummy_vocab_size"))
         self.vocab_words = list(self.vocab_word_to_id_dict.keys())
 
         self.tokenizer = BaseTokenizer(self.vocab_word_to_id_dict)
@@ -66,7 +67,7 @@ class ExtractEmbeddingsFromBert:
         self.special_tokens_word_id_dict = self._get_special_token_ids(
             self.special_tokens, self.tokenizer
         )
-        
+
         self.max_sequence_length = params["predict_input"]["max_sequence_length"]
         self.output_type_shapes = self._get_output_type_shapes(self.max_sequence_length)
 
@@ -87,7 +88,6 @@ class ExtractEmbeddingsFromBert:
             )
         return special_tokens_word_id_dict
 
-
     def _build_predict_input_fn(self, data):
         """
         Helper function to build `predict_input_fn` to be used by CSEstimator
@@ -99,8 +99,9 @@ class ExtractEmbeddingsFromBert:
             for sequence in data:
                 if isinstance(sequence, str):
                     sequence = list(sequence.strip())
-                
-                input_ids = [self.special_tokens_word_id_dict["[CLS]"]] + self.tokenizer.convert_tokens_to_ids(sequence) + [self.special_tokens_word_id_dict["[SEP]"]]
+
+                input_ids = [self.special_tokens_word_id_dict["[CLS]"]] + self.tokenizer.convert_tokens_to_ids(
+                    sequence) + [self.special_tokens_word_id_dict["[SEP]"]]
 
                 # Input mask is  0's on non-padded & 1's on padded position 
                 input_mask = [0] * len(input_ids)
@@ -150,23 +151,21 @@ class ExtractEmbeddingsFromBert:
 
         return dataset
 
-
     def predict_input_fn(self, params, input_context=None):
         return self._build_predict_input_fn(self.data)
 
-    
     def _get_output_type_shapes(self, max_sequence_length):
         # process for output shapes and types
         output = {
-            "input_ids": {"output_type": "int32", "shape": [max_sequence_length],},
-            "input_mask": {"output_type": "int32", "shape": [max_sequence_length],},
+            "input_ids": {"output_type": "int32", "shape": [max_sequence_length], },
+            "input_mask": {"output_type": "int32", "shape": [max_sequence_length], },
         }
 
         if self.use_segment_embedding:
             output["segment_ids"] = {"output_type": "int32", "shape": [max_sequence_length]}
 
         return output
-    
+
     def extract_embeddings(self, data):
         """
         Function to extract encoder outputs from BERT model
@@ -177,13 +176,13 @@ class ExtractEmbeddingsFromBert:
         self.params["runconfig"]["predict_steps"] = len(data)
 
         predictions_generator = run(
-        args=self.args,
-        params=self.params,
-        model_fn=model_fn,
-        train_input_fn=None,
-        eval_input_fn=None,
-        predict_input_fn=self.predict_input_fn,
-        cs1_modes=["train", "eval", "predict"])
+            args=self.args,
+            params=self.params,
+            model_fn=model_fn,
+            train_input_fn=None,
+            eval_input_fn=None,
+            predict_input_fn=self.predict_input_fn,
+            cs1_modes=["train", "eval", "predict"])
 
         return predictions_generator
 
@@ -215,7 +214,7 @@ def main(params_file_path, output_dir, data_file_path, checkpoint_path=None):
     #     for rep in range(10):
     #         if rep % 100 == 0:
     #             print(rep)
-                
+
     #         data_batch = sess.run(next_batch)
     #         print(data_batch)
     ####################################################################
@@ -240,7 +239,7 @@ def main(params_file_path, output_dir, data_file_path, checkpoint_path=None):
                 fileidx += 1
                 file_content = []
                 len_file_content = 0
-                parquet_file_path = os.path.join(output_dir, f"extracted_features_{fileidx}.parquet")   
+                parquet_file_path = os.path.join(output_dir, f"extracted_features_{fileidx}.parquet")
             else:
                 predictions = next(predictions_generator)
                 for key, val in predictions.items():
@@ -255,7 +254,6 @@ def main(params_file_path, output_dir, data_file_path, checkpoint_path=None):
             print(df.head())
             print(df.info())
             break
-    
 
 
 if __name__ == "__main__":
@@ -291,13 +289,14 @@ if __name__ == "__main__":
         default=None,
         help="Data filepath to extract embeddings for",
     )
-    
 
     args = parser.parse_args(sys.argv[1:])
 
-    data = ["MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG","KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPNAAEEHLKALARKGVIEIVSGASRGIRLLQEE",
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    data = [
+        "MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG",
+        "KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPNAAEEHLKALARKGVIEIVSGASRGIRLLQEE",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     ]
-    
+
     # main(args.params, args.output_dir, args.data_file_path, args.checkpoint_path)
     main(args.params, args.output_dir, data, args.checkpoint_path)
