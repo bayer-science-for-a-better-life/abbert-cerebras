@@ -2,8 +2,8 @@ name: abbert2
 
 channels:
   - conda-forge
-  - nodefaults
   - bioconda
+  - nodefaults
 
 dependencies:
   - python
@@ -20,6 +20,10 @@ dependencies:
   - smart_open
   - python-xxhash
   - anarci==2020.04.23
+
+  # For cerebras
+  - pyyaml
   - tensorflow
+
   - pip:
     - -e .
