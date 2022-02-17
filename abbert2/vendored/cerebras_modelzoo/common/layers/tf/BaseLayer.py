@@ -37,9 +37,12 @@ class BaseLayer(tf.keras.layers.Layer):
             self._dtype_policy.name in _SUPPORTED_MP_POLICIES
         ), f"Unsupported MP policy type: {self._dtype_policy.name}"
 
-        self.dtype_policy = self._dtype_policy
-        self.variable_dtype = self._dtype_policy.variable_dtype
-        self.compute_dtype = self._dtype_policy.compute_dtype
+        try:
+            self.dtype_policy = self._dtype_policy
+            self.variable_dtype = self._dtype_policy.variable_dtype
+            self.compute_dtype = self._dtype_policy.compute_dtype
+        except AttributeError:  # SANTI: Allow to run this in newer TF versions
+            ...
 
         self.boundary_casting = boundary_casting
         self.tf_summary = tf_summary
