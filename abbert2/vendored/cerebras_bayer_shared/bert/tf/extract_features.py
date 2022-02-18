@@ -26,7 +26,7 @@ def to_parquet(df, path, compression='zstd', compression_level=20, **write_table
 
 
 class ExtractEmbeddingsFromBert:
-    def __init__(self, params, checkpoint_path=None):
+    def __init__(self, params, checkpoint_path=None, args=None):
         """
         Main object to initialize model, create input fn for estimator and extract embeddings
         :param params: parameters read from yaml file used to initialize model
