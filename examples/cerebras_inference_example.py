@@ -118,10 +118,15 @@ if __name__ == '__main__':
         "KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPNAAEEHLKALARKGVIEIVSGASRGIRLLQEE",
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     ]
+
     start = time.perf_counter()
     embedder = InfiniteAbbertCerebras(run_id=run_id)
+    print(f'Setting-up Taken: {time.perf_counter() - start:.2f}s')
+
+    start = time.perf_counter()
     embeddings_df = pd.DataFrame(embedder(sequences))
-    print(f'Taken {time.perf_counter() - start}s')
+    print(f'Inference Taken {time.perf_counter() - start:.2f}s')
+
     embeddings_df.info()
     #
     # Data columns (total 15 columns):
