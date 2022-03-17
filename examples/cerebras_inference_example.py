@@ -120,7 +120,7 @@ if __name__ == '__main__':
     ]
 
     start = time.perf_counter()
-    embedder = InfiniteAbbertCerebras(run_id=run_id)
+    embedder = InfiniteAbbertCerebras(run_id=run_id, warmup=True)
     print(f'Setting-up Taken: {time.perf_counter() - start:.2f}s')
 
     start = time.perf_counter()
