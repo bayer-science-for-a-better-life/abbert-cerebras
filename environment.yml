@@ -23,7 +23,7 @@ dependencies:
 
   # For cerebras
   - pyyaml
-  - tensorflow
+  - tensorflow>=2.3
 
   - pip:
     - -e .
