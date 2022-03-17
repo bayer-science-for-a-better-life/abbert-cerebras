@@ -99,10 +99,13 @@ class ExtractEmbeddingsFromBert:
                 if isinstance(sequence, str):
                     sequence = list(sequence.strip())
 
-                input_ids = [self.special_tokens_word_id_dict["[CLS]"]] + self.tokenizer.convert_tokens_to_ids(
-                    sequence) + [self.special_tokens_word_id_dict["[SEP]"]]
+                input_ids = (
+                    [self.special_tokens_word_id_dict["[CLS]"]] +
+                    self.tokenizer.convert_tokens_to_ids(sequence) +
+                    [self.special_tokens_word_id_dict["[SEP]"]]
+                )
 
-                # Input mask is  0's on non-padded & 1's on padded position 
+                # Input mask is  0's on non-padded & 1's on padded position
                 input_mask = [0] * len(input_ids)
 
                 num_pad = self.max_sequence_length - len(input_ids)
