@@ -161,6 +161,7 @@ def run(
     eval_input_fn=None,
     predict_input_fn=None,
     output_layer_name=None,
+    do_save_params=False,
     cs1_modes=CS1_MODES,
 ):
     """
@@ -179,7 +180,8 @@ def run(
     update_params_from_args(args, runconfig_params)
     validate_params(params, cs1_modes)
     # save params for reproducibility
-    save_params(params, model_dir=runconfig_params["model_dir"])
+    if do_save_params:
+        save_params(params, model_dir=runconfig_params["model_dir"])
 
     # get cs-specific configs
     cs_config = get_csconfig(params.get("csconfig", dict()))
