@@ -1,4 +1,4 @@
 include README.md
 include data
-include *.yml
-include *.yaml
+recursive-include *.yml
+recursive-include *.yaml
