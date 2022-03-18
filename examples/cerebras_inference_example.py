@@ -2,7 +2,7 @@ import time
 
 import pandas as pd
 
-from abbert2.abbert2 import InfiniteAbbert2
+from abbert2.models import InfiniteAbbert2
 
 if __name__ == '__main__':
 
