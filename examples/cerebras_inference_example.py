@@ -49,12 +49,14 @@ def find_cerebras_model_checkpoint(
 class InfiniteAbbertCerebras(ExtractEmbeddingsFromBert):
 
     def __init__(self, run_id=15, remove_cls=True, remove_sep=True, warmup=False):
-        params = read_cerebras_model_params(run_id=run_id)
-        checkpoint_path = str(find_cerebras_model_checkpoint(run_id=run_id))
-        super().__init__(params, checkpoint_path, args=None)
+        super().__init__(
+            params=read_cerebras_model_params(run_id=run_id),
+            checkpoint_path=str(find_cerebras_model_checkpoint(run_id=run_id)),
+            args=None
+        )
         self.remove_cls = remove_cls
         self.remove_sep = remove_sep
-        self._embedder_cache = None  # this will hold
+        self._embedder_cache = None
         self._next = None
         if warmup:
             self.warmup()
@@ -88,8 +90,11 @@ class InfiniteAbbertCerebras(ExtractEmbeddingsFromBert):
         return self._embedder_cache
 
     def __del__(self):
-        next(self._embedder())       # Raise Stop Iteration
-        self._embedder_cache = None  # TF session die
+        try:
+            next(self._embedder())       # Raise Stop Iteration
+            self._embedder_cache = None  # TF session die
+        except AttributeError:
+            ...
 
     # --- Simple API sequence -> embeddings dict
 
