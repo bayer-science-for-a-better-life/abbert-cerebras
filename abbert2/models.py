@@ -5,6 +5,8 @@ from pathlib import Path
 
 from typing import Optional, List, Dict, Union, Iterable
 
+import pandas as pd
+
 from abbert2.vendored.cerebras_bayer_shared.bert.tf.extract_features import ExtractEmbeddingsFromBert
 from abbert2.vendored.cerebras_bayer_shared.bert.tf.utils import get_params
 
@@ -177,6 +179,36 @@ class InfiniteAbbert2(ExtractEmbeddingsFromBert):
         #  13  encoder_layer_10_output  3 non-null      object
         #  14  encoder_layer_11_output  3 non-null      object
         #
+
+
+# --- Model summaries
+
+
+def _excel_to_python():
+    # The Excel file provided by Aarti
+    path = _find_abbert2_checkpoints_path()
+    df = pd.read_excel(path / 'Bayer_runs.xlsx')
+    # Turn in to a dictionary
+
+_excel_to_python()
+exit(22)
+
+ABBERT2_MODELS = (
+    {
+        'run_id': 1,
+        'chain': 'heavy',
+        'species': 'human',
+        'lr': 1e-4,
+        'filters': '1-2,year<2018',
+        'masking': 'uniform 15%',
+        'notes': None,
+        'samples/s': 7_558,
+        'checkpoint_best_cdr3_accuracy': 470_000,
+        'total_steps@bsz1024': 500_000,
+        'overall_accuracy': 0.85,
+        'cdr3_accuracy': 56.7
+    }
+)
 
 
 # --- Notes
