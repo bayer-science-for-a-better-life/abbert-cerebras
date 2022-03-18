@@ -11,8 +11,8 @@ from abbert2.vendored.cerebras_bayer_shared.bert.tf.utils import get_params
 
 
 def read_cerebras_model_params(run_id: int = 15) -> dict:
-    with resources.path('abbert2.vendored.cerebras_bayer_shared.bert.tf', 'configs') as path:
-        return get_params(path / f'run{run_id}_params.yaml')
+    with resources.files('abbert2.vendored.cerebras_bayer_shared.bert.tf') as path:
+        return get_params(path / 'configs' / f'run{run_id}_params.yaml')
 
 
 def find_cerebras_model_checkpoint(
