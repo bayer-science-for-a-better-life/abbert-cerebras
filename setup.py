@@ -15,6 +15,8 @@ setup(
     author_email='sdvillal@gmail.com',
     description='Antibody-specific language models',
 
+    include_package_data=True,
+
     # at the moment deps are managed solely via conda
     install_requires=[],
     tests_require=[],
