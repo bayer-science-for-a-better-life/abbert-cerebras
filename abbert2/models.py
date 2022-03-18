@@ -2,10 +2,7 @@
 import os
 from importlib import resources
 from pathlib import Path
-
 from typing import Optional, List, Dict, Union, Iterable
-
-import pandas as pd
 
 from abbert2.vendored.cerebras_bayer_shared.bert.tf.extract_features import ExtractEmbeddingsFromBert
 from abbert2.vendored.cerebras_bayer_shared.bert.tf.utils import get_params
@@ -31,7 +28,7 @@ def _read_abbert2_model_params(run_id: int = 15) -> dict:
         return get_params(path / 'configs' / f'run{run_id}_params.yaml')
 
 
-def _find_abbert2_checkpoints_path():
+def _find_abbert2_checkpoints_path() -> Optional[Path]:
     """Try to infer where the checkpoints live."""
 
     RELATIVE_MODEL_CHECKPOINTS_PATH = Path(__file__).parent.parent.parent / 'models' / 'final_trained_models'
@@ -182,32 +179,351 @@ class InfiniteAbbert2(ExtractEmbeddingsFromBert):
 
 
 # --- Model summaries
+# From report + emails + excel file (beware: super copy-pasta)
+# You can find the original sources, with extended info, in the checkpoints directory
 
-
-def _excel_to_python():
-    # The Excel file provided by Aarti
-    path = _find_abbert2_checkpoints_path()
-    df = pd.read_excel(path / 'Bayer_runs.xlsx')
-    # Turn in to a dictionary
-
-_excel_to_python()
-exit(22)
+MODELS_ARQUITECTURES = {
+    'bert-small': {'L':  4, 'A':  8, 'H':  128},
+    'bert-base':  {'L': 12, 'A': 12, 'H':  768},
+    'bert-large': {'L': 12, 'A': 16, 'H': 1024},
+}
 
 ABBERT2_MODELS = (
     {
         'run_id': 1,
         'chain': 'heavy',
         'species': 'human',
-        'lr': 1e-4,
         'filters': '1-2,year<2018',
+        'max_sequence_length': 164,
+        'model': 'bert-base',
         'masking': 'uniform 15%',
+        'segment_embedding': False,
+        'lr': 1e-4,
         'notes': None,
-        'samples/s': 7_558,
         'checkpoint_best_cdr3_accuracy': 470_000,
         'total_steps@bsz1024': 500_000,
         'overall_accuracy': 0.85,
-        'cdr3_accuracy': 56.7
-    }
+        'cdr3_accuracy': 0.57,
+        'samples/s': 7_558,
+        'pe_utilization': 63,
+    },
+
+    {
+        'run_id': 2,
+        'chain': 'heavy',
+        'species': 'human',
+        'filters': '1-2,year<2018',
+        'max_sequence_length': 164,
+        'model': 'bert-base',
+        'masking': 'uniform 15%',
+        'segment_embedding': True,
+        'lr': 1e-4,
+        'notes': 'segment_embedding',
+        'checkpoint_best_cdr3_accuracy': 490_000,
+        'total_steps@bsz1024': 500_000,
+        'overall_accuracy': 0.85,
+        'cdr3_accuracy': 0.57,
+        'samples/s': 7_455,
+        'pe_utilization': 62,
+    },
+
+    {
+        'run_id': 3,
+        'chain': 'both',
+        'species': 'human',
+        'filters': '1-2,year<2018',
+        'max_sequence_length': 164,
+        'model': 'bert-base',
+        'masking': 'uniform 15%',
+        'segment_embedding': False,
+        'lr': 1e-4,
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 650_000,
+        'total_steps@bsz1024': 684_809,
+        'overall_accuracy': 0.83,
+        'cdr3_accuracy': 0.56,
+        'samples/s': 7_580,
+        'pe_utilization': 63,
+    },
+
+    {
+        'run_id': 4,
+        'chain': 'heavy',
+        'species': 'human',
+        'filters': '1-2,year<2018',
+        'max_sequence_length': 164,
+        'model': 'bert-large',
+        'masking': 'uniform 15%',
+        'segment_embedding': False,
+        'lr': 1e-4,
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 310_000,
+        'total_steps@bsz1024': 340_000,
+        'overall_accuracy': 0.85,
+        'cdr3_accuracy': 0.57,
+        'samples/s': 4_547,
+        'pe_utilization': 94,
+    },
+
+    {
+        'run_id': 5,
+        'chain': 'both',
+        'species': 'human',
+        'filters': '1-2,year<2018',
+        'max_sequence_length': 164,
+        'model': 'bert-base',
+        'masking': 'uniform 15%',
+        'segment_embedding': False,
+        'lr': 1e-4,
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 400_000,
+        'total_steps@bsz1024': 2_000_000,
+        'overall_accuracy': 0.85,
+        'cdr3_accuracy': 0.58,
+        'samples/s': 7_512,
+        'pe_utilization': 63,
+    },
+
+    {
+        'run_id': 6,
+        'chain': 'both',
+        'species': 'human',
+        'filters': '1-2,year<2018',
+        'max_sequence_length': 164,
+        'model': 'bert-base',
+        'masking': 'cdr1=25%,cdr2=25%,cdr3=50%',
+        'segment_embedding': False,
+        'lr': 1e-4,
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 200_000,
+        'total_steps@bsz1024': 200_000,
+        'overall_accuracy': 0.71,
+        'cdr3_accuracy': 0.57,
+        'samples/s': 7_485,
+        'pe_utilization': 63,
+    },
+
+    {
+        'run_id': 7,
+        'chain': 'both',
+        'species': 'human',
+        'filters': '1-2,year<2018',
+        'max_sequence_length': 164,
+        'model': 'bert-base',
+        'masking': 'cdr1=25%,cdr2=25%,cdr3=50%',
+        'segment_embedding': False,
+        'lr': 4e-4,
+        'notes': '5M shuffle buffer',
+        'checkpoint_best_cdr3_accuracy': 50_000,
+        'total_steps@bsz1024': 50_000,
+        'overall_accuracy': 0.70,
+        'cdr3_accuracy': 0.54,
+        'samples/s': 7_498,
+        'pe_utilization': 63,
+    },
+
+    {
+        'run_id': 8,
+        'chain': 'both',
+        'species': 'human',
+        'filters': '1-2,year<2018',
+        'max_sequence_length': 164,
+        'model': 'bert-base',
+        'masking': 'cdr1=25%,cdr2=25%,cdr3=50%',
+        'segment_embedding': False,
+        'lr': 4e-4,
+        'notes': '500k shuffle buffer',
+        'checkpoint_best_cdr3_accuracy': 490_000,
+        'total_steps@bsz1024': 500_000,
+        'overall_accuracy': 0.72,
+        'cdr3_accuracy': 0.58,
+        'samples/s': 7_493,
+        'pe_utilization': 63,
+    },
+
+    {
+        'run_id': 9,
+        'chain': 'both',
+        'species': 'human',
+        'filters': '1-2,year<2018',
+        'max_sequence_length': 164,
+        'model': 'bert-base',
+        'masking': 'cdr1=25%,cdr2=25%,cdr3=50%',
+        'segment_embedding': False,
+        'lr': 6e-4,
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 450_000,
+        'total_steps@bsz1024': 540_000,
+        'overall_accuracy': 0.71,
+        'cdr3_accuracy': 0.58,
+        'samples/s': 7_497,
+        'pe_utilization': 63,
+    },
+
+    {
+        'run_id': 10,
+        'chain': 'both',
+        'species': 'human',
+        'filters': '1-2,year<2018',
+        'max_sequence_length': 164,
+        'model': 'bert-small',
+        'masking': 'cdr1=25%,cdr2=25%,cdr3=50%',
+        'segment_embedding': False,
+        'lr': 4e-4,
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 480_000,
+        'total_steps@bsz1024': 500_000,
+        'overall_accuracy': 0.65,
+        'cdr3_accuracy': 0.53,
+        'samples/s': 10_180,
+        'pe_utilization': 2,
+    },
+
+    # --- Here we changed the dataset and filters
+    #
+    # Accuracy becomes better, might be real or an artifact of eval.
+    #
+    # We become a tad slower, likely because of larger sequence length
+    # and maybe also due to larger data (I/O bound?)
+    # => Hard to say, as there are no reports of CS2 utilization
+    #
+
+    {
+        'run_id': 11,
+        'chain': 'both',
+        'species': 'all',
+        'filters': '1-11,hash split',
+        'max_sequence_length': 182,
+        'model': 'bert-base',
+        'masking': 'uniform 15%',
+        'segment_embedding': False,
+        'lr': 1e-4,
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 300_000,
+        'total_steps@bsz1024': 300_000,
+        'overall_accuracy': 0.90,
+        'cdr3_accuracy': 0.68,
+        'samples/s': 6_861,
+        'pe_utilization': 62,
+    },
+
+    {
+        'run_id': 12,
+        'chain': 'both',
+        'species': 'all',
+        'filters': '1-11,hash split',
+        'max_sequence_length': 182,
+        'model': 'bert-base',
+        'masking': 'uniform 15%',
+        'segment_embedding': False,
+        'lr': 1e-6,
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 300_000,
+        'total_steps@bsz1024': 750_000,
+        'overall_accuracy': 0.89,
+        'cdr3_accuracy': 0.62,
+        'samples/s': 6_909,
+        'pe_utilization': 63,
+    },
+
+    {
+        'run_id': 13,
+        'chain': 'both',
+        'species': 'all',
+        'filters': '1-11,hash split',
+        'max_sequence_length': 182,
+        'model': 'bert-base',
+        'masking': 'cdr1=12.5,cdr2=12.5,cdr3=25,fw=12.5',
+        'segment_embedding': False,
+        'lr': 1e-6,
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 300_000,
+        'total_steps@bsz1024': 750_000,
+        'overall_accuracy': 0.83,
+        'cdr3_accuracy': 0.62,
+        'samples/s': 6_906,
+        'pe_utilization': 63,
+    },
+
+    # And here comes the big jump, use LRS
+
+    {
+        'run_id': 14,
+        'chain': 'both',
+        'species': 'all',
+        'filters': '1-11,hash split',
+        'max_sequence_length': 182,
+        'model': 'bert-base',
+        'masking': 'uniform 15%',
+        'segment_embedding': False,
+        'lr': 'lrs',
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 650_000,
+        'total_steps@bsz1024': 800_000,
+        'overall_accuracy': 0.92,
+        'cdr3_accuracy': 0.71,
+        'samples/s': 6_955,
+        'pe_utilization': 62,
+    },
+
+    {
+        'run_id': 15,
+        'chain': 'both',
+        'species': 'all',
+        'filters': '1-11,hash split',
+        'max_sequence_length': 182,
+        'model': 'bert-base',
+        'masking': 'uniform 15%',
+        'segment_embedding': False,
+        'lr': 'lrs',
+        'notes': 'weight CDR3 loss 2x',
+        'checkpoint_best_cdr3_accuracy': 300_000,
+        'total_steps@bsz1024': 300_000,
+        'overall_accuracy': 0.91,
+        'cdr3_accuracy': 0.71,
+        'samples/s': 6_830,
+        'pe_utilization': 63,
+    },
+
+    # Note the performance deterioration if we focus on human
+
+    {
+        'run_id': 16,
+        'chain': 'heavy',
+        'species': 'human',
+        'filters': '1-11,hash split',
+        'max_sequence_length': 182,
+        'model': 'bert-base',
+        'masking': 'uniform 15%',
+        'segment_embedding': False,
+        'lr': 'lrs',
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 400_000,
+        'total_steps@bsz1024': 447_393,
+        'overall_accuracy': 0.83,
+        'cdr3_accuracy': 0.53,
+        'samples/s': 6_932,
+        'pe_utilization': 63,
+    },
+
+    {
+        'run_id': 17,
+        'chain': 'both',
+        'species': 'human',
+        'filters': '1-11,hash split',
+        'max_sequence_length': 182,
+        'model': 'bert-base',
+        'masking': 'uniform 15%',
+        'segment_embedding': False,
+        'lr': 'lrs',
+        'notes': None,
+        'checkpoint_best_cdr3_accuracy': 550_000,
+        'total_steps@bsz1024': 551_438,
+        'overall_accuracy': 0.84,
+        'cdr3_accuracy': 0.57,
+        'samples/s': 6_901,
+        'pe_utilization': 63,
+    },
 )
 
 
