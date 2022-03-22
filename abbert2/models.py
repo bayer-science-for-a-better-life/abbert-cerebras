@@ -67,7 +67,7 @@ def _find_abbert2_model_checkpoint(
         checkpoints_path = _find_abbert2_checkpoints_path()
 
     # find the concrete checkpoints path
-    candidates = sorted(checkpoints_path.glob(f'run{run_id}*'))
+    candidates = sorted(checkpoints_path.glob(f'run{run_id}_*'))
     if len(candidates) > 1:
         raise ValueError(f'Too many candidates for run_id={run_id}: {candidates}')
     if len(candidates) == 0:
