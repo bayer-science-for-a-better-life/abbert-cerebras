@@ -54,6 +54,7 @@ from typing import Tuple, Union, Iterator, Optional, List, Callable, Sequence
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
+from pyarrow import Table
 import requests
 import xxhash
 from joblib import Parallel, delayed
@@ -688,9 +689,9 @@ class Unit:
     def should_recompute(self, force=False) -> bool:
         return (force or not self.has_sequences) and self.has_original_csv
 
-    def sequences_df(self, columns=None) -> Optional[pd.DataFrame]:
+    def sequences_df(self, columns=None, as_dataframe=True) -> Optional[Union[pd.DataFrame, Table]]:
         try:
-            return from_parquet(self.sequences_path, columns=columns)
+            return from_parquet(self.sequences_path, columns=columns, as_dataframe=as_dataframe)
         except (IOError, FileNotFoundError, ArrowInvalid):
             return None
 
