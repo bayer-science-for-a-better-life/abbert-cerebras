@@ -228,7 +228,11 @@ class OnlyIsotypes(Filter):
         #
         # return df[df['isotype'].isin(self.isotypes)]
         #
-        raise NotImplementedError
+        # raise NotImplementedError
+        if unit.isotype in self.isotypes:
+            return df
+        else:
+            return df.head(0)
 
 
 # noinspection DuplicatedCode
