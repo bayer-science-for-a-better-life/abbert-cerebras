@@ -365,7 +365,7 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
                      f'  - Click search without adding any filter\n'
                      f'  - Download the shell script and copy it to "{path.absolute()}"\n')
         print(help_text)
-        raise Exception(f'{path} does not exist')
+        raise Exception(f'{bulk_download_path} does not exist')
 
     # parse it
     urls = _fix_bulk_download(bulk_download_path)
