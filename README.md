@@ -15,7 +15,7 @@ git clone https://github.com/bayer-science-for-a-better-life/abbert-cerebras.git
 cd abbert2
 
 # create the conda environment
-conda env reate -f environment.yml
+conda env create -f environment.yml
 
 # activate it
 conda activate abbert2
