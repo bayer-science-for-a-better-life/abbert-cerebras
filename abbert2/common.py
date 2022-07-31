@@ -220,3 +220,53 @@ def from_parquet(path: Union[Path, str], columns=None, as_dataframe=True):
     if as_dataframe:
         return table.to_pandas()
     return table
+
+
+# --- Combinatorials
+
+def number_of_mutants(
+    sequence_length: int = 3,
+    max_mutations: int = None,
+    alphabet_size: int = len(NATURAL_AMINO_ACIDS)
+) -> int:
+    """
+    Returns the number of mutants for a sequence of the provided length when
+    only a maximum number of positions are allowed to mutate at the same time.
+
+    Parameters
+    ----------
+    sequence_length : int, default 3
+      The length of the sequence
+
+    max_mutations : int or None, default None
+      The maximum number of positions to mutate.
+      If None, `sequence_length` is used and this reduces to alphabet_size^sequence_length
+      Otherwise, it must be in [1, sequence_length]
+
+    alphabet_size : int, default 20
+      The number of different values each position can adopt
+
+    Examples
+    --------
+    # When no mutation is allowed, we are left with the original sequence
+    >>> number_of_mutants(sequence_length=3, max_mutations=0)
+    1
+
+    # When only one position at a time is allowed to mutate, we have 20 * 3 = 60
+    >>> number_of_mutants(sequence_length=3, max_mutations=1)
+    60
+
+    # When maximum two positions at a time are allowed to mutate, we have 2^20 * 3! / (2! (3 - 2)!) = 1_200
+    >>> number_of_mutants(sequence_length=3, max_mutations=2)
+    1200
+
+    # When all positions are allowed to mutate at a time, we have 20^3 = 8_000
+    >>> number_of_mutants(sequence_length=3, max_mutations=None)
+    8000
+    """
+    import math
+    if max_mutations is None:
+        max_mutations = sequence_length
+    if sequence_length < max_mutations:
+        raise ValueError(f'Number of positions to mutate must')
+    return math.comb(sequence_length, max_mutations) * alphabet_size ** max_mutations
