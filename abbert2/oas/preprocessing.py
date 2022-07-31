@@ -83,7 +83,6 @@ def _parse_oas_url(url: str) -> Dict[str, str]:
     ...             'isotype': 'IGHE'}
     >>> _parse_oas_url(url) == expected
     True
-
     """
     result = urlparse(_fix_oas_paired_url(url))
     if result.scheme != 'http':
@@ -116,10 +115,23 @@ def _parse_oas_url(url: str) -> Dict[str, str]:
                 # TODO: ask how to interpret these (1)
                 origin_id, origin_occurrence, chain, isotype = parts
             except ValueError:
-                # Like: rettig_2018_04_Heavy_Bulk.csv.gz
-                # TODO: ask how to interpret these (2018, 04)
-                study_id_one, study_id_two, origin_occurrence, chain, isotype = parts
-                origin_id = study_id_one + study_id_two
+                try:
+                    # Like: rettig_2018_04_Heavy_Bulk.csv.gz
+                    # TODO: ask how to interpret these (2018, 04)
+                    study_id_one, study_id_two, origin_occurrence, chain, isotype = parts
+                    origin_id = study_id_one + study_id_two
+                except ValueError:
+                    # Like: Mouse-1_Richardson_2022_1_Heavy_IGHM.csv.gz
+                    # TODO: ask how to interpret these
+                    study_id_one, study_id_two, study_id_three, origin_occurrence, chain, isotype = parts
+                    origin_id = study_id_one + study_id_two + study_id_three
+                    studies = (
+                        [f'Mouse-{i}Richardson2022' for i in range(1, 8)] +
+                        [f'schanz2014{i:02d}' for i in range(1, 11)] +
+                        [f'rettig2018{i:02d}' for i in range(1, 9)]
+                    )
+                    assert origin_id in studies, f'New study id type: {parts}'
+                # TODO: at the end we likely would need manual curation to understand the meaning of each file name
 
     return {'oas_subset': oas_subset,
             'study_id': study_id,
