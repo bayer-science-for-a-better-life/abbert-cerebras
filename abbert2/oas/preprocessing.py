@@ -41,7 +41,7 @@ from abbert2.oas.oas import OAS, Unit
 
 def _parse_oas_url(url: str) -> Dict[str, str]:
     """
-    Parses a OAS URL as present in `bulk_download.sh`.
+    Parses an OAS URL as present in `bulk_download.sh`.
 
     This function has also heuristics to detect changes in the URLs
     that might be indicative of changes to the dataset.
@@ -465,7 +465,7 @@ def parse_anarci_status(status: Optional[str]) -> Dict:
     This step predominantly removes sequences that contain a stop codon.
     An ANARCI status highlighting potential problems for each sequence is retained in the database.
     This status contains comments regarding unusual residues, lack of conserved cysteines,
-    deletions and insertions outside of the CDRs, truncation of frameworks 1 or 4,
+    deletions and insertions outside the CDRs, truncation of frameworks 1 or 4,
     and if the CDR3 is longer than 37 residues.
     Finally, sequences were grouped into units sharing the same metadata,
     the same chain (e.g., heavy, light, or paired), and isotype.
@@ -574,7 +574,7 @@ ANARCI_IMGT_CDR_LENGTHS = {
     #     However, reading some code:
     #       https://github.com/oxpig/ANARCI/blob/fd2f694c2c45033f356fb7077b866e3a62acfc7c/lib/python/anarci/schemes.py#L421-L436
     #       https://github.com/oxpig/ANARCI/blob/fd2f694c2c45033f356fb7077b866e3a62acfc7c/build/lib/anarci/schemes.py#L485-L491
-    #     Length seems limited by the insertions alphabet (52 insertion codes + space for "no insertion"):
+    #     Length seems limited by the "insertions" alphabet (52 insertion codes + space for "no insertion"):
     #       https://github.com/oxpig/ANARCI/blob/fd2f694c2c45033f356fb7077b866e3a62acfc7c/build/lib/anarci/schemes.py#L82
     #       ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q",
     #        "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "BB", "CC", "DD", "EE", "FF", "GG",
@@ -645,7 +645,7 @@ def _preprocess_anarci_data(numbering_data_dict,
     #     Gabi's take:
     #       > Hmm... so, the V segments contain CDRs 1 and 2, so these shouldn't get longer
     #         than germline - are you looking at a different species antibody where you're seing this?
-    #         If so, I suppose they would use the same .1 etc scheme that they use for CDR3, although
+    #         If so, I suppose they would use the same .1 etc. scheme that they use for CDR3, although
     #         they were probably assuming at the time that no longer loops existed...
     #         I think they included everything they knew at the time, but surely there are some odd ruminants
     #         that have freak antibodies.
@@ -769,7 +769,7 @@ def _preprocess_anarci_data(numbering_data_dict,
     # Make the alignment data a tad more efficient to work with. Still playing...
     #
     #   - Likely using arrays for aligned sequences is not needed.
-    #     They currently precludes parquet from better representation.
+    #     They currently preclude parquet from better representation.
     #
     #   - Probably sparse insertion codes make more sense performance-wise.
     #     They are less practical though.
@@ -836,7 +836,7 @@ def _process_sequences_df(df: pd.DataFrame,
     # --- do munging
 
     # We will keep just a few of the many columns for the time being.
-    # Note, nucleotides might be interested later on, together with some of the IgBlast gathered info.
+    # Note, nucleotides might be interested later on, together with some IgBlast gathered info.
     # If so, beware the size of parquet files is much larger
     # (as compression is per column and cannot realize the redundancy between columns).
     # If bringing back, the best would be to remove redundancy where possible

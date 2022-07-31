@@ -24,7 +24,7 @@ Any sequence that ANARCI could not process was removed.
 This step predominantly removes sequences that contain a stop codon.
 An ANARCI status highlighting potential problems for each sequence
 is retained in the database. This status contains comments regarding unusual residues,
-lack of conserved cysteines, deletions and insertions outside of the CDRs,
+lack of conserved cysteines, deletions and insertions outside the CDRs,
 truncation of frameworks 1 or 4, and if the CDR3 is longer than 37 residues.
 Finally, sequences were grouped into units sharing the same metadata,
 the same chain (e.g., heavy, light, or paired), and isotype.
@@ -88,6 +88,7 @@ import xxhash
 from abbert2.oas import OAS, Unit
 
 
+# noinspection DuplicatedCode
 class Filter:
 
     def __init__(self) -> None:
