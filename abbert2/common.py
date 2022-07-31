@@ -43,7 +43,7 @@ IUPAC_CODES = (
 
 # --- Antibodies - ANARCI
 
-ANARCI_POSITION_REGEXP = re.compile(r'([0-9]+)([A-Z]*)')
+ANARCI_POSITION_REGEXP = re.compile(r'(\d+)([A-Z]*)')
 ANARCI_CODE2INSERTION = [''] + anarci_insertion_alphabet[:-1]  # N.B. swap ' ' with '' (no insertion) and move to start
 ANARCI_INSERTION2CODE = {insertion: code for code, insertion in enumerate(ANARCI_CODE2INSERTION)}
 ANARCI_INSERTION2CODE[''] = ANARCI_INSERTION2CODE[' '] = 0  # to support also ANARCI ' ' representation of no insertion
@@ -169,7 +169,7 @@ def to_snake_case(name):
     # from https://stackoverflow.com/questions/1175208/elegant-python-function-to-convert-camelcase-to-snake-case
     name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     name = re.sub('__([A-Z])', r'_\1', name)
-    name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', name)
+    name = re.sub('([a-z\d])([A-Z])', r'\1_\2', name)
     return name.lower()
 
 
