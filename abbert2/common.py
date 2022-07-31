@@ -12,33 +12,43 @@ from anarci.schemes import alphabet as anarci_insertion_alphabet
 
 # --- Proteins
 
-NATURAL_AMINO_ACIDS = 'ABCDEFGHIKLMNPQRSTUVWXYZ'
+#
+# IUPAC Amino Acid Abbreviations
+#   https://www.ncbi.nlm.nih.gov/Class/MLACourse/Modules/MolBioReview/iupac_aa_abbreviations.html
+# Also look at:
+#  https://en.wikipedia.org/wiki/Amino_acid#/media/File:ProteinogenicAminoAcids.svg
+# We add Selenocysteine:
+#  https://en.wikipedia.org/wiki/Selenocysteine
+#
+IUPAC_AMINO_ACIDS = 'ABCDEFGHIKLMNPQRSTUVWXYZ'
+
+NATURAL_AMINO_ACIDS = IUPAC_AMINO_ACIDS.replace('S', '').replace('B', '').replace('Z', '').replace('X', '')
 
 IUPAC_CODES = (
-    ('Ala', 'A'),
-    ('Asx', 'B'),
-    ('Cys', 'C'),
-    ('Asp', 'D'),
-    ('Glu', 'E'),
-    ('Phe', 'F'),
-    ('Gly', 'G'),
-    ('His', 'H'),
-    ('Ile', 'I'),
-    ('Lys', 'K'),
-    ('Leu', 'L'),
-    ('Met', 'M'),
-    ('Asn', 'N'),
-    ('Pro', 'P'),
-    ('Gln', 'Q'),
-    ('Arg', 'R'),
-    ('Ser', 'S'),
-    ('Thr', 'T'),
-    ('Sec', 'U'),
-    ('Val', 'V'),
-    ('Trp', 'W'),
-    ('Xaa', 'X'),
-    ('Tyr', 'Y'),
-    ('Glx', 'Z')
+    ('Ala', 'A'),  # Alanine
+    ('Asx', 'B'),  # Aspartic acid or Asparagine
+    ('Cys', 'C'),  # Cysteine
+    ('Asp', 'D'),  # Asparagine
+    ('Glu', 'E'),  # Glutamine
+    ('Phe', 'F'),  # Phenylalanine
+    ('Gly', 'G'),  # Glycine
+    ('His', 'H'),  # Histidine
+    ('Ile', 'I'),  # Isoleucine
+    ('Lys', 'K'),  # Lysine
+    ('Leu', 'L'),  # Leucine
+    ('Met', 'M'),  # Methonine
+    ('Asn', 'N'),  # Asparagine
+    ('Pro', 'P'),  # Proline
+    ('Gln', 'Q'),  # Glutamine
+    ('Arg', 'R'),  # Arginine
+    ('Ser', 'S'),  # Serine
+    ('Thr', 'T'),  # Threonine
+    ('Sec', 'U'),  # Selenocysteine (https://en.wikipedia.org/wiki/Selenocysteine)
+    ('Val', 'V'),  # Valine
+    ('Trp', 'W'),  # Tryptophan
+    ('Xaa', 'X'),  # Any amino acid
+    ('Tyr', 'Y'),  # Tyrosine
+    ('Glx', 'Z')   # Glutamine or Glutamic acid
 )
 
 # --- Antibodies - ANARCI
