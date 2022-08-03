@@ -1312,6 +1312,9 @@ def download_units(oas_path=None,
         if redownload or unit.needs_redownload:
             units_to_download.append(unit)
 
+    units_without_online = [unit for unit in units_to_download if unit.online_csv_size_bytes is None]
+    if units_without_online:
+        print(f'Warning, there are units without online download: {units_without_online}')
     size_to_download = sum(unit.online_csv_size_bytes for unit in units_to_download)
     print(f'Downloading {len(units_to_download)} units ({size_to_download / 1024**2:.2f}MiB)')
 
