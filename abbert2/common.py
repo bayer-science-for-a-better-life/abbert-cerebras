@@ -16,6 +16,7 @@ from anarci.schemes import alphabet as anarci_insertion_alphabet
 # IUPAC Amino Acid Abbreviations
 #   https://www.ncbi.nlm.nih.gov/Class/MLACourse/Modules/MolBioReview/iupac_aa_abbreviations.html
 # Also look at:
+#  https://en.wikipedia.org/wiki/Amino_acid
 #  https://en.wikipedia.org/wiki/Amino_acid#/media/File:ProteinogenicAminoAcids.svg
 # We add Selenocysteine:
 #  https://en.wikipedia.org/wiki/Selenocysteine
