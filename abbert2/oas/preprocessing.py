@@ -440,7 +440,7 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
         'Accept-Ranges',
         'Proxy-Connection',
         'isotype'
-    ])
+    ], errors='ignore')
 
     # Ensure unit_id is first in the frame and some other mild column reordering
     columns = ['oas_subset', 'study_id', 'unit_id']
