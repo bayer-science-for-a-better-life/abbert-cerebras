@@ -387,7 +387,10 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
     try:
         if recompute:
             raise IOError
-        units_download_info_df = from_parquet(bulk_download_info_cache_path)
+        try:
+            units_download_info_df = from_parquet(bulk_download_info_cache_path)
+        except FileNotFoundError:
+            raise IOError
     except IOError:
         # Parallel download each unit metadata
         n_jobs = effective_n_jobs(n_jobs) if n_jobs is not None else 64
