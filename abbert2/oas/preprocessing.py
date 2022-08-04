@@ -1225,19 +1225,19 @@ def cache_units_meta(recompute: bool = False, paired: bool = None, n_jobs=-1):
     # --- Simple size statistics, compare with reported numbers in the web
 
     # Update these expected values with the data that appears in the webapp
-    # Updated 2021/09/10
+    # Updated 2022/08/06
     #
     # "Your search yielded 1,535,831,757 unique sequences from 80 studies."
     #   http://opig.stats.ox.ac.uk/webapps/oas/oas
     # Of course, this is before de-duplication
-    EXPECTED_UNPAIRED_NUM_STUDIES = 80
-    EXPECTED_UNPAIRED_NUM_SEQUENCES = 1_535_831_757
+    EXPECTED_UNPAIRED_NUM_STUDIES = 89
+    EXPECTED_UNPAIRED_NUM_SEQUENCES = 2_426_036_223
     #
     # "Your search yielded 121,838 filtered sequences from 5 studies."
     #   http://opig.stats.ox.ac.uk/webapps/oas/oas_paired
     # Of course, this is before de-duplication
-    EXPECTED_PAIRED_NUM_STUDIES = 5
-    EXPECTED_PAIRED_NUM_SEQUENCES = 121_838
+    EXPECTED_PAIRED_NUM_STUDIES = 7
+    EXPECTED_PAIRED_NUM_SEQUENCES = 172_723
 
     num_paired_studies = df.query('oas_subset == "paired"')['study_id'].nunique()
     num_unpaired_studies = df.query('oas_subset == "unpaired"')['study_id'].nunique()
