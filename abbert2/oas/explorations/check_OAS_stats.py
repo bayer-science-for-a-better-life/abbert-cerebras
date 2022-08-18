@@ -317,7 +317,5 @@ if __name__ == '__main__':
         plt.close("all")
 
 
-    # TODO: compute individual stats for each property (without filtering) and add visualizations
-    #   y log-scale
     # TODO: after that, filter the df for all criteria and check the remaining size vs unfiltered size
 
