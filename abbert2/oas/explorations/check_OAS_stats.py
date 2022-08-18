@@ -136,7 +136,6 @@ def cdr3_len_cutoff_stats(merged_df):
     print(merged_df.anarci_cdr3_is_over_37_aa_long.describe())
     assert all((_cdr3_length >= 37) == _is_over_37 for _cdr3_length, _is_over_37 in zip(merged_df.cdr3_length.to_list(),
                                                                     merged_df.anarci_cdr3_is_over_37_aa_long.to_list()))
-    # TODO: is it 37 inclusive or not ?
     return merged_df
 
 
@@ -285,11 +284,17 @@ if __name__ == '__main__':
     # n_seq_replicas = all 1 (duplicates have been filtered out) but avg redundancy > 1 (study-level)
     # avg n_cdr3_replicas > 1
     # anarci_cdr3_is_over_37_aa_long = all False
+    # TODO: is it 37 inclusive or not ?
     # has_insertions and has_unexpected_insertions = not all False
     # n_imgt_insertions and n_anarci_deletions = not all 0
     # FW1_lt_20 and FW4_lt_10 = all False
     # anarci_fwr1_shorter_than_imgt_defined and anarci_fwr4_shorter_than_imgt_defined = some True
     # complete_vdj = some False / has_wrong_cdr3_reconstruction = some True
+    # TODO: is complete_vdj proper for light chain (no d_call anyway) ?
+    #     print("\n*******************")
+    #     print(merged_df[merged_df["complete_vdj"]==True].chain.unique())
+    #     print(merged_df[merged_df["complete_vdj"]==False].chain.unique())
+    #     print("\n*******************")
     # bulk_isotype = some True
     # productive = all True
     # anarci_missing_conserved_cysteine and has_mutated_conserved_cysteines = all False
@@ -317,5 +322,14 @@ if __name__ == '__main__':
         plt.close("all")
 
 
-    # TODO: after that, filter the df for all criteria and check the remaining size vs unfiltered size
+    # --> apply filtering
+
+    print(f"\nunfiltered dataset of size {len(merged_df)}")
+    for _filter in [("has_unexpected_insertions", False),
+                    ("anarci_fwr1_shorter_than_imgt_defined", False),
+                    ("anarci_fwr4_shorter_than_imgt_defined", False),
+                    ("has_wrong_cdr3_reconstruction", False)]:
+        print("applying filter for", _filter)
+        merged_df = merged_df[merged_df[_filter[0]] == _filter[1]]
+        print(f"filtered dataset of size {len(merged_df)}")
 
