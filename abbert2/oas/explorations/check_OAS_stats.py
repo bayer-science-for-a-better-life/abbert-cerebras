@@ -322,7 +322,7 @@ if __name__ == '__main__':
         plt.close("all")
 
 
-    # --> apply filtering
+    # --> apply filtering (TODO: also re-apply the filters from -filters=default)
 
     print(f"\nunfiltered dataset of size {len(merged_df)}")
     for _filter in [("has_unexpected_insertions", False),
