@@ -61,9 +61,53 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import seaborn as sns
+from joblib import Parallel, delayed
 
 from abbert2.oas import OAS
 from abbert2.oas import RELATIVE_OAS_TEST_DATA_PATH
+
+
+def get_one_unit(i_UID, unit, species, chains, UID):
+    print(f"\nparsing unit {i_UID} out of {len(UID)}")
+    if species != "all" and species.casefold() not in unit.species.casefold():
+        print("** discarding unit with species", unit.species)
+        df = None
+    else:
+        df = unit.sequences_df()
+        print(f"raw df of size {len(df)}, N heavy={unit.num_heavy_sequences}, N light={unit.num_light_sequences},"
+              f" unique chains {df.chain.unique()}")
+        if chains != "all":
+            df = df[df.chain.str.casefold() == chains.casefold()]
+        # TODO: unit.chain can be paired and contain both heavy and light --> fix oas_data_unpaired.py
+        if len(df) > 0:
+            print(f"kept unit {unit.id} with species {unit.species}")
+            df["isotype"] = [unit.isotype] * len(df)
+            df["species"] = [unit.species] * len(df)
+        else:
+            df = None
+    return df
+
+
+def parallel_merge_OAS_df(oas_path, species, chains, save_path, n_jobs, n_break=-1):
+    OAS_PATHS = [RELATIVE_OAS_TEST_DATA_PATH,  # = 0 units in the conda env
+                 "/project/biomols/antibodies/data/public/oas/20211114",  # the full, unfiltered dataset = 12695 units
+                 "/project/biomols/antibodies/data/public/oas/20211114-filters=default"]  # the version we used with cerebras = 12695 units
+    OAS_PATH = OAS_PATHS[oas_path]  # we get both heavy and light chains cf unit.id
+    oas = OAS(oas_path=OAS_PATH)
+    UID = list(oas.units_in_disk())
+    random.shuffle(UID)
+    if n_break > 0:
+        # here n_break is in number of units (not in number of sequences)
+        all_df = Parallel(n_jobs=n_jobs)(delayed(get_one_unit)(i_UID, unit, species, chains, UID)
+                                    for i_UID, unit in enumerate(UID[:n_break]))
+    else:
+        all_df = Parallel(n_jobs=n_jobs)(delayed(get_one_unit)(i_UID, unit, species, chains, UID)
+                                    for i_UID, unit in enumerate(UID))
+    all_df = [df for df in all_df if df is not None]
+    print(f"\nfinished parsing {len(all_df)} non-empty valid df")
+    merged_df = pd.concat(all_df)
+    merged_df.to_parquet(save_path)
+    return merged_df
 
 
 def merge_OAS_df(oas_path, species, chains, save_path, n_break=-1):
@@ -89,6 +133,7 @@ def merge_OAS_df(oas_path, species, chains, save_path, n_break=-1):
             if len(df) > 0:
                 print(f"kept unit {unit.id} with species {unit.species}")
                 df["isotype"] = [unit.isotype]*len(df)
+                df["species"] = [unit.species] * len(df)
                 if merged_df is None:
                     print(unit.nice_metadata)
                     print(df.columns)
@@ -134,8 +179,9 @@ def cdr3_len_cutoff_stats(merged_df):
     print("\n\ncdr3_len_cutoff_stats")
     print("isnull", merged_df.anarci_cdr3_is_over_37_aa_long.isnull().sum())
     print(merged_df.anarci_cdr3_is_over_37_aa_long.describe())
-    assert all((_cdr3_length >= 37) == _is_over_37 for _cdr3_length, _is_over_37 in zip(merged_df.cdr3_length.to_list(),
-                                                                    merged_df.anarci_cdr3_is_over_37_aa_long.to_list()))
+    print("all (cdr3_length >= 37) ==  anarci_cdr3_is_over_37_aa_long",
+        all((_cdr3_length >= 37) == _is_over_37 for _cdr3_length, _is_over_37 in zip(merged_df.cdr3_length.to_list(),
+                                                                merged_df.anarci_cdr3_is_over_37_aa_long.to_list())))
     return merged_df
 
 
@@ -166,7 +212,14 @@ def indels_stats(merged_df):
     merged_df["n_imgt_insertions"] = n_imgt_insertions
     print(merged_df.n_imgt_insertions.describe())
     assert len(merged_df[merged_df["n_imgt_insertions"] > 0]) == len(merged_df[merged_df["has_insertions"] == True])
-    merged_df["n_anarci_deletions"] = [len(_anarci_del) for _anarci_del in merged_df.anarci_deletions.to_list()]
+    n_anarci_deletions = []
+    for _anarci_del in merged_df.anarci_deletions.to_list():
+        try:
+            n_anarci_deletions.append(len(_anarci_del))
+        except:
+            n_anarci_deletions.append(0)
+    merged_df["n_anarci_deletions"] = n_anarci_deletions
+    # merged_df["n_anarci_deletions"] = [len(_anarci_del) for _anarci_del in merged_df.anarci_deletions.to_list()]
     print(merged_df.n_anarci_deletions.describe())
     return merged_df
 
@@ -239,8 +292,8 @@ def unnatural_AAs_stats(merged_df, natural_AAs=list("ACDEFGHIKLMNPQRSTVWY")):
 
 
 if __name__ == '__main__':
-    # python check_OAS_stats.py --species all --chains all
-    # python check_OAS_stats.py --species all --chains all --save_path /home/gnlzm/OAS_datasets/tmp/subsampled100k_OAS_default_filter --n_break 100000
+    # python check_OAS_stats.py --species all --chains all --save_path /home/gnlzm/OAS_datasets/tmp/subsampled25Units_OAS_default_filter --n_break 25 --n_jobs 16
+    # python check_OAS_stats.py --species all --chains all --save_path /home/gnlzm/OAS_datasets/tmp/full_OAS_default_filter --n_break -1 --n_jobs 32
 
     parser = ArgumentParser()
     parser.add_argument('--oas_path', default=2, type=int)
@@ -248,11 +301,16 @@ if __name__ == '__main__':
     parser.add_argument('--chains', default="all", type=str)  # "all", "heavy", "lig
     parser.add_argument('--save_path', default="/home/gnlzm/OAS_datasets/tmp/full_OAS_default_filter", type=str)
     parser.add_argument('--n_break', default=-1, type=int)
+    parser.add_argument('--n_jobs', default=1, type=int)
     args = parser.parse_args()
 
     if not os.path.exists(args.save_path+".parquet"):
-        print("\nrunning merge_OAS_df")
-        merged_df = merge_OAS_df(args.oas_path, args.species, args.chains, args.save_path+".parquet", n_break=args.n_break)
+        if args.n_jobs > 1:
+            print(f"\nrunning parallel_merge_OAS_df with {args.n_jobs} CPUs")
+            merged_df = parallel_merge_OAS_df(args.oas_path, args.species, args.chains, args.save_path+".parquet", args.n_jobs, n_break=args.n_break)
+        else:
+            print("\nrunning merge_OAS_df")
+            merged_df = merge_OAS_df(args.oas_path, args.species, args.chains, args.save_path + ".parquet", n_break=args.n_break)
     else:
         print("\nloading pre-computed merged_df")
         merged_df = pd.read_parquet(args.save_path+".parquet")
@@ -332,4 +390,9 @@ if __name__ == '__main__':
         print("applying filter for", _filter)
         merged_df = merged_df[merged_df[_filter[0]] == _filter[1]]
         print(f"filtered dataset of size {len(merged_df)}")
+
+
+    # --> store the filtered dataset
+
+    merged_df.to_parquet(args.save_path+"__cleaned.parquet")
 
