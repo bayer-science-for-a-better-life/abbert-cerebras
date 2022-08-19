@@ -294,6 +294,7 @@ def unnatural_AAs_stats(merged_df, natural_AAs=list("ACDEFGHIKLMNPQRSTVWY")):
 if __name__ == '__main__':
     # python check_OAS_stats.py --species all --chains all --save_path /home/gnlzm/OAS_datasets/tmp/subsampled25Units_OAS_default_filter --n_break 25 --n_jobs 16
     # python check_OAS_stats.py --species all --chains all --save_path /home/gnlzm/OAS_datasets/tmp/full_OAS_default_filter --n_break -1 --n_jobs 32
+    # python check_OAS_stats.py --species human --chains all --save_path /home/gnlzm/OAS_datasets/tmp/human_OAS_default_filter --n_break -1 --n_jobs 32
 
     parser = ArgumentParser()
     parser.add_argument('--oas_path', default=2, type=int)
