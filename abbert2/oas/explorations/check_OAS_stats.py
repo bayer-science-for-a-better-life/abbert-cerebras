@@ -33,7 +33,6 @@
 # 'anarci_cdr3_is_over_37_aa_long'
 
 ########################################################################################################################
-# https://www.imgt.org/IMGTScientificChart/Nomenclature/IMGT-FRCDRdefinition.html#Overview = region lengths in IMGT num.
 # --> what properties we want to check = which df columns
 # full sequence replicas (e.g. >3) = sequence_aa / (redundancy but it is within the same study cf. filtering.py?)
 # CDR3 replicas = sequence_aa[cdr3_start: cdr3_start+cdr3_length]
@@ -48,6 +47,7 @@
 # Size metadata vs Size_igblastn = TODO: where is it ? (should be a unit-level metadata)
 # kappa gap 21 = has_kappa_gap_21
 # only 20 natural AAs = sequence_aa
+# + species (from metadata) in the abbert2 check_OAS_stats
 
 
 import json
@@ -293,8 +293,8 @@ def unnatural_AAs_stats(merged_df, natural_AAs=list("ACDEFGHIKLMNPQRSTVWY")):
 
 if __name__ == '__main__':
     # python check_OAS_stats.py --species all --chains all --save_path /home/gnlzm/OAS_datasets/tmp/subsampled25Units_OAS_default_filter --n_break 25 --n_jobs 16
-    # python check_OAS_stats.py --species all --chains all --save_path /home/gnlzm/OAS_datasets/tmp/full_OAS_default_filter --n_break -1 --n_jobs 32
-    # python check_OAS_stats.py --species human --chains all --save_path /home/gnlzm/OAS_datasets/tmp/human_OAS_default_filter --n_break -1 --n_jobs 32
+    # python check_OAS_stats.py --species all --chains all --save_path /home/gnlzm/OAS_datasets/tmp/full_OAS_default_filter --n_break -1 --n_jobs 32 --strict_length_cutoffs
+    # python check_OAS_stats.py --species human --chains all --save_path /home/gnlzm/OAS_datasets/tmp/human_OAS_default_filter --n_break -1 --n_jobs 32 --strict_length_cutoffs
 
     parser = ArgumentParser()
     parser.add_argument('--oas_path', default=2, type=int)
@@ -303,7 +303,21 @@ if __name__ == '__main__':
     parser.add_argument('--save_path', default="/home/gnlzm/OAS_datasets/tmp/full_OAS_default_filter", type=str)
     parser.add_argument('--n_break', default=-1, type=int)
     parser.add_argument('--n_jobs', default=1, type=int)
+    parser.add_argument('--strict_length_cutoffs', action='store_true')
     args = parser.parse_args()
+
+    if args.strict_length_cutoffs:
+        # https://www.imgt.org/IMGTScientificChart/Nomenclature/IMGT-FRCDRdefinition.html#Overview = region lengths in IMGT num.
+        # https://www.imgt.org/IMGTScientificChart/Numbering/IMGTIGVLsuperfamily.html
+        # --> inclusive min-max lengths based on IMGT num. and plots
+        # TODO: refine these values ...
+        cdr1_length_cutoffs = [4, 15]
+        cdr2_length_cutoffs = [1, 10]
+        cdr3_length_cutoffs = [2, 37]
+        fwr1_length_cutoffs = [20, 26]
+        fwr2_length_cutoffs = [1, 17]
+        fwr3_length_cutoffs = [20, 39]
+        fwr4_length_cutoffs = [10, 12]
 
     if not os.path.exists(args.save_path+".parquet"):
         if args.n_jobs > 1:
@@ -325,6 +339,7 @@ if __name__ == '__main__':
     merged_df = seq_replicas_stats(merged_df)
     merged_df = cdr3_replicas_stats(merged_df)
     merged_df = cdr3_len_cutoff_stats(merged_df)
+    # TODO: issue with filtering -> all (cdr3_length >= 37) ==  anarci_cdr3_is_over_37_aa_long -> False
     merged_df = region_len_stats(merged_df)
     merged_df = indels_stats(merged_df)
     merged_df = truncated_FW_stats(merged_df)
@@ -392,8 +407,18 @@ if __name__ == '__main__':
         merged_df = merged_df[merged_df[_filter[0]] == _filter[1]]
         print(f"filtered dataset of size {len(merged_df)}")
 
+    if args.strict_length_cutoffs:
+        for _region, _cutoffs in zip(["cdr1_length", "cdr2_length", "cdr3_length",
+                                    "fwr1_length", "fwr2_length", "fwr3_length", "fwr4_length"],
+                                    [cdr1_length_cutoffs, cdr2_length_cutoffs, cdr3_length_cutoffs,
+                                    fwr1_length_cutoffs, fwr2_length_cutoffs, fwr3_length_cutoffs, fwr4_length_cutoffs]):
+            print("applying length cutoff for", _region, _cutoffs)
+            merged_df = merged_df[merged_df[_region] >= _cutoffs[0]]
+            merged_df = merged_df[merged_df[_region] <= _cutoffs[1]]
 
     # --> store the filtered dataset
-
-    merged_df.to_parquet(args.save_path+"__cleaned.parquet")
+    if args.strict_length_cutoffs:
+        merged_df.to_parquet(args.save_path+"__cleaned_lencutoffs.parquet")
+    else:
+        merged_df.to_parquet(args.save_path+"__cleaned.parquet")
 
