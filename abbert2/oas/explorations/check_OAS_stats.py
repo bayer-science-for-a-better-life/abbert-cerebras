@@ -292,32 +292,27 @@ def unnatural_AAs_stats(merged_df, natural_AAs=list("ACDEFGHIKLMNPQRSTVWY")):
 
 
 if __name__ == '__main__':
-    # python check_OAS_stats.py --species all --chains all --save_path /home/gnlzm/OAS_datasets/tmp/subsampled25Units_OAS_default_filter --n_break 25 --n_jobs 16
-    # python check_OAS_stats.py --species all --chains all --save_path /home/gnlzm/OAS_datasets/tmp/full_OAS_default_filter --n_break -1 --n_jobs 32 --strict_length_cutoffs
-    # python check_OAS_stats.py --species human --chains all --save_path /home/gnlzm/OAS_datasets/tmp/human_OAS_default_filter --n_break -1 --n_jobs 32 --strict_length_cutoffs
-
     parser = ArgumentParser()
     parser.add_argument('--oas_path', default=2, type=int)
     parser.add_argument('--species', default="all", type=str)  # "all", "whatever species"
     parser.add_argument('--chains', default="all", type=str)  # "all", "heavy", "lig
     parser.add_argument('--save_path', default="/home/gnlzm/OAS_datasets/tmp/full_OAS_default_filter", type=str)
+    parser.add_argument('--save_tag', default="__cleaned.parquet", type=str)
     parser.add_argument('--n_break', default=-1, type=int)
     parser.add_argument('--n_jobs', default=1, type=int)
     parser.add_argument('--strict_length_cutoffs', action='store_true')
+    # https://www.imgt.org/IMGTScientificChart/Nomenclature/IMGT-FRCDRdefinition.html#Overview = region lengths in IMGT num.
+    # https://www.imgt.org/IMGTScientificChart/Numbering/IMGTIGVLsuperfamily.html
+    # --> inclusive min-max lengths based on IMGT num. and plots
+    # TODO: refine these values ...
+    parser.add_argument('--cdr1_length_cutoffs', nargs='+', default=[4, 15])  # for CAIPY [6, 12]
+    parser.add_argument('--cdr2_length_cutoffs', nargs='+', default=[1, 10])  # for CAIPY [3, 10]
+    parser.add_argument('--cdr3_length_cutoffs', nargs='+', default=[2, 37])  # for CAIPY [2, 37]
+    parser.add_argument('--fwr1_length_cutoffs', nargs='+', default=[20, 26])  # for CAIPY [20, 26]
+    parser.add_argument('--fwr2_length_cutoffs', nargs='+', default=[1, 17])  # for CAIPY [17, 17]
+    parser.add_argument('--fwr3_length_cutoffs', nargs='+', default=[20, 39])  # for CAIPY [36, 38]
+    parser.add_argument('--fwr4_length_cutoffs', nargs='+', default=[10, 12])  # for CAIPY [10, 11]
     args = parser.parse_args()
-
-    if args.strict_length_cutoffs:
-        # https://www.imgt.org/IMGTScientificChart/Nomenclature/IMGT-FRCDRdefinition.html#Overview = region lengths in IMGT num.
-        # https://www.imgt.org/IMGTScientificChart/Numbering/IMGTIGVLsuperfamily.html
-        # --> inclusive min-max lengths based on IMGT num. and plots
-        # TODO: refine these values ...
-        cdr1_length_cutoffs = [4, 15]
-        cdr2_length_cutoffs = [1, 10]
-        cdr3_length_cutoffs = [2, 37]
-        fwr1_length_cutoffs = [20, 26]
-        fwr2_length_cutoffs = [1, 17]
-        fwr3_length_cutoffs = [20, 39]
-        fwr4_length_cutoffs = [10, 12]
 
     if not os.path.exists(args.save_path+".parquet"):
         if args.n_jobs > 1:
@@ -409,17 +404,15 @@ if __name__ == '__main__':
 
     if args.strict_length_cutoffs:
         for _region, _cutoffs in zip(["cdr1_length", "cdr2_length", "cdr3_length",
-                                    "fwr1_length", "fwr2_length", "fwr3_length", "fwr4_length"],
-                                    [cdr1_length_cutoffs, cdr2_length_cutoffs, cdr3_length_cutoffs,
-                                    fwr1_length_cutoffs, fwr2_length_cutoffs, fwr3_length_cutoffs, fwr4_length_cutoffs]):
+                                        "fwr1_length", "fwr2_length", "fwr3_length", "fwr4_length"],
+                                        [args.cdr1_length_cutoffs, args.cdr2_length_cutoffs, args.cdr3_length_cutoffs,
+                                        args.fwr1_length_cutoffs, args.fwr2_length_cutoffs, args.fwr3_length_cutoffs,
+                                                                                        args.fwr4_length_cutoffs]):
             print("applying length cutoff for", _region, _cutoffs)
             merged_df = merged_df[merged_df[_region] >= _cutoffs[0]]
             merged_df = merged_df[merged_df[_region] <= _cutoffs[1]]
             print(f"filtered dataset of size {len(merged_df)}")
 
     # --> store the filtered dataset
-    if args.strict_length_cutoffs:
-        merged_df.to_parquet(args.save_path+"__cleaned_lencutoffs.parquet")
-    else:
-        merged_df.to_parquet(args.save_path+"__cleaned.parquet")
+    merged_df.to_parquet(args.save_path+args.save_tag)
 
