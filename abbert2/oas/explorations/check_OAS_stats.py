@@ -409,8 +409,8 @@ if __name__ == '__main__':
                                         args.fwr1_length_cutoffs, args.fwr2_length_cutoffs, args.fwr3_length_cutoffs,
                                                                                         args.fwr4_length_cutoffs]):
             print("applying length cutoff for", _region, _cutoffs)
-            merged_df = merged_df[merged_df[_region] >= _cutoffs[0]]
-            merged_df = merged_df[merged_df[_region] <= _cutoffs[1]]
+            merged_df = merged_df[merged_df[_region] >= int(_cutoffs[0])]
+            merged_df = merged_df[merged_df[_region] <= int(_cutoffs[1])]
             print(f"filtered dataset of size {len(merged_df)}")
 
     # --> store the filtered dataset
