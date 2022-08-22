@@ -86,6 +86,10 @@ def get_one_unit(i_UID, unit, species, chains, UID):
             df["species"] = [unit.species] * len(df)
             df["bsource"] = [unit.bsource] * len(df)
             df["btype"] = [unit.btype] * len(df)
+            if "naive".casefold() in unit.btype.casefold():
+                df["is_naive_Bcell"] = [True] * len(df)
+            else:
+                df["is_naive_Bcell"] = [False] * len(df)
         else:
             df = None
     return df
@@ -137,6 +141,12 @@ def merge_OAS_df(oas_path, species, chains, save_path, n_break=-1):
                 print(f"kept unit {unit.id} with species {unit.species}")
                 df["isotype"] = [unit.isotype]*len(df)
                 df["species"] = [unit.species] * len(df)
+                df["bsource"] = [unit.bsource] * len(df)
+                df["btype"] = [unit.btype] * len(df)
+                if "naive".casefold() in unit.btype.casefold():
+                    df["is_naive_Bcell"] = [True] * len(df)
+                else:
+                    df["is_naive_Bcell"] = [False] * len(df)
                 if merged_df is None:
                     print(unit.nice_metadata)
                     print(df.columns)
@@ -157,9 +167,9 @@ def merge_OAS_df(oas_path, species, chains, save_path, n_break=-1):
 
 def remove_missing_values(merged_df):
     for col in merged_df.columns:
-        print(col+".isnull", merged_df[col].isnull().sum())
+        print(col+".isnull", merged_df[col].isnull().sum(), f"out of {len(merged_df)}")
     no_missing_values = ['chain', 'sequence_aa', 'fwr1_start', 'fwr1_length', 'cdr1_start', 'cdr1_length', 'fwr2_start',
-                         'fwr2_length', 'cdr2_start', 'cdr2_length', 'fwr3_start', 'fwr3_length' 'cdr3_start',
+                         'fwr2_length', 'cdr2_start', 'cdr2_length', 'fwr3_start', 'fwr3_length', 'cdr3_start',
                          'cdr3_length', 'fwr4_start', 'fwr4_length']
     print(f"\ndropping missing values in df of size {len(merged_df)}")
     merged_df = merged_df.dropna(subset=no_missing_values)
@@ -312,6 +322,7 @@ def Bcell_stats(merged_df):
         print(col+".isnull", merged_df[col].isnull().sum())
         print(merged_df[col].describe())
         print(merged_df[col].unique())
+    print(merged_df.is_naive_Bcell.describe())
     return merged_df
 
 
@@ -330,6 +341,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_break', default=-1, type=int)
     parser.add_argument('--n_jobs', default=1, type=int)
     parser.add_argument('--strict_length_cutoffs', action='store_true')
+    parser.add_argument('--no_naive_Bcells', action='store_true')
     # https://www.imgt.org/IMGTScientificChart/Nomenclature/IMGT-FRCDRdefinition.html#Overview = region lengths in IMGT num.
     # https://www.imgt.org/IMGTScientificChart/Numbering/IMGTIGVLsuperfamily.html
     # --> inclusive min-max lengths based on IMGT num. and plots
@@ -375,7 +387,7 @@ if __name__ == '__main__':
     merged_df = unusual_residue_stats(merged_df)
     merged_df = kappa_gap_21_stats(merged_df)
     merged_df = unnatural_AAs_stats(merged_df, natural_AAs=list("ACDEFGHIKLMNPQRSTVWY"))
-    merged_df = Bcell_stats(merged_df)  # TODO: add plots for this property and labels e.g. is_naive_Bcell
+    merged_df = Bcell_stats(merged_df)
 
 
     # --> preliminary observations (for a subset of 20211114-filters=default)
@@ -409,7 +421,7 @@ if __name__ == '__main__':
 
     for _col in ["redundancy", "n_cdr3_replicas", "has_insertions", "has_unexpected_insertions", "n_imgt_insertions",
             "n_anarci_deletions", "anarci_fwr1_shorter_than_imgt_defined", "anarci_fwr4_shorter_than_imgt_defined",
-            "complete_vdj", "has_wrong_cdr3_reconstruction", "bulk_isotype",
+            "complete_vdj", "has_wrong_cdr3_reconstruction", "bulk_isotype", "is_naive_Bcell",
             "cdr1_length", "cdr2_length", "cdr3_length", "fwr1_length", "fwr2_length", "fwr3_length", "fwr4_length"]:
         print("\nplotting", _col, merged_df[_col].dtypes)
         plt.figure(figsize=(12, 12))
@@ -425,11 +437,14 @@ if __name__ == '__main__':
     # --> apply filtering (TODO: add more filters ; also re-apply the filters from -filters=default ?)
 
     print(f"\nunfiltered dataset of size {len(merged_df)}")
-    for _filter in [("has_unexpected_insertions", False),
-                    ("anarci_fwr1_shorter_than_imgt_defined", False),
-                    ("anarci_fwr4_shorter_than_imgt_defined", False),
-                    ("has_wrong_cdr3_reconstruction", False),
-                    ("anarci_cdr3_is_over_37_aa_long", False)]:
+    all_filter = [("has_unexpected_insertions", False),
+                 ("anarci_fwr1_shorter_than_imgt_defined", False),
+                 ("anarci_fwr4_shorter_than_imgt_defined", False),
+                 ("has_wrong_cdr3_reconstruction", False),
+                 ("anarci_cdr3_is_over_37_aa_long", False)]
+    if args.no_naive_Bcells:
+        all_filter.append(("is_naive_Bcell", False))
+    for _filter in all_filter:
         print("applying filter for", _filter)
         merged_df = merged_df[merged_df[_filter[0]] == _filter[1]]
         print(f"filtered dataset of size {len(merged_df)}")
