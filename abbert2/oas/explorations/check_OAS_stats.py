@@ -48,6 +48,7 @@
 # kappa gap 21 = has_kappa_gap_21
 # only 20 natural AAs = sequence_aa
 # + species (from metadata) in the abbert2 check_OAS_stats
+# + bsource and btype (from metadata)
 
 
 import json
@@ -83,6 +84,8 @@ def get_one_unit(i_UID, unit, species, chains, UID):
             print(f"kept unit {unit.id} with species {unit.species}")
             df["isotype"] = [unit.isotype] * len(df)
             df["species"] = [unit.species] * len(df)
+            df["bsource"] = [unit.bsource] * len(df)
+            df["btype"] = [unit.btype] * len(df)
         else:
             df = None
     return df
@@ -149,6 +152,18 @@ def merge_OAS_df(oas_path, species, chains, save_path, n_break=-1):
             break
 
     merged_df.to_parquet(save_path)
+    return merged_df
+
+
+def remove_missing_values(merged_df):
+    for col in merged_df.columns:
+        print(col+".isnull", merged_df[col].isnull().sum())
+    no_missing_values = ['chain', 'sequence_aa', 'fwr1_start', 'fwr1_length', 'cdr1_start', 'cdr1_length', 'fwr2_start',
+                         'fwr2_length', 'cdr2_start', 'cdr2_length', 'fwr3_start', 'fwr3_length' 'cdr3_start',
+                         'cdr3_length', 'fwr4_start', 'fwr4_length']
+    print(f"\ndropping missing values in df of size {len(merged_df)}")
+    merged_df = merged_df.dropna(subset=no_missing_values)
+    print(f"resulting df of size {len(merged_df)}")
     return merged_df
 
 
@@ -291,6 +306,15 @@ def unnatural_AAs_stats(merged_df, natural_AAs=list("ACDEFGHIKLMNPQRSTVWY")):
     return merged_df
 
 
+def Bcell_stats(merged_df):
+    print("\n\nBcell_stats")
+    for col in ["bsource", "btype"]:
+        print(col+".isnull", merged_df[col].isnull().sum())
+        print(merged_df[col].describe())
+        print(merged_df[col].unique())
+    return merged_df
+
+
 if __name__ == '__main__':
 
     # TODO: add metadata as in "Antibody optimization enabled by AI predictions of binding affinity and naturalness" for
@@ -333,13 +357,14 @@ if __name__ == '__main__':
     merged_df = merged_df.reset_index(drop=True)
     merged_df.info()
 
+    merged_df = remove_missing_values(merged_df)
+
 
     # --> report statistics for various properties of interest
 
     merged_df = seq_replicas_stats(merged_df)
     merged_df = cdr3_replicas_stats(merged_df)
     merged_df = cdr3_len_cutoff_stats(merged_df)
-    # TODO: issue with filtering -> all (cdr3_length >= 37) ==  anarci_cdr3_is_over_37_aa_long -> False
     merged_df = region_len_stats(merged_df)
     merged_df = indels_stats(merged_df)
     merged_df = truncated_FW_stats(merged_df)
@@ -350,6 +375,7 @@ if __name__ == '__main__':
     merged_df = unusual_residue_stats(merged_df)
     merged_df = kappa_gap_21_stats(merged_df)
     merged_df = unnatural_AAs_stats(merged_df, natural_AAs=list("ACDEFGHIKLMNPQRSTVWY"))
+    merged_df = Bcell_stats(merged_df)  # TODO: add plots for this property and labels e.g. is_naive_Bcell
 
 
     # --> preliminary observations (for a subset of 20211114-filters=default)
@@ -396,13 +422,14 @@ if __name__ == '__main__':
         plt.close("all")
 
 
-    # --> apply filtering (TODO: also re-apply the filters from -filters=default)
+    # --> apply filtering (TODO: add more filters ; also re-apply the filters from -filters=default ?)
 
     print(f"\nunfiltered dataset of size {len(merged_df)}")
     for _filter in [("has_unexpected_insertions", False),
                     ("anarci_fwr1_shorter_than_imgt_defined", False),
                     ("anarci_fwr4_shorter_than_imgt_defined", False),
-                    ("has_wrong_cdr3_reconstruction", False)]:
+                    ("has_wrong_cdr3_reconstruction", False),
+                    ("anarci_cdr3_is_over_37_aa_long", False)]:
         print("applying filter for", _filter)
         merged_df = merged_df[merged_df[_filter[0]] == _filter[1]]
         print(f"filtered dataset of size {len(merged_df)}")
