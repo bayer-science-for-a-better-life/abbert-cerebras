@@ -292,6 +292,11 @@ def unnatural_AAs_stats(merged_df, natural_AAs=list("ACDEFGHIKLMNPQRSTVWY")):
 
 
 if __name__ == '__main__':
+
+    # TODO: add metadata as in "Antibody optimization enabled by AI predictions of binding affinity and naturalness" for
+    #   Author field belongs to prior study / Study originates from immature B cells / Study originates from B cell cancers
+    #   --> "Filter studies" + additional criteria for "Filter sequences"
+
     parser = ArgumentParser()
     parser.add_argument('--oas_path', default=2, type=int)
     parser.add_argument('--species', default="all", type=str)  # "all", "whatever species"
