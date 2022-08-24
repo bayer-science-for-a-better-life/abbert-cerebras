@@ -391,7 +391,6 @@ if __name__ == '__main__':
 
 
     # --> preliminary observations (for a subset of 20211114-filters=default)
-    # TODO: double check on full ~300M filtered OAS
 
     # n_seq_replicas = all 1 (duplicates have been filtered out) but avg redundancy > 1 (study-level)
     # avg n_cdr3_replicas > 1
@@ -438,10 +437,11 @@ if __name__ == '__main__':
 
     print(f"\nunfiltered dataset of size {len(merged_df)}")
     all_filter = [("has_unexpected_insertions", False),
-                 ("anarci_fwr1_shorter_than_imgt_defined", False),
-                 ("anarci_fwr4_shorter_than_imgt_defined", False),
-                 ("has_wrong_cdr3_reconstruction", False),
-                 ("anarci_cdr3_is_over_37_aa_long", False)]
+                    ("anarci_fwr1_shorter_than_imgt_defined", False),
+                    ("anarci_fwr4_shorter_than_imgt_defined", False),
+                    ("has_wrong_cdr3_reconstruction", False),
+                    ("anarci_cdr3_is_over_37_aa_long", False),
+                    ("complete_vdj", True)]
     if args.no_naive_Bcells:
         all_filter.append(("is_naive_Bcell", False))
     for _filter in all_filter:
