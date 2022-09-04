@@ -234,7 +234,8 @@ def _fix_bulk_download(path) -> List[str]:
 def _download_units_info(urls: List[str],
                          job_id: int = -1,
                          verbose: bool = True,
-                         add_study_metadata: bool = True) -> pd.DataFrame:
+                         add_study_metadata: bool = True,
+                         num_retries: int = 5) -> pd.DataFrame:
     import requests
     with requests.Session() as session:
         headers = []
@@ -242,9 +243,17 @@ def _download_units_info(urls: List[str],
         for i, url in enumerate(urls):
             header = {'url': url}
             header.update(_parse_oas_url(url))
-            header.update(session.head(url).headers)
+            http_headers = None
+            for _ in range(num_retries):
+                http_headers = session.head(url).headers
+                if http_headers.get('Content-Length') is None:
+                    continue
+                break
+            if http_headers.get('Content-Length') is None:
+                print(f'WARNING: COULD NOT GET HEADERS FOR {url}')
+            header.update(http_headers)
             if add_study_metadata:
-                unit_metadata = _read_unit_metadata(url, add_column_names=True)
+                unit_metadata = _read_unit_metadata(url, add_column_names=True, num_retries=num_retries)
                 assert not (set(unit_metadata) & set(header))
                 header.update(unit_metadata)
             if verbose:
