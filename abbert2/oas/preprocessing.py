@@ -250,7 +250,10 @@ def _download_units_info(urls: List[str],
                     continue
                 break
             if http_headers.get('Content-Length') is None:
+                header.update({'http_headers_error': f'Could not download headers after {num_retries} retries'})
                 print(f'WARNING: COULD NOT GET HEADERS FOR {url}')
+            else:
+                header.update({'http_headers_error': None})
             header.update(http_headers)
             if add_study_metadata:
                 unit_metadata = _read_unit_metadata(url, add_column_names=True, num_retries=num_retries)
