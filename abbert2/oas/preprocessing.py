@@ -245,7 +245,9 @@ def _download_units_info(urls: List[str],
             header.update(_parse_oas_url(url))
             http_headers = None
             for _ in range(num_retries):
-                http_headers = session.head(url).headers
+                http_headers = session.head(url,
+                                            allow_redirects=True,
+                                            stream=True).headers
                 if http_headers.get('Content-Length') is None:
                     continue
                 break
