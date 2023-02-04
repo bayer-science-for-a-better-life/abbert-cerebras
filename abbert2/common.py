@@ -29,7 +29,7 @@ IUPAC_CODES = (
     ('Ala', 'A'),  # Alanine
     ('Asx', 'B'),  # Aspartic acid or Asparagine
     ('Cys', 'C'),  # Cysteine
-    ('Asp', 'D'),  # Asparagine
+    ('Asp', 'D'),  # Aspartic acid (Aspartate)
     ('Glu', 'E'),  # Glutamine
     ('Phe', 'F'),  # Phenylalanine
     ('Gly', 'G'),  # Glycine
