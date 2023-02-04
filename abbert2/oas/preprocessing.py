@@ -426,7 +426,8 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
         dtype = {
             k: t for k, t in {'Age': str,
                               'Unique sequences': pd.Int64Dtype(),
-                              'Total sequences': pd.Int64Dtype()}.items()
+                              # 'Total sequences': pd.Int64Dtype(),
+                              'Run': str}.items()
             if k in units_download_info_df.columns
         }
         units_download_info_df = units_download_info_df.astype(dtype=dtype)
@@ -1263,7 +1264,7 @@ def cache_units_meta(recompute: bool = False, paired: bool = None, n_jobs=-1):
 
     print(f'Expected number of paired sequences: {EXPECTED_PAIRED_NUM_SEQUENCES}')
     print(f'Unpaired number of unpaired sequences: {EXPECTED_UNPAIRED_NUM_SEQUENCES}')
-    print(df.groupby('oas_subset')[['Unique sequences', 'Total sequences']].sum())
+    print(df.groupby('oas_subset')[['Unique sequences']].sum())
     print('(Disagreements are likely due to URLs in the download script actually missing)')
 
     # --- Summarize original unit sizes
