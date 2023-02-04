@@ -264,6 +264,10 @@ def number_of_mutants(
     # When all positions are allowed to mutate at a time, we have 20^3 = 8_000
     >>> number_of_mutants(sequence_length=3, max_mutations=None)
     8000
+
+    # All these are "up to max number of mutants"; for getting the number of mutants with exactly 3 mutations
+    >>> number_of_mutants(sequence_length=3) - number_of_mutants(sequence_length=3, max_mutations=2)
+    6800
     """
     import math
     if max_mutations is None:
