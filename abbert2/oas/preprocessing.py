@@ -235,7 +235,7 @@ def _download_units_info(urls: List[str],
                          job_id: int = -1,
                          verbose: bool = True,
                          add_study_metadata: bool = True,
-                         num_retries: int = 5) -> pd.DataFrame:
+                         num_retries: int = 10) -> pd.DataFrame:
     import requests
     with requests.Session() as session:
         headers = []
@@ -271,7 +271,7 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
                    paired: bool = None,
                    keep_missing: bool = False,
                    recompute: bool = False,
-                   n_jobs: int = -1) -> pd.DataFrame:
+                   n_jobs: int = 1) -> pd.DataFrame:
     """
     Returns a pandas dataframe with the metadata collected online from the units CSVs.
 
@@ -362,7 +362,7 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
       If True redownload the metadata from the online CSVs
       Otherwise try to use cached data
 
-    n_jobs : int, default -1
+    n_jobs : int, default 1
       Number of jobs to use when collecting metadata online (joblib semantics)
     """
 
@@ -407,6 +407,9 @@ def oas_units_meta(oas_path: Union[str, Path] = None,
             raise IOError
     except IOError:
         # Parallel download each unit metadata
+        # TODO: parallel download seems not robust at the moment with server config
+        # We need to be nice and stop for some time, likely
+        # Or just do with one job
         n_jobs = effective_n_jobs(n_jobs) if n_jobs is not None else 64
         units_download_info_df: pd.DataFrame = pd.concat(
             Parallel(n_jobs=n_jobs, backend='threading')(
