@@ -1,14 +1,18 @@
+import contextlib
 import re
 import datetime
+import warnings
 from pathlib import Path
 from typing import Union, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import requests
 from pyarrow import parquet as pq
 
 from anarci.schemes import alphabet as anarci_insertion_alphabet
+from urllib3.exceptions import InsecureRequestWarning
 
 # --- Proteins
 
@@ -275,3 +279,38 @@ def number_of_mutants(
     if sequence_length < max_mutations:
         raise ValueError(f'Number of positions to mutate must')
     return math.comb(sequence_length, max_mutations) * alphabet_size ** max_mutations
+
+
+# --- Network utils
+
+old_merge_environment_settings = requests.Session.merge_environment_settings
+
+@contextlib.contextmanager
+def no_ssl_verification():
+    opened_adapters = set()
+
+    def merge_environment_settings(self, url, proxies, stream, verify, cert):
+        # Verification happens only once per connection so we need to close
+        # all the opened adapters once we're done. Otherwise, the effects of
+        # verify=False persist beyond the end of this context manager.
+        opened_adapters.add(self.get_adapter(url))
+
+        settings = old_merge_environment_settings(self, url, proxies, stream, verify, cert)
+        settings['verify'] = False
+
+        return settings
+
+    requests.Session.merge_environment_settings = merge_environment_settings
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', InsecureRequestWarning)
+            yield
+    finally:
+        requests.Session.merge_environment_settings = old_merge_environment_settings
+
+        for adapter in opened_adapters:
+            try:
+                adapter.close()
+            except:
+                pass
