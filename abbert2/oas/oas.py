@@ -461,7 +461,8 @@ class Unit:
 
         # Check that remote sizes coincide
         remote_size = self.online_csv_size_bytes
-        remote_size_checked = int(requests.head(self.original_url).headers.get('content-length', 0))
+        remote_size_checked = int(
+            requests.head(self.original_url, allow_redirects=True).headers.get('content-length', 0))
         if remote_size != remote_size_checked:
             raise Exception(f'Remote size must coincide with metadata size '
                             f'({remote_size_checked} != {remote_size})')
@@ -474,6 +475,7 @@ class Unit:
                 download_start_byte = local_size
 
         with requests.get(self.original_url,
+                          allow_redirects=True,
                           stream=True,
                           headers={'Range': f'bytes={download_start_byte}-'}) as request:
             self.path.mkdir(parents=True, exist_ok=True)
@@ -1002,7 +1004,6 @@ def consolidate_all_units_stats(oas_path: Optional[Union[str, Path]] = None,
 
 
 def aligned_positions_to_df(aps):
-
     records = []
     for position_aa, count in aps.items():
         position, insertion, aa = parse_anarci_position_aa_to_imgt_code(position_aa)
@@ -1018,7 +1019,6 @@ def aligned_positions_to_df(aps):
 
 
 def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute=False):
-
     oas = OAS(oas_path=oas_path)
     cache_path = oas.oas_path / 'summaries' / 'count_stats.pickle'
 
