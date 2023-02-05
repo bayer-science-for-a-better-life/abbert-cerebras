@@ -96,4 +96,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+
+    with no_ssl_verification():
+        main()
