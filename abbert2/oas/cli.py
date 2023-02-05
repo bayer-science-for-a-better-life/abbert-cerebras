@@ -3,8 +3,10 @@ from typing import Optional, Union
 
 import pandas as pd
 
-from abbert2.oas.oas import consolidate_all_units_stats, summarize_count_stats, diagnose, OAS
+from abbert2.common import no_ssl_verification
+from abbert2.oas.oas import consolidate_all_units_stats, summarize_count_stats, diagnose, OAS, compare_csv_schemas
 from abbert2.oas.preprocessing import cache_units_meta, process_units, download_units
+from antidoto.misc import envvar
 
 
 def populate_metadata(oas_path: Optional[Union[str, Path]] = None,
@@ -56,13 +58,19 @@ def main():
     parser = argh.ArghParser()
     parser.add_commands([
         # --- Bootstrap commmands
+
         # Step 0: download bulk_download from the OAS website (not easy to automate)
+
         # Step 1: Run this to cache units metadata from the web
         cache_units_meta,
+
         # Step 2: Run this to populate individual unit metadata
         populate_metadata,
+        # Step 2b: Run compare_csv_schemas (see below) to detect schema changes
+
         # Step 3: Download the units (will take quite a while)
         download_units,
+
         # Step 4: Convert the CSVs to more efficient representations (will take a lot of time)
         process_units,
         # Step 5: Run this again to populate unit metadata with processed sequences info
@@ -77,6 +85,8 @@ def main():
         # parse_all_anarci_status,
 
         # --- Analysis commands
+        # This will show what columns are in different units
+        compare_csv_schemas,
         # This will consolidate stats for all units (e.g., frequences of amino acids on numbered sequences)
         consolidate_all_units_stats,
         # This will summarize and print count stats
