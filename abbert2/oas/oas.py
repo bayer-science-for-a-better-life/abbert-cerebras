@@ -46,7 +46,7 @@ import time
 from builtins import IOError
 from collections import defaultdict
 from functools import cached_property, total_ordering
-from itertools import chain, zip_longest, islice
+from itertools import chain, zip_longest, islice, combinations
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Tuple, Union, Iterator, Optional, List, Callable, Sequence
@@ -54,11 +54,11 @@ from typing import Tuple, Union, Iterator, Optional, List, Callable, Sequence
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
-from pyarrow import Table
 import requests
 import xxhash
 from joblib import Parallel, delayed
 from pyarrow import ArrowInvalid
+from pyarrow import Table
 from smart_open import open
 from tqdm import tqdm
 
@@ -1168,97 +1168,348 @@ def print_count_stats():
 # --- Maintenance
 
 
-def compare_csv_schemas():
-    """Compares the schemas of the original OAS CSVs."""
+def compare_csv_schemas(remove_chain_prefix: bool = False):
+    """
+    Compares the schemas of the original OAS CSVs.
+
+    Only requires "cache_units_meta" and "populate_metadata" to have been run, not the CSVs in disk.
+    """
 
     oas = OAS()
 
     # What columns did we find in the original CSVs?
     df = oas.unit_metadata_df
-    df['column_names'] = df.column_names.apply(
-        lambda x: tuple(sorted(set(x.replace('_heavy', '').replace('_light', '') for x in x)))
-    )
-    print(df.groupby('column_names').size())
-    print(df.groupby('column_names')['study_id'].unique())
+    if remove_chain_prefix:
+        df['column_names'] = df.column_names.apply(
+            lambda x: tuple(sorted(set(x.replace('_heavy', '').replace('_light', '') for x in x)))
+        )
+    else:
+        df['column_names'] = df.column_names.apply(
+            lambda x: tuple(sorted(set(x)))
+        )
+    column_groups = df.groupby('column_names')
+    for group, size in column_groups:
+        print(column_groups.size()[group], tuple(sorted(column_groups['oas_subset'].unique()[group])))
+        print(tuple(sorted(column_groups['study_id'].unique()[group])))
+        print(group)
+        print('-' * 80)
 
-    # 12637 unpaired units have these columns
-    UNPAIRED = (
-        'ANARCI_numbering', 'ANARCI_status', 'Redundancy', 'c_region', 'cdr1', 'cdr1_aa', 'cdr1_end', 'cdr1_start',
-        'cdr2', 'cdr2_aa', 'cdr2_end', 'cdr2_start', 'cdr3', 'cdr3_aa', 'cdr3_end', 'cdr3_start', 'complete_vdj',
-        'd_alignment_end', 'd_alignment_start', 'd_call', 'd_cigar', 'd_germline_alignment', 'd_germline_alignment_aa',
-        'd_germline_end', 'd_germline_start', 'd_identity', 'd_score', 'd_sequence_alignment',
-        'd_sequence_alignment_aa', 'd_sequence_end', 'd_sequence_start', 'd_support', 'fwr1', 'fwr1_aa', 'fwr1_end',
-        'fwr1_start', 'fwr2',
-        'fwr2_aa', 'fwr2_end', 'fwr2_start', 'fwr3', 'fwr3_aa', 'fwr3_end', 'fwr3_start', 'fwr4', 'fwr4_aa', 'fwr4_end',
-        'fwr4_start', 'germline_alignment', 'germline_alignment_aa', 'j_alignment_end', 'j_alignment_start', 'j_call',
-        'j_cigar',
-        'j_germline_alignment', 'j_germline_alignment_aa', 'j_germline_end', 'j_germline_start', 'j_identity',
-        'j_score', 'j_sequence_alignment', 'j_sequence_alignment_aa', 'j_sequence_end', 'j_sequence_start', 'j_support',
-        'junction', 'junction_aa', 'junction_aa_length', 'junction_length', 'locus', 'np1', 'np1_length', 'np2',
-        'np2_length',
-        'productive', 'rev_comp', 'sequence', 'sequence_alignment', 'sequence_alignment_aa', 'stop_codon',
-        'v_alignment_end', 'v_alignment_start', 'v_call', 'v_cigar', 'v_frameshift', 'v_germline_alignment',
-        'v_germline_alignment_aa', 'v_germline_end', 'v_germline_start', 'v_identity', 'v_score',
-        'v_sequence_alignment', 'v_sequence_alignment_aa', 'v_sequence_end', 'v_sequence_start', 'v_support',
-        'vj_in_frame'
-    )
-
-    # 11 units from Briney_2019 have these columns
-    BRINEY = (
-        'ANARCI_numbering', 'ANARCI_status', 'Redundancy', 'c_region', 'cdr1', 'cdr1_aa', 'cdr1_end', 'cdr1_start',
-        'cdr2',
-        'cdr2_aa', 'cdr2_end', 'cdr2_start', 'cdr3', 'cdr3_aa', 'cdr3_end', 'cdr3_start', 'd_alignment_end',
-        'd_alignment_start', 'd_call', 'd_cigar', 'd_germline_alignment', 'd_germline_alignment_aa', 'd_germline_end',
-        'd_germline_start', 'd_identity', 'd_score', 'd_sequence_alignment', 'd_sequence_alignment_aa',
-        'd_sequence_end',
-        'd_sequence_start', 'd_support', 'fwr1', 'fwr1_aa', 'fwr1_end', 'fwr1_start', 'fwr2', 'fwr2_aa', 'fwr2_end',
-        'fwr2_start', 'fwr3', 'fwr3_aa', 'fwr3_end', 'fwr3_start', 'germline_alignment', 'germline_alignment_aa',
-        'j_alignment_end', 'j_alignment_start', 'j_call', 'j_cigar', 'j_germline_alignment', 'j_germline_alignment_aa',
-        'j_germline_end', 'j_germline_start', 'j_identity', 'j_score', 'j_sequence_alignment',
-        'j_sequence_alignment_aa',
-        'j_sequence_end', 'j_sequence_start', 'j_support', 'junction', 'junction_aa', 'junction_aa_length',
-        'junction_length', 'locus', 'np1', 'np1_length', 'np2', 'np2_length', 'productive', 'rev_comp', 'sequence',
-        'sequence_alignment', 'sequence_alignment_aa', 'stop_codon', 'v_alignment_end', 'v_alignment_start', 'v_call',
-        'v_cigar', 'v_germline_alignment', 'v_germline_alignment_aa', 'v_germline_end', 'v_germline_start',
-        'v_identity',
-        'v_score', 'v_sequence_alignment', 'v_sequence_alignment_aa', 'v_sequence_end', 'v_sequence_start', 'v_support',
-        'vj_in_frame'
-    )
-
-    # The 47 paired units have these columns
-    PAIRED = (
-        'ANARCI_numbering', 'ANARCI_status', 'cdr1', 'cdr1_aa', 'cdr1_end', 'cdr1_start', 'cdr2', 'cdr2_aa', 'cdr2_end',
-        'cdr2_start', 'cdr3', 'cdr3_aa', 'cdr3_end', 'cdr3_start', 'd_alignment_end', 'd_alignment_start', 'd_call',
-        'd_cigar', 'd_germline_alignment', 'd_germline_alignment_aa', 'd_germline_end', 'd_germline_start',
-        'd_identity',
-        'd_score', 'd_sequence_alignment', 'd_sequence_alignment_aa', 'd_sequence_end', 'd_sequence_start', 'd_support',
-        'fwr1', 'fwr1_aa', 'fwr1_end', 'fwr1_start', 'fwr2', 'fwr2_aa', 'fwr2_end', 'fwr2_start', 'fwr3', 'fwr3_aa',
-        'fwr3_end', 'fwr3_start', 'germline_alignment', 'germline_alignment_aa', 'j_alignment_end', 'j_alignment_start',
-        'j_call', 'j_cigar', 'j_germline_alignment', 'j_germline_alignment_aa', 'j_germline_end', 'j_germline_start',
-        'j_identity', 'j_score', 'j_sequence_alignment', 'j_sequence_alignment_aa', 'j_sequence_end',
-        'j_sequence_start',
-        'j_support', 'junction', 'junction_aa', 'junction_aa_length', 'junction_length', 'locus', 'np1', 'np1_length',
-        'np2', 'np2_length', 'productive', 'rev_comp', 'sequence', 'sequence_alignment', 'sequence_alignment_aa',
-        'sequence_id', 'stop_codon', 'v_alignment_end', 'v_alignment_start', 'v_call', 'v_cigar',
-        'v_germline_alignment',
-        'v_germline_alignment_aa', 'v_germline_end', 'v_germline_start', 'v_identity', 'v_score',
-        'v_sequence_alignment',
-        'v_sequence_alignment_aa', 'v_sequence_end', 'v_sequence_start', 'v_support', 'vj_in_frame'
-    )
-
-    print('U - B:', sorted(set(UNPAIRED) - set(BRINEY)))
-    print('B - U:', sorted(set(BRINEY) - set(UNPAIRED)))
-    print('U - P:', sorted(set(UNPAIRED) - set(PAIRED)))
-    print('P - U:', sorted(set(PAIRED) - set(UNPAIRED)))
     #
-    # U - B: ['complete_vdj', 'fwr4', 'fwr4_aa', 'fwr4_end', 'fwr4_start', 'v_frameshift']
-    # B - U: []
-    # U - P: ['Redundancy', 'c_region', 'complete_vdj', 'fwr4', 'fwr4_aa', 'fwr4_end', 'fwr4_start', 'v_frameshift']
-    # P - U: ['sequence_id']
+    # --- After running this on the 2023/02/04 OAS version, we get 4 groups of schemata
+    #   - UNPAIRED_1: An unpaired schema with 15624 units
+    #   - UNPAIRED_2: An unpaired schema with 7 units (study: Richardson_2022)
+    #   - PAIRED_1: A paired schema with 47 units
+    #   - PAIRED_2: A paired schema with 111 units (studies: Jaffe_2022, Mor_2021, Woodruff_2020)
+    # What follows is a description of these groups
+    #
+
+    # 15624 unpaired units have these columns
+    UNPAIRED_1_COLUMNS = (
+        'ANARCI_numbering', 'ANARCI_status', 'Redundancy', 'c_region',
+        'cdr1', 'cdr1_aa', 'cdr1_end', 'cdr1_start',
+        'cdr2', 'cdr2_aa', 'cdr2_end', 'cdr2_start',
+        'cdr3', 'cdr3_aa', 'cdr3_end', 'cdr3_start',
+        'complete_vdj',
+        'd_alignment_end', 'd_alignment_start', 'd_call', 'd_cigar',
+        'd_germline_alignment', 'd_germline_alignment_aa', 'd_germline_end', 'd_germline_start',
+        'd_identity', 'd_score', 'd_sequence_alignment', 'd_sequence_alignment_aa',
+        'd_sequence_end', 'd_sequence_start', 'd_support',
+        'fwr1', 'fwr1_aa', 'fwr1_end', 'fwr1_start',
+        'fwr2', 'fwr2_aa', 'fwr2_end', 'fwr2_start',
+        'fwr3', 'fwr3_aa', 'fwr3_end', 'fwr3_start',
+        'fwr4', 'fwr4_aa', 'fwr4_end', 'fwr4_start',
+        'germline_alignment', 'germline_alignment_aa',
+        'j_alignment_end', 'j_alignment_start', 'j_call', 'j_cigar',
+        'j_germline_alignment', 'j_germline_alignment_aa', 'j_germline_end', 'j_germline_start',
+        'j_identity', 'j_score', 'j_sequence_alignment', 'j_sequence_alignment_aa',
+        'j_sequence_end', 'j_sequence_start',
+        'np1', 'np1_length',
+        'np2', 'np2_length',
+        'productive', 'rev_comp',
+        'sequence', 'sequence_alignment', 'sequence_alignment_aa',
+        'stop_codon',
+        'v_alignment_end', 'v_alignment_start', 'v_call', 'v_cigar', 'v_frameshift',
+        'v_germline_alignment', 'v_germline_alignment_aa', 'v_germline_end', 'v_germline_start',
+        'v_identity', 'v_score', 'v_sequence_alignment', 'v_sequence_alignment_aa',
+        'v_sequence_end', 'v_sequence_start', 'v_support', 'vj_in_frame'
+    )
+    # UNPAIRED_1_STUDIES = (
+    #     'Banerjee_2017', 'Bashford_2013', 'Bender_2020', 'Bernardes_2020',
+    #     'Bernat_2019_1', 'Bernat_2019_2', 'Bhiman_2015', 'Bolland_2016', 'Bonsignori_2016',
+    #     'Briney_2019', 'Buchheim_2020', 'Chen_2020', 'Collins_2015', 'Corcoran_2016',
+    #     'Cui_2019', 'Davis_2019', 'Doria-Rose_2015', 'Eccles_2020', 'Eliyahu_2018',
+    #     'Ellebedy_2016', 'Fisher_2017',
+    #     'Galson_2015', 'Galson_2015a', 'Galson_2016', 'Galson_2016a', 'Galson_2020',
+    #     'Ghraichy_2020', 'Gidoni_2019', 'Greiff_2014', 'Greiff_2015', 'Greiff_2017',
+    #     'Gupta_2017', 'Halliley_2015', 'Huang_2016', 'Jaffe_2022', 'Jiang_2013',
+    #     'Johnson_2018', 'Joyce_2016', 'Khan_2016', 'Kim_2020', 'King_2020_1', 'King_2020_2',
+    #     'Kuri-Cervantes_2020', 'Levin_2016', 'Levin_2017', 'Li_2017', 'Liao_2013', 'Lindner_2015',
+    #     'Meng_2017', 'Menzel_2014', 'Montague_2021', 'Mor_2021', 'Mroczek_2014', 'Mukhamedova_2021',
+    #     'Nielsen_2020', 'Ohm-Laursen_2018', 'Ota_2010', 'Palanichamy_2014', 'Parameswaran_2014',
+    #     'Prohaska_2018', 'Rettig_2018', 'Rubelt_2016', 'Schanz_2014', 'Schultheiss_2020',
+    #     'Setliff_2018', 'Sevy_2019', 'Sheng_2017', 'Simonich_2020', 'Soto_2016', 'Soto_2019',
+    #     'Stern_2014', 'Sundling_2014', 'Tipton_2015', 'Tong_2017', 'Turchaninova_2016',
+    #     'Turner_2021', 'VanDuijn_2017', 'Vander_Heiden_2017', 'Vergani_2017',
+    #     'Waltari_2018', 'Wesemann_2013', 'Woodruff_2020',
+    #     'Wu_2011', 'Wu_2014', 'Wu_2015',
+    #     'Zhou_2013', 'Zhou_2015', 'Zhu_2012', 'Zhu_2013'
+    # )
+
+    # 7 unpaired units have these columns
+    UNPAIRED_2_COLUMNS = (
+        'ANARCI_numbering', 'ANARCI_status', 'Redundancy', 'c_region',
+        'cdr1', 'cdr1_aa', 'cdr1_end', 'cdr1_start',
+        'cdr2', 'cdr2_aa', 'cdr2_end', 'cdr2_start',
+        'cdr3', 'cdr3_aa', 'cdr3_end', 'cdr3_start',
+        'd_alignment_end', 'd_alignment_start', 'd_call', 'd_cigar',
+        'd_germline_alignment', 'd_germline_alignment_aa', 'd_germline_end', 'd_germline_start',
+        'd_identity', 'd_score', 'd_sequence_alignment', 'd_sequence_alignment_aa',
+        'd_sequence_end', 'd_sequence_start', 'd_support',
+        'fwr1', 'fwr1_aa', 'fwr1_end', 'fwr1_start',
+        'fwr2', 'fwr2_aa', 'fwr2_end', 'fwr2_start',
+        'fwr3', 'fwr3_aa', 'fwr3_end', 'fwr3_start',
+        'fwr4', 'fwr4_aa', 'fwr4_end', 'fwr4_start',
+        'germline_alignment', 'germline_alignment_aa',
+        'j_alignment_end', 'j_alignment_start', 'j_call', 'j_cigar',
+        'j_germline_alignment', 'j_germline_alignment_aa', 'j_germline_end', 'j_germline_start',
+        'j_identity', 'j_score', 'j_sequence_alignment', 'j_sequence_alignment_aa',
+        'j_sequence_end', 'j_sequence_start',
+        'j_support',
+        'junction', 'junction_aa', 'junction_aa_length', 'junction_length',
+        'locus',
+        'np1', 'np1_length',
+        'np2', 'np2_length',
+        'productive', 'rev_comp',
+        'sequence', 'sequence_alignment', 'sequence_alignment_aa',
+        'stop_codon',
+        'v_alignment_end', 'v_alignment_start', 'v_call', 'v_cigar',
+        'v_germline_alignment', 'v_germline_alignment_aa', 'v_germline_end', 'v_germline_start',
+        'v_identity', 'v_score', 'v_sequence_alignment', 'v_sequence_alignment_aa',
+        'v_sequence_end', 'v_sequence_start', 'v_support', 'vj_in_frame'
+    )
+    # UNPAIRED_2_STUDIES = ('Richardson_2022',)
+
+    # 47 paired units have these columns
+    PAIRED_1_COLUMNS = (
+        'ANARCI_numbering_heavy', 'ANARCI_numbering_light',
+        'ANARCI_status_heavy', 'ANARCI_status_light',
+        'cdr1_aa_heavy', 'cdr1_aa_light',
+        'cdr1_end_heavy', 'cdr1_end_light',
+        'cdr1_heavy', 'cdr1_light',
+        'cdr1_start_heavy', 'cdr1_start_light',
+        'cdr2_aa_heavy', 'cdr2_aa_light',
+        'cdr2_end_heavy', 'cdr2_end_light',
+        'cdr2_heavy', 'cdr2_light',
+        'cdr2_start_heavy', 'cdr2_start_light',
+        'cdr3_aa_heavy', 'cdr3_aa_light',
+        'cdr3_end_heavy', 'cdr3_end_light',
+        'cdr3_heavy', 'cdr3_light',
+        'cdr3_start_heavy', 'cdr3_start_light',
+        'd_alignment_end_heavy', 'd_alignment_end_light',
+        'd_alignment_start_heavy', 'd_alignment_start_light',
+        'd_call_heavy', 'd_call_light',
+        'd_cigar_heavy', 'd_cigar_light',
+        'd_germline_alignment_aa_heavy', 'd_germline_alignment_aa_light',
+        'd_germline_alignment_heavy', 'd_germline_alignment_light',
+        'd_germline_end_heavy', 'd_germline_end_light',
+        'd_germline_start_heavy', 'd_germline_start_light',
+        'd_identity_heavy', 'd_identity_light',
+        'd_score_heavy', 'd_score_light',
+        'd_sequence_alignment_aa_heavy', 'd_sequence_alignment_aa_light',
+        'd_sequence_alignment_heavy', 'd_sequence_alignment_light',
+        'd_sequence_end_heavy', 'd_sequence_end_light',
+        'd_sequence_start_heavy', 'd_sequence_start_light',
+        'd_support_heavy', 'd_support_light',
+        'fwr1_aa_heavy', 'fwr1_aa_light', 'fwr1_end_heavy', 'fwr1_end_light',
+        'fwr1_heavy', 'fwr1_light', 'fwr1_start_heavy', 'fwr1_start_light',
+        'fwr2_aa_heavy', 'fwr2_aa_light', 'fwr2_end_heavy', 'fwr2_end_light',
+        'fwr2_heavy', 'fwr2_light', 'fwr2_start_heavy', 'fwr2_start_light',
+        'fwr3_aa_heavy', 'fwr3_aa_light', 'fwr3_end_heavy', 'fwr3_end_light',
+        'fwr3_heavy', 'fwr3_light', 'fwr3_start_heavy', 'fwr3_start_light',
+        'germline_alignment_aa_heavy', 'germline_alignment_aa_light',
+        'germline_alignment_heavy', 'germline_alignment_light',
+        'j_alignment_end_heavy', 'j_alignment_end_light',
+        'j_alignment_start_heavy', 'j_alignment_start_light',
+        'j_call_heavy', 'j_call_light', 'j_cigar_heavy', 'j_cigar_light',
+        'j_germline_alignment_aa_heavy', 'j_germline_alignment_aa_light',
+        'j_germline_alignment_heavy', 'j_germline_alignment_light',
+        'j_germline_end_heavy', 'j_germline_end_light',
+        'j_germline_start_heavy', 'j_germline_start_light',
+        'j_identity_heavy', 'j_identity_light',
+        'j_score_heavy', 'j_score_light',
+        'j_sequence_alignment_aa_heavy', 'j_sequence_alignment_aa_light',
+        'j_sequence_alignment_heavy', 'j_sequence_alignment_light',
+        'j_sequence_end_heavy', 'j_sequence_end_light',
+        'j_sequence_start_heavy', 'j_sequence_start_light',
+        'j_support_heavy', 'j_support_light',
+        'junction_aa_heavy', 'junction_aa_length_heavy',
+        'junction_aa_length_light', 'junction_aa_light',
+        'junction_heavy', 'junction_length_heavy',
+        'junction_length_light', 'junction_light',
+        'locus_heavy', 'locus_light',
+        'np1_heavy', 'np1_length_heavy', 'np1_length_light', 'np1_light',
+        'np2_heavy', 'np2_length_heavy', 'np2_length_light', 'np2_light',
+        'productive_heavy', 'productive_light',
+        'rev_comp_heavy', 'rev_comp_light',
+        'sequence_alignment_aa_heavy', 'sequence_alignment_aa_light',
+        'sequence_alignment_heavy', 'sequence_alignment_light',
+        'sequence_heavy',
+        'sequence_id_heavy', 'sequence_id_light',
+        'sequence_light',
+        'stop_codon_heavy', 'stop_codon_light',
+        'v_alignment_end_heavy', 'v_alignment_end_light',
+        'v_alignment_start_heavy', 'v_alignment_start_light',
+        'v_call_heavy', 'v_call_light',
+        'v_cigar_heavy', 'v_cigar_light',
+        'v_germline_alignment_aa_heavy', 'v_germline_alignment_aa_light',
+        'v_germline_alignment_heavy', 'v_germline_alignment_light',
+        'v_germline_end_heavy', 'v_germline_end_light', 'v_germline_start_heavy', 'v_germline_start_light',
+        'v_identity_heavy', 'v_identity_light', 'v_score_heavy', 'v_score_light',
+        'v_sequence_alignment_aa_heavy', 'v_sequence_alignment_aa_light',
+        'v_sequence_alignment_heavy', 'v_sequence_alignment_light',
+        'v_sequence_end_heavy', 'v_sequence_end_light', 'v_sequence_start_heavy', 'v_sequence_start_light',
+        'v_support_heavy', 'v_support_light',
+        'vj_in_frame_heavy', 'vj_in_frame_light'
+    )
+    # PAIRED_1_STUDIES = ('Alsoiussi_2020', 'Eccles_2020', 'Goldstein_2019', 'King_2020_2', 'Setliff_2019')
+
+    # 111 paired units have these columns
+    PAIRED_2_COLUMNS = (
+        'ANARCI_numbering_heavy', 'ANARCI_numbering_light',
+        'ANARCI_status_heavy', 'ANARCI_status_light',
+        'Isotype_heavy', 'Isotype_light',
+        'Redundancy_heavy', 'Redundancy_light',
+        'c_region_heavy', 'c_region_light',
+        'cdr1_aa_heavy', 'cdr1_aa_light',
+        'cdr1_end_heavy', 'cdr1_end_light',
+        'cdr1_heavy', 'cdr1_light',
+        'cdr1_start_heavy', 'cdr1_start_light',
+        'cdr2_aa_heavy', 'cdr2_aa_light',
+        'cdr2_end_heavy', 'cdr2_end_light',
+        'cdr2_heavy', 'cdr2_light',
+        'cdr2_start_heavy', 'cdr2_start_light',
+        'cdr3_aa_heavy', 'cdr3_aa_light',
+        'cdr3_end_heavy', 'cdr3_end_light',
+        'cdr3_heavy', 'cdr3_light',
+        'cdr3_start_heavy', 'cdr3_start_light',
+        'complete_vdj_heavy', 'complete_vdj_light',
+        'd_alignment_end_heavy', 'd_alignment_end_light',
+        'd_alignment_start_heavy', 'd_alignment_start_light',
+        'd_call_heavy', 'd_call_light',
+        'd_cigar_heavy', 'd_cigar_light',
+        'd_germline_alignment_aa_heavy', 'd_germline_alignment_aa_light',
+        'd_germline_alignment_heavy', 'd_germline_alignment_light',
+        'd_germline_end_heavy', 'd_germline_end_light',
+        'd_germline_start_heavy', 'd_germline_start_light',
+        'd_identity_heavy', 'd_identity_light',
+        'd_score_heavy', 'd_score_light',
+        'd_sequence_alignment_aa_heavy', 'd_sequence_alignment_aa_light',
+        'd_sequence_alignment_heavy', 'd_sequence_alignment_light',
+        'd_sequence_end_heavy', 'd_sequence_end_light',
+        'd_sequence_start_heavy', 'd_sequence_start_light',
+        'd_support_heavy', 'd_support_light',
+        'fwr1_aa_heavy', 'fwr1_aa_light', 'fwr1_end_heavy', 'fwr1_end_light',
+        'fwr1_heavy', 'fwr1_light', 'fwr1_start_heavy', 'fwr1_start_light',
+        'fwr2_aa_heavy', 'fwr2_aa_light', 'fwr2_end_heavy', 'fwr2_end_light',
+        'fwr2_heavy', 'fwr2_light', 'fwr2_start_heavy', 'fwr2_start_light',
+        'fwr3_aa_heavy', 'fwr3_aa_light', 'fwr3_end_heavy', 'fwr3_end_light',
+        'fwr3_heavy', 'fwr3_light', 'fwr3_start_heavy', 'fwr3_start_light',
+        'fwr4_aa_heavy', 'fwr4_aa_light', 'fwr4_end_heavy', 'fwr4_end_light',
+        'fwr4_heavy', 'fwr4_light', 'fwr4_start_heavy', 'fwr4_start_light',
+        'germline_alignment_aa_heavy', 'germline_alignment_aa_light',
+        'germline_alignment_heavy', 'germline_alignment_light',
+        'j_alignment_end_heavy', 'j_alignment_end_light',
+        'j_alignment_start_heavy', 'j_alignment_start_light',
+        'j_call_heavy', 'j_call_light', 'j_cigar_heavy', 'j_cigar_light',
+        'j_germline_alignment_aa_heavy', 'j_germline_alignment_aa_light',
+        'j_germline_alignment_heavy', 'j_germline_alignment_light',
+        'j_germline_end_heavy', 'j_germline_end_light',
+        'j_germline_start_heavy', 'j_germline_start_light',
+        'j_identity_heavy', 'j_identity_light',
+        'j_score_heavy', 'j_score_light',
+        'j_sequence_alignment_aa_heavy', 'j_sequence_alignment_aa_light',
+        'j_sequence_alignment_heavy', 'j_sequence_alignment_light',
+        'j_sequence_end_heavy', 'j_sequence_end_light',
+        'j_sequence_start_heavy', 'j_sequence_start_light',
+        'j_support_heavy', 'j_support_light',
+        'junction_aa_heavy', 'junction_aa_length_heavy',
+        'junction_aa_length_light', 'junction_aa_light',
+        'junction_heavy', 'junction_length_heavy',
+        'junction_length_light', 'junction_light',
+        'locus_heavy', 'locus_light',
+        'np1_heavy', 'np1_length_heavy', 'np1_length_light', 'np1_light',
+        'np2_heavy', 'np2_length_heavy', 'np2_length_light', 'np2_light',
+        'productive_heavy', 'productive_light',
+        'rev_comp_heavy', 'rev_comp_light',
+        'sequence_alignment_aa_heavy', 'sequence_alignment_aa_light',
+        'sequence_alignment_heavy', 'sequence_alignment_light',
+        'sequence_heavy',
+        'sequence_id_heavy', 'sequence_id_light',
+        'sequence_light',
+        'stop_codon_heavy', 'stop_codon_light',
+        'v_alignment_end_heavy', 'v_alignment_end_light',
+        'v_alignment_start_heavy', 'v_alignment_start_light',
+        'v_call_heavy', 'v_call_light',
+        'v_cigar_heavy', 'v_cigar_light',
+        'v_frameshift_heavy', 'v_frameshift_light',
+        'v_germline_alignment_aa_heavy', 'v_germline_alignment_aa_light',
+        'v_germline_alignment_heavy', 'v_germline_alignment_light',
+        'v_germline_end_heavy', 'v_germline_end_light', 'v_germline_start_heavy', 'v_germline_start_light',
+        'v_identity_heavy', 'v_identity_light', 'v_score_heavy', 'v_score_light',
+        'v_sequence_alignment_aa_heavy', 'v_sequence_alignment_aa_light',
+        'v_sequence_alignment_heavy', 'v_sequence_alignment_light',
+        'v_sequence_end_heavy', 'v_sequence_end_light', 'v_sequence_start_heavy', 'v_sequence_start_light',
+        'v_support_heavy', 'v_support_light',
+        'vj_in_frame_heavy', 'vj_in_frame_light'
+    )
+    # PAIRED_2_STUDIES = ('Jaffe_2022', 'Mor_2021', 'Woodruff_2020')
+
+    # --- Now let's compare them
+    SCHEMAS = {
+        'U1': UNPAIRED_1_COLUMNS,
+        'U2': UNPAIRED_2_COLUMNS,
+        'P1': PAIRED_1_COLUMNS,
+        'P2': PAIRED_2_COLUMNS
+    }
+    for (name1, columns1), (name2, columns2) in combinations(SCHEMAS.items(), 2):
+        if name1.startswith('P') and not name2.startswith('P'):
+            columns1 = set(x.replace('_heavy', '').replace('_light', '') for x in columns1)
+        if name2.startswith('P') and not name1.startswith('P'):
+            columns2 = set(x.replace('_heavy', '').replace('_light', '') for x in columns2)
+        print(f'{name1} - {name2}: {sorted(set(columns1) - set(columns2))}')
+        print(f'{name2} - {name1}: {sorted(set(columns2) - set(columns1))}')
+    #
+    # U1 - U2: ['complete_vdj', 'v_frameshift']
+    # U2 - U1: ['j_support', 'junction', 'junction_aa', 'junction_aa_length', 'junction_length', 'locus']
+    #
+    # U1 - P1: ['Redundancy', 'c_region', 'complete_vdj', 'fwr4', 'fwr4_aa', 'fwr4_end', 'fwr4_start', 'v_frameshift']
+    # P1 - U1: ['j_support', 'junction', 'junction_aa', 'junction_aa_length', 'junction_length', 'locus', 'sequence_id']
+    #
+    # U1 - P2: []
+    # P2 - U1: ['Isotype', 'j_support', 'junction', 'junction_aa', 'junction_aa_length', 'junction_length',
+    #           'locus', 'sequence_id']
+    #
+    # U2 - P1: ['Redundancy', 'c_region', 'fwr4', 'fwr4_aa', 'fwr4_end', 'fwr4_start']
+    # P1 - U2: ['sequence_id']
+    #
+    # U2 - P2: []
+    # P2 - U2: ['Isotype', 'complete_vdj', 'sequence_id', 'v_frameshift']
+    #
+    # P1 - P2: []
+    # P2 - P1: ['Isotype_heavy', 'Isotype_light', 'Redundancy_heavy', 'Redundancy_light',
+    #           'c_region_heavy', 'c_region_light', 'complete_vdj_heavy', 'complete_vdj_light',
+    #           'fwr4_aa_heavy', 'fwr4_aa_light',
+    #           'fwr4_end_heavy', 'fwr4_end_light',
+    #           'fwr4_heavy', 'fwr4_light',
+    #           'fwr4_start_heavy', 'fwr4_start_light',
+    #           'v_frameshift_heavy', 'v_frameshift_light']
     #
     # Conclusions:
-    #   - we need to compute ourselves redundancy in the paired set
+    #   - we need to compute ourselves redundancy in some of the paired sets
+    #   - the lack of fwr4 in P1 is worrying
     #   - all the other missing columns, we probably can live with
+    #     (Briney was fixed for fwr4, yay!, maybe it still is missing in the data)
+    #   - lack of consistency is heartbreaking
     #
 
 
