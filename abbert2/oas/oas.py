@@ -1222,17 +1222,22 @@ def compare_csv_schemas(remove_chain_prefix: bool = False):
         'j_alignment_end', 'j_alignment_start', 'j_call', 'j_cigar',
         'j_germline_alignment', 'j_germline_alignment_aa', 'j_germline_end', 'j_germline_start',
         'j_identity', 'j_score', 'j_sequence_alignment', 'j_sequence_alignment_aa',
-        'j_sequence_end', 'j_sequence_start',
+        'j_sequence_end', 'j_sequence_start', 'j_support',
+        'junction', 'junction_aa', 'junction_aa_length', 'junction_length',
+        'locus',
         'np1', 'np1_length',
         'np2', 'np2_length',
         'productive', 'rev_comp',
         'sequence', 'sequence_alignment', 'sequence_alignment_aa',
         'stop_codon',
-        'v_alignment_end', 'v_alignment_start', 'v_call', 'v_cigar', 'v_frameshift',
+        'v_alignment_end', 'v_alignment_start', 'v_call', 'v_cigar',
+        'v_frameshift',
         'v_germline_alignment', 'v_germline_alignment_aa', 'v_germline_end', 'v_germline_start',
         'v_identity', 'v_score', 'v_sequence_alignment', 'v_sequence_alignment_aa',
-        'v_sequence_end', 'v_sequence_start', 'v_support', 'vj_in_frame'
+        'v_sequence_end', 'v_sequence_start', 'v_support',
+        'vj_in_frame'
     )
+
     # UNPAIRED_1_STUDIES = (
     #     'Banerjee_2017', 'Bashford_2013', 'Bender_2020', 'Bernardes_2020',
     #     'Bernat_2019_1', 'Bernat_2019_2', 'Bhiman_2015', 'Bolland_2016', 'Bonsignori_2016',
@@ -1480,14 +1485,13 @@ def compare_csv_schemas(remove_chain_prefix: bool = False):
         print(f'{name2} - {name1}: {sorted(set(columns2) - set(columns1))}')
     #
     # U1 - U2: ['complete_vdj', 'v_frameshift']
-    # U2 - U1: ['j_support', 'junction', 'junction_aa', 'junction_aa_length', 'junction_length', 'locus']
+    # U2 - U1: []
     #
     # U1 - P1: ['Redundancy', 'c_region', 'complete_vdj', 'fwr4', 'fwr4_aa', 'fwr4_end', 'fwr4_start', 'v_frameshift']
-    # P1 - U1: ['j_support', 'junction', 'junction_aa', 'junction_aa_length', 'junction_length', 'locus', 'sequence_id']
+    # P1 - U1: ['sequence_id']
     #
     # U1 - P2: []
-    # P2 - U1: ['Isotype', 'j_support', 'junction', 'junction_aa', 'junction_aa_length', 'junction_length',
-    #           'locus', 'sequence_id']
+    # P2 - U1: ['Isotype', 'sequence_id']
     #
     # U2 - P1: ['Redundancy', 'c_region', 'fwr4', 'fwr4_aa', 'fwr4_end', 'fwr4_start']
     # P1 - U2: ['sequence_id']
