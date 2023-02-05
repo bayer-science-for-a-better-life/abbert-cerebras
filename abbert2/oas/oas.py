@@ -1168,31 +1168,22 @@ def print_count_stats():
 # --- Maintenance
 
 
-def compare_csv_schemas(remove_chain_prefix: bool = False):
+def compare_csv_schemas():
     """
     Compares the schemas of the original OAS CSVs.
 
+    This function will print useful information and fail out loud with an exception if the expected schema changes.
+
     Only requires "cache_units_meta" and "populate_metadata" to have been run, not the CSVs in disk.
+
+    Read the content in the function body to learn about expected schemas.
     """
 
     oas = OAS()
 
     # What columns did we find in the original CSVs?
     df = oas.unit_metadata_df
-    if remove_chain_prefix:
-        df['column_names'] = df.column_names.apply(
-            lambda x: tuple(sorted(set(x.replace('_heavy', '').replace('_light', '') for x in x)))
-        )
-    else:
-        df['column_names'] = df.column_names.apply(
-            lambda x: tuple(sorted(set(x)))
-        )
-    column_groups = df.groupby('column_names')
-    for group, size in column_groups:
-        print(column_groups.size()[group], tuple(sorted(column_groups['oas_subset'].unique()[group])))
-        print(tuple(sorted(column_groups['study_id'].unique()[group])))
-        print(group)
-        print('-' * 80)
+    df['column_names'] = df.column_names.apply(lambda x: tuple(sorted(set(x))))
 
     #
     # --- After running this on the 2023/02/04 OAS version, we get 4 groups of schemata
@@ -1469,14 +1460,40 @@ def compare_csv_schemas(remove_chain_prefix: bool = False):
     )
     # PAIRED_2_STUDIES = ('Jaffe_2022', 'Mor_2021', 'Woodruff_2020')
 
-    # --- Now let's compare them
-    SCHEMAS = {
+    # --- Now let's compare the schemas
+
+    EXPECTED_SCHEMAS = {
         'U1': UNPAIRED_1_COLUMNS,
         'U2': UNPAIRED_2_COLUMNS,
         'P1': PAIRED_1_COLUMNS,
         'P2': PAIRED_2_COLUMNS
     }
-    for (name1, columns1), (name2, columns2) in combinations(SCHEMAS.items(), 2):
+
+    print('PRESENT COLUMN GROUPS')
+    print('---------------------')
+    column_groups = df.groupby('column_names')
+    for group, size in column_groups:
+        print(column_groups.size()[group], tuple(sorted(column_groups['oas_subset'].unique()[group])))
+        print(tuple(sorted(column_groups['study_id'].unique()[group])))
+        print(group)
+        print('-' * 80)
+    print('=' * 80)
+
+    print('PRESENT COLUMN GROUPS vs EXPECTED COLUMN GROUPS')
+    print('-----------------------------------------------')
+    expected_not_present: set = set(EXPECTED_SCHEMAS.values()) - set(column_groups.indices)
+    present_not_expected: set = set(column_groups.indices) - set(EXPECTED_SCHEMAS.values())
+    if expected_not_present or present_not_expected:
+        for column_set in sorted(expected_not_present):
+            print('MISSING EXPECTED COLUMN SET: ', column_set)
+        for column_set in sorted(present_not_expected):
+            print('UNEXPECTED COLUMN SET: ', column_set)
+        raise ValueError('OAS Schema has diverged (see previous log)')
+    print('=' * 80)
+
+    print('COMPARISON BETWEEN PRESENT COLUMN GROUPS')
+    print('----------------------------------------')
+    for (name1, columns1), (name2, columns2) in combinations(EXPECTED_SCHEMAS.items(), 2):
         if name1.startswith('P') and not name2.startswith('P'):
             columns1 = set(x.replace('_heavy', '').replace('_light', '') for x in columns1)
         if name2.startswith('P') and not name1.startswith('P'):
