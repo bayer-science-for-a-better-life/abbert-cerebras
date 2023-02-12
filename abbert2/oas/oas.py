@@ -1504,6 +1504,10 @@ def compare_csv_schemas():
         print(f'{name1} - {name2}: {sorted(set(columns1) - set(columns2))}')
         print(f'{name2} - {name1}: {sorted(set(columns2) - set(columns1))}')
     #
+    # NOTE: WE CAN SIMPLIFY ANALYSIS BY LOOKING ONLY AT U1 and P2, WHICH ARE THE COLUMN SUPERSETS
+    # (see U2 - U1 and P1 - P2 are empty)
+    # -------------------------------------------------------------------------------------------
+    #
     # U1 - U2: ['complete_vdj', 'v_frameshift']
     # U2 - U1: []
     #
