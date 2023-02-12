@@ -1323,10 +1323,15 @@ def _process_sequences_df(df: pd.DataFrame,
         'anarci_cdr3_is_over_37_aa_long': None,
         'anarci_status': None,
     }
-    if set(COLUMNS) - set(df.columns):
-        raise Exception(f'Some expected columns are missing {sorted(set(COLUMNS) - set(df.columns))} (unit={unit.id})')
+    # Scream if we get unexpected columns
     if set(df.columns) - set(COLUMNS):
         raise Exception(f'Some columns are spurious {sorted(set(df.columns) - set(COLUMNS))} (unit={unit.id})')
+    # Make ALL dataframes have the same columns
+    missing_expected_columns = set(COLUMNS) - set(df.columns)
+    if missing_expected_columns:
+        print(f'WARNING: Attributing missing expected columns {missing_expected_columns} (unit={unit.id})')
+        for column in missing_expected_columns:
+            df[column] = None
     renamer = {column: f'{column if new_name is None else new_name}' for column, new_name in COLUMNS.items()}
     df = df.rename(columns=renamer)[list(renamer.values())]
 
@@ -1336,6 +1341,7 @@ def _process_sequences_df(df: pd.DataFrame,
 
     # Done
     logs.update({
+        'missing_expected_columns': sorted(missing_expected_columns),
         'num_records': len(df),
         'taken_s': time.time() - start
     })
