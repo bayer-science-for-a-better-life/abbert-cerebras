@@ -1060,7 +1060,7 @@ def _process_sequences_df(df: pd.DataFrame,
     df: pd.DataFrame = pd.concat(dfs).sort_values('index_in_unit')
 
     # Drop some more redundant columns
-    df = df.drop(columns=['cdr3_aa', 'ANARCI_numbering'])
+    df = df.drop(columns=['ANARCI_numbering'])
 
     # Snake-casing more columns
     df = df.rename(columns={'Redundancy': 'redundancy', 'ANARCI_status': 'anarci_status'})
@@ -1098,67 +1098,63 @@ def _process_sequences_df(df: pd.DataFrame,
             df = df.drop(columns=[f'{region}_end'])
 
     # Ensure good types
-    for column in (
-        'v_alignment_start',
-        'v_alignment_length',
-        'd_alignment_start',
-        'd_alignment_length',
-        'j_alignment_start',
-        'j_alignment_length',
-        'junction_length',
-        'junction_aa_length',
-        'v_sequence_start',
-        'v_sequence_length',
-        'v_germline_start',
-        'v_germline_length',
-        'd_sequence_start',
-        'd_sequence_length',
-        'd_germline_start',
-        'd_germline_length',
-        'j_sequence_start',
-        'j_sequence_length',
-        'j_germline_start',
-        'j_germline_length',
-        'fwr1_start',
-        'fwr1_length',
-        'fwr1_aa_start',
-        'fwr1_aa_length',
-        'cdr1_start',
-        'cdr1_length',
-        'cdr1_aa_start',
-        'cdr1_aa_length',
-        'fwr2_start',
-        'fwr2_length',
-        'fwr2_aa_start',
-        'fwr2_aa_length',
-        'cdr2_start',
-        'cdr2_length',
-        'cdr2_aa_start',
-        'cdr2_aa_length',
-        'fwr3_start',
-        'fwr3_length',
-        'fwr3_aa_start',
-        'fwr3_aa_length',
-        'cdr3_start',
-        'cdr3_length',
-        'cdr3_aa_start',
-        'cdr3_aa_length',
-        'fwr4_start',
-        'fwr4_length'
-        'fwr4_aa_start',
-        'fwr4_aa_length',
-        'np1_length',
-        'np2_length',
+    for column, dtype in (
+        ('v_alignment_start', pd.UInt16Dtype()),
+        ('v_alignment_length', pd.UInt16Dtype()),
+        ('d_alignment_start', pd.UInt16Dtype()),
+        ('d_alignment_length', pd.UInt16Dtype()),
+        ('j_alignment_start', pd.UInt16Dtype()),
+        ('j_alignment_length', pd.UInt16Dtype()),
+        ('junction_length', pd.UInt16Dtype()),
+        ('junction_aa_length', pd.UInt16Dtype()),
+        ('v_sequence_start', pd.UInt16Dtype()),
+        ('v_sequence_length', pd.UInt16Dtype()),
+        ('v_germline_start', pd.UInt16Dtype()),
+        ('v_germline_length', pd.UInt16Dtype()),
+        ('d_sequence_start', pd.UInt16Dtype()),
+        ('d_sequence_length', pd.UInt16Dtype()),
+        ('d_germline_start', pd.UInt16Dtype()),
+        ('d_germline_length', pd.Int32Dtype()),  # there are negative lengths in d_germline
+        ('j_sequence_start', pd.UInt16Dtype()),
+        ('j_sequence_length', pd.UInt16Dtype()),
+        ('j_germline_start', pd.UInt16Dtype()),
+        ('j_germline_length', pd.UInt16Dtype()),
+        ('fwr1_start', pd.UInt16Dtype()),
+        ('fwr1_length', pd.UInt16Dtype()),
+        ('fwr1_aa_start', pd.UInt16Dtype()),
+        ('fwr1_aa_length', pd.UInt16Dtype()),
+        ('cdr1_start', pd.UInt16Dtype()),
+        ('cdr1_length', pd.UInt16Dtype()),
+        ('cdr1_aa_start', pd.UInt16Dtype()),
+        ('cdr1_aa_length', pd.UInt16Dtype()),
+        ('fwr2_start', pd.UInt16Dtype()),
+        ('fwr2_length', pd.UInt16Dtype()),
+        ('fwr2_aa_start', pd.UInt16Dtype()),
+        ('fwr2_aa_length', pd.UInt16Dtype()),
+        ('cdr2_start', pd.UInt16Dtype()),
+        ('cdr2_length', pd.UInt16Dtype()),
+        ('cdr2_aa_start', pd.UInt16Dtype()),
+        ('cdr2_aa_length', pd.UInt16Dtype()),
+        ('fwr3_start', pd.UInt16Dtype()),
+        ('fwr3_length', pd.UInt16Dtype()),
+        ('fwr3_aa_start', pd.UInt16Dtype()),
+        ('fwr3_aa_length', pd.UInt16Dtype()),
+        ('cdr3_start', pd.UInt16Dtype()),
+        ('cdr3_length', pd.UInt16Dtype()),
+        ('cdr3_aa_start', pd.UInt16Dtype()),
+        ('cdr3_aa_length', pd.UInt16Dtype()),
+        ('fwr4_start', pd.UInt16Dtype()),
+        ('fwr4_length', pd.UInt16Dtype()),
+        ('fwr4_aa_start', pd.UInt16Dtype()),
+        ('fwr4_aa_length', pd.UInt16Dtype()),
+        ('np1_length', pd.UInt16Dtype()),
+        ('np2_length', pd.UInt16Dtype()),
+        ('redundancy', pd.UInt64Dtype()),
+        ('index_in_unit', pd.UInt64Dtype())
     ):
         if column not in df.columns:
             df[column] = None
-        df[column] = df[column].astype(pd.Int32Dtype())
-        # should be pd.UInt16Dtype(), but there are negative lengths in d_germline
-    if 'redundancy' not in df.columns:
-        df['redundancy'] = None
-    df['redundancy'] = df['redundancy'].astype(pd.UInt64Dtype())
-    for column in ('index_in_unit',):
-        df[column] = df[column].astype(pd.UInt64Dtype())
+        df[column] = df[column].astype(dtype)
     for column in ('stop_codon',
                    'vj_in_frame',
                    'v_frameshift',
