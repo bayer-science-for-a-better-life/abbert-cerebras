@@ -862,10 +862,10 @@ def _process_sequences_df(df: pd.DataFrame,
     if unit.oas_subset == 'unpaired' and 'locus' not in df.columns:
         raise ValueError(f'Unaired unit {unit.id} does not have correct locus columns')
 
-    if unit.oas_subset == 'unpaired':
-        loci = df.locus.unique()
-        if len(loci) != 1:
-            raise ValueError(f'More than one locus ({loci}) in unit {unit.path}')
+    # if unit.oas_subset == 'unpaired':
+    #     loci = df.locus.unique()
+    #     if len(loci) != 1:
+    #         raise ValueError(f'More than one locus ({loci}) in unit {unit.path}')
 
     # --- do munging
 
