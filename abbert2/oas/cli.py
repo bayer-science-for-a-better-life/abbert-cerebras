@@ -72,6 +72,7 @@ def main():
         download_units,
 
         # Step 4: Convert the CSVs to more efficient representations (will take a lot of time)
+        # Run check_csv_parsing_corner_cases (see below) for some lean smoke testing
         process_units,
         # Step 4b: Run parse_all_anarci_status (see below) to detect ANARCI status parsing problems
 
@@ -81,6 +82,8 @@ def main():
         # --- Maintenance commands
         # This will show what columns are in different units and screams if there is a change on expected schema
         compare_csv_schemas,
+        # This command runs some smoke tests against exemplary units and screams if something is wrong
+        check_csv_parsing_corner_cases,
         # This allows to extract a copy of the processed units (e.g., to create tars)
         copy,
         # This prints reports on the units
@@ -97,7 +100,17 @@ def main():
     parser.dispatch()
 
 
-if __name__ == '__main__':
-
+# This is an example workflow while developing / rerunning stuff
+def example_main():
     with no_ssl_verification():
-        main()
+        with envvar('OAS_PATH', value=str(Path.home() / 'oas-new' / '20230204')):
+            cache_units_meta(paired=False, n_jobs=1)
+            populate_metadata()
+            compare_csv_schemas()
+            download_units(clean_not_in_meta=True)
+            check_csv_parsing_corner_cases()
+            # process_units()
+
+
+if __name__ == '__main__':
+    main()
