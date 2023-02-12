@@ -1743,16 +1743,33 @@ def parse_all_anarci_status():
 # --- Some things that should become proper tests
 
 def check_csv_parsing_corner_cases():
+    """Smoke tests for CSV parsing."""
     oas = OAS()
     units = (
-        # Very long CDR3s with insertions, codes at and beyond "AA"
-        # oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_1_Heavy_IGHA'),
-        # A paired unit, newer and nicer set
+
+        # A standard unpaired unit (set U1)
+        # (very long CDR3s with insertions, codes at and beyond "AA")
+        oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_1_Heavy_IGHA'),
+
+        # A non-standard unpaired unit (set U2)
+        # These are the new mice sequences, so important to have
+        oas.unit(oas_subset='unpaired', study_id='Richardson_2022', unit_id='Mouse-4_Richardson_2022_1_Heavy_IGHM'),
+
+        # A paired unit, older missing fwr4 set
+        # I am inclined to ignore these, as they amount to < 200K sequences
+        oas.unit(oas_subset='paired', study_id='Eccles_2020', unit_id='SRR10358523_paired'),
+
+        # A paired unit, newer and nicer set (set P2)
         oas.unit(oas_subset='paired', study_id='Jaffe_2022', unit_id='1279052_1_Paired_All'),
     )
     for unit in units:
         unit.download(force=False, dry_run=False, drop_caches=False)
-        _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
+        logs, df = _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
+        test_parquet = unit.path / 'test.deleteme.parquet'
+        to_parquet(df, test_parquet)
+        print(f'PARQUET SIZE: {test_parquet.lstat().st_size}')
+        print(f'CSV SIZE:     {unit.online_csv_size_bytes}')
+        test_parquet.unlink()
 
 
 def check_csv_parsing():
