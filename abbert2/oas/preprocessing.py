@@ -1799,3 +1799,78 @@ if __name__ == '__main__':
 #   - http://www.htslib.org/benchmarks/zlib.html
 #   - https://bugs.python.org/issue41566
 #
+
+#
+# [18:16] Adrien Bitton
+# Hi Santi
+# about the new OAS sequence-level metadata
+# right now the dataframes have the following columns
+#
+# 'index_in_unit', 'chain', 'locus', 'v_call', 'd_call', 'j_call',
+# 'sequence_aa', 'imgt_positions', 'imgt_insertions', 'rev_comp',
+# 'junction_aa', 'junction_aa_length', 'fwr1_start', 'fwr1_length',
+# 'cdr1_start', 'cdr1_length', 'fwr2_start', 'fwr2_length', 'cdr2_start',
+# 'fwr3_start', 'fwr3_length', 'cdr2_length', 'cdr3_start', 'cdr3_length',
+# 'fwr4_start', 'fwr4_length', 'redundancy', 'stop_codon', 'vj_in_frame',
+# 'v_frameshift', 'productive', 'complete_vdj', 'has_insertions',
+# 'has_unexpected_insertions', 'has_mutated_conserved_cysteines',
+# 'has_wrong_cdr3_reconstruction', 'has_kappa_gap_21', 'anarci_deletions',
+# 'anarci_insertions', 'anarci_missing_conserved_cysteine',
+# 'anarci_unusual_residue', 'anarci_fwr1_shorter_than_imgt_defined',
+# 'anarci_fwr4_shorter_than_imgt_defined',
+# 'anarci_cdr3_is_over_37_aa_long'
+
+#
+# looking at an example raw .csv file of OAS
+# I would add the following metadata related to germline alignment/identity
+# v_score, d_score, j_score
+# v_support, d_support, j_support
+# v_identity, d_identity, j_identity
+# I guess they are redundant but these are just single float each so not so heavy,
+# in case we could look at their distributions and reflect on which to use,
+# or just go for the vdj_identity values alone
+#
+
+#
+# I would prefer if you give examples of not-well parsed status
+# -------------------------------------------------------------
+# If we want to double check the parsing of ANARCI status,
+# we could add the raw ANARCI_status to the dataframe too, if you think that's necessary
+#
+
+#
+# In theory we could collect this like we do in the filters
+# ---------------------------------------------------------
+# Lastly, this might be more involved, we may like to know the redundancy at the whole database
+# level (not at the unit level, that is the already existing df column for redundancy)
+# before removing sequence duplicates so that we could add a filter like in AbLang paper
+# to keep only sequences seen 3 times or more
+#
+
+#
+# [Tuesday 17:42] Adrien Bitton
+# Hi Santi
+# we merged our Cerebras branches with Sven, still some work to do but its advancing
+# I also looked into OAS csv as we discussedmade some "exploration" here
+# https://github.com/bayer-science-for-a-better-life/bmlm-bayer-cerebras/blob/main/sample_data/check_oas_units.py
+# using 4 randomly picked VH units and 4 randomly picked VL unitsthe region start/end are in nucleotide
+# as we observedthe Fv_aa sequence can be reconstructed by concatenating all region_aa sequences
+# but to get the matching Fv_dna sequence is not straightforward as we also discussed before
+# for 8 units I get 17687 sequences and 4700 with no missing value in the columns
+# out of the 4700 I get 2133 matches with dna sequence2060 matches by concatenating
+# the annotated nucleotide regions+ 41 by trimming seq_dna from fwr1_start to fwr4_end
+# + 32 by aligning the trimmed seq_dna (because sometimes the fwr1_start to fwr4_end trim
+# is longer than the expected length)
+#
+# [Tuesday 17:45] Adrien Bitton
+# so I guess the most simple would be to only look at fwr1+cdr1+...+fwr4 and fwr1_aa+cdr1_aa+...+fwr4_aa
+# if they match we are good, otherwise we maybe only keep the sequence_aawhich means when we want to
+# train on aa we dont loose anything
+# when we want to train on codons, we will loose some data,
+# hopefully not too much (but from this test, it could be around 50%)
+#
+# [Tuesday 17:47] Adrien Bitton
+# also I think you were overwriting the values of region start/length no ?
+# because it seemed it was in amino acid index, so you derived directly
+# from the length of the region_aa sequences ... right?
+#
