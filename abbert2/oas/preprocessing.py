@@ -1474,10 +1474,10 @@ def parse_all_anarci_status():
 
 def check_csv_parsing_corner_cases():
     # Very long CDR3s with insertions, codes at and beyond "AA"
-        oas = OAS()
-        unit = oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_1_Heavy_IGHA')
-        unit.download(force=False, dry_run=False, drop_caches=False)
-        _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
+    oas = OAS()
+    unit = oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_1_Heavy_IGHA')
+    unit.download(force=False, dry_run=False, drop_caches=False)
+    _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
 
 
 def check_csv_parsing():
