@@ -868,14 +868,25 @@ def _process_sequences_df(df: pd.DataFrame,
 
     # --- do munging
 
-    # We will keep just a few of the many columns for the time being.
-    # Note, nucleotides might be interested later on, together with some IgBlast gathered info.
+    #
+    # Keeping just the necessary columns shall prove useful
+    # Note, nucleotides might be interesting later on, together with some IgBlast gathered info.
     # If so, beware the size of parquet files is much larger
     # (as compression is per column and cannot realize the redundancy between columns).
-    # If bringing back, the best would be to remove redundancy where possible
+    # When keeping, the best would be to remove redundancy where possible
     # (e.g., by storing indices instead of substrings).
-    # Here an example record with selected values, for documentations
+    #
+    # Here an example record (somewhat problematic!) with selected values, for documentation:
+    # oas = OAS()
+    # unit = oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_1_Heavy_IGHA')
+    # unit.download(force=False, dry_run=False, drop_caches=False)
+    # _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
+    # ... =>
+    # from pprint import pprint
+    # pprint(df.iloc[0].to_dict(), sort_dicts=False)
+    #
     SELECTED_UNPAIRED_RECORD_EXAMPLE = {
+        'sequence': 'ACACAGG...',
         'locus': 'H',
         'stop_codon': 'F',
         'vj_in_frame': 'T',
@@ -883,17 +894,113 @@ def _process_sequences_df(df: pd.DataFrame,
         'productive': 'T',
         'rev_comp': 'T',
         'complete_vdj': 'F',
-        'v_call': 'IGHV4-31*03',
-        'd_call': 'IGHD2-8*01',
+        'v_call': 'IGHV4-61*07',
+        'd_call': None,
         'j_call': 'IGHJ4*02',
-        'junction_aa': 'CARDTRGVGAAWSKVYW',
-        f'junction_aa_length': 17.0,
-        'cdr3_aa': 'WHATEVER',
+        'sequence_alignment': 'ACACAGG...',
+        'germline_alignment': 'ACAGTGG...',
+        'sequence_alignment_aa': 'TGTTHYNPSPKSRRTLAADTAKTQFSLRLSSVTPADTAVYYCARLDMALDYWGQGALVTVSS',
+        'germline_alignment_aa': 'SGSTNYNPSLKSRVTISVDTSKNQFSLKLSSVTAADTAVYYCARXXXXXDYWGQGTLVTVSS',
+        'v_alignment_start': 1.0,
+        'v_alignment_end': 135.0,
+        'd_alignment_start': None,
+        'd_alignment_end': None,
+        'j_alignment_start': 148.0,
+        'j_alignment_end': 189.0,
+        'v_sequence_alignment': 'ACACAG...',
+        'v_sequence_alignment_aa': 'TGTTHYNPSPKSRRTLAADTAKTQFSLRLSSVTPADTAVYYCAR',
+        'v_germline_alignment': 'ACAGTG...',
+        'v_germline_alignment_aa': 'SGSTNYNPSLKSRVTISVDTSKNQFSLKLSSVTAADTAVYYCAR',
+        'd_sequence_alignment': None,
+        'd_sequence_alignment_aa': None,
+        'd_germline_alignment': None,
+        'd_germline_alignment_aa': None,
+        'j_sequence_alignment': 'TTGACTACTGGGGCCAGGGAGCCCTGGTCACCGTCTCCTCAG',
+        'j_sequence_alignment_aa': 'DYWGQGALVTVSS',
+        'j_germline_alignment': 'TTGACTACTGGGGCCAGGGAACCCTGGTCACCGTCTCCTCAG',
+        'j_germline_alignment_aa': 'DYWGQGTLVTVSS',
+        'fwr1': None,
+        'fwr1_aa': None,
+        'cdr1': None,
+        'cdr1_aa': None,
+        'fwr2': None,
+        'fwr2_aa': None,
+        'cdr2': 'ACACAGGGACAACA',
+        'cdr2_aa': 'TGTT',
+        'fwr3': 'CACTAC...',
+        'fwr3_aa': 'HYNPSPKSRRTLAADTAKTQFSLRLSSVTPADTAVYYC',
+        'fwr4': 'TGGGGCCAGGGAGCCCTGGTCACCGTCTCCTCA',
+        'fwr4_aa': 'WGQGALVTVSS',
+        'cdr3': 'GCGAGACTAGACATGGCGCTTGACTAC',
+        'cdr3_aa': 'ARLDMALDY',
+        'junction': 'TGTGCGAGACTAGACATGGCGCTTGACTACTGG',
+        'junction_length': 33.0,
+        'junction_aa': 'CARLDMALDYW',
+        'junction_aa_length': 11.0,
+        'v_score': 149.857,
+        'd_score': None,
+        'j_score': 75.672,
+        'v_cigar': '91N135M166S1N',
+        'd_cigar': None,
+        'j_cigar': '147S6N42M112S',
+        'v_support': 2.612e-38,
+        'd_support': None,
+        'j_support': 4.94e-18,
+        'v_identity': 85.185,
+        'd_identity': None,
+        'j_identity': 97.619,
+        'v_sequence_start': 1.0,
+        'v_sequence_end': 135.0,
+        'v_germline_start': 92.0,
+        'v_germline_end': 226.0,
+        'd_sequence_start': None,
+        'd_sequence_end': None,
+        'd_germline_start': None,
+        'd_germline_end': None,
+        'j_sequence_start': 148.0,
+        'j_sequence_end': 189.0,
+        'j_germline_start': 7.0,
+        'j_germline_end': 48.0,
+        'fwr1_start': None,
+        'fwr1_end': None,
+        'cdr1_start': None,
+        'cdr1_end': None,
+        'fwr2_start': None,
+        'fwr2_end': None,
+        'cdr2_start': 1.0,
+        'cdr2_end': 14.0,
+        'fwr3_start': 15.0,
+        'fwr3_end': 128.0,
+        'fwr4_start': 156.0,
+        'fwr4_end': 188.0,
+        'cdr3_start': 129.0,
+        'cdr3_end': 155.0,
+        'np1': 'TAGACATGGCGC',
+        'np1_length': 12.0,
+        'np2': None,
+        'np2_length': None,
+        'c_region': 'CATCCC...',
         'Redundancy': 1,
-        'ANARCI_numbering': "{'fwh1': {'18 ': 'T', '19 ': 'L', '20 ': ...",
-        'ANARCI_status': '|Deletions: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 73, 128'
-                         '|Insertion: F40A|'
-                         '|Shorter than IMGT defined: fw1, fw4|'
+        # These get further processed by _preprocess_anarci_data
+        'ANARCI_numbering': "{'fwh1': {}, 'cdrh1': {}, 'fwh2': {}, 'cdrh2': {'56 ': "
+                            "'G', '57 ': 'T', '65 ': 'T'}, 'fwh3': {'66 ': 'H', '67 "
+                            "': 'Y', '68 ': 'N', '69 ': 'P', '70 ': 'S', '71 ': 'P', "
+                            "'72 ': 'K', '74 ': 'S', '75 ': 'R', '76 ': 'R', '77 ': "
+                            "'T', '78 ': 'L', '79 ': 'A', '80 ': 'A', '81 ': 'D', '82 "
+                            "': 'T', '83 ': 'A', '84 ': 'K', '85 ': 'T', '86 ': 'Q', "
+                            "'87 ': 'F', '88 ': 'S', '89 ': 'L', '90 ': 'R', '91 ': "
+                            "'L', '92 ': 'S', '93 ': 'S', '94 ': 'V', '95 ': 'T', '96 "
+                            "': 'P', '97 ': 'A', '98 ': 'D', '99 ': 'T', '100 ': 'A', "
+                            "'101 ': 'V', '102 ': 'Y', '103 ': 'Y', '104 ': 'C'}, "
+                            "'cdrh3': {'105 ': 'A', '106 ': 'R', '107 ': 'L', '108 ': "
+                            "'D', '109 ': 'M', '114 ': 'A', '115 ': 'L', '116 ': 'D', "
+                            "'117 ': 'Y'}, 'fwh4': {'118 ': 'W', '119 ': 'G', '120 ': "
+                            "'Q', '121 ': 'G', '122 ': 'A', '123 ': 'L', '124 ': 'V', "
+                            "'125 ': 'T', '126 ': 'V', '127 ': 'S', '128 ': 'S'}}",
+        'ANARCI_status': '|Deletions: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, '
+                         '15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 39, 40, 41, '
+                         '42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, '
+                         '73|||Shorter than IMGT defined: fw1|'
     }
 
     start = time.time()
