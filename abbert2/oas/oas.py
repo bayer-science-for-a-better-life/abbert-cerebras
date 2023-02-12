@@ -453,7 +453,10 @@ class Unit:
         if drop_caches:
             print(f'\tRemove {self.id}: {self.path}')
             if not dry_run:
-                shutil.rmtree(self.path, ignore_errors=False)
+                try:
+                    shutil.rmtree(self.path, ignore_errors=False)
+                except FileNotFoundError:
+                    pass
 
         if dry_run:
             print(f'\tDRY-RUN Not downloading {self.id}')
