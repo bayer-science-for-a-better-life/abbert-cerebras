@@ -1009,10 +1009,17 @@ def _process_sequences_df(df: pd.DataFrame,
 
     for chain_suffix in ('', '_heavy', '_light'):
 
-        # Select chain columns
+        # Select chain columns - paired units have a subset of the columns of unpaired units, suffixed
         possible_columns = [f'{column}{chain_suffix}'
                             for column in SELECTED_UNPAIRED_RECORD_EXAMPLE
                             if f'{column}{chain_suffix}' in df.columns]
+        if not possible_columns:
+            continue
+        elif chain_suffix:
+            # In a subset of paired units, we have these two extra columns
+            possible_columns += [column
+                                 for column in (f'Isotype{chain_suffix}', 'sequence_id')
+                                 if column in df.columns]
         chain_df = df[possible_columns]
         if chain_df.empty:
             continue
@@ -1022,7 +1029,9 @@ def _process_sequences_df(df: pd.DataFrame,
 
         # Remove column chain suffix
         if chain_suffix:
-            chain_df = chain_df.rename(columns=lambda column: column.rpartition('_')[0])
+            chain_df = chain_df.rename(
+                columns=lambda column: column.rpartition('_')[0] if column.endswith(chain_suffix)
+            )
 
         # Process all the records
         processed_records = []
