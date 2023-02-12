@@ -1655,11 +1655,16 @@ def parse_all_anarci_status():
 # --- Some things that should become proper tests
 
 def check_csv_parsing_corner_cases():
-    # Very long CDR3s with insertions, codes at and beyond "AA"
     oas = OAS()
-    unit = oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_1_Heavy_IGHA')
-    unit.download(force=False, dry_run=False, drop_caches=False)
-    _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
+    units = (
+        # Very long CDR3s with insertions, codes at and beyond "AA"
+        # oas.unit(oas_subset='unpaired', study_id='Kim_2020', unit_id='SRR12326757_1_Heavy_IGHA'),
+        # A paired unit, newer and nicer set
+        oas.unit(oas_subset='paired', study_id='Jaffe_2022', unit_id='1279052_1_Paired_All'),
+    )
+    for unit in units:
+        unit.download(force=False, dry_run=False, drop_caches=False)
+        _process_oas_csv_unit(unit, async_io=False, verbose=True, reraise=True)
 
 
 def check_csv_parsing():
