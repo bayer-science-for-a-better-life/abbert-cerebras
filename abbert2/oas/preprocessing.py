@@ -1030,7 +1030,7 @@ def _process_sequences_df(df: pd.DataFrame,
         # Remove column chain suffix
         if chain_suffix:
             chain_df = chain_df.rename(
-                columns=lambda column: column.rpartition('_')[0] if column.endswith(chain_suffix)
+                columns=lambda column: column.rpartition('_')[0] if column.endswith(chain_suffix) else column
             )
 
         # Process all the records
