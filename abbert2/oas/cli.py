@@ -5,7 +5,7 @@ import pandas as pd
 
 from abbert2.common import no_ssl_verification
 from abbert2.oas.oas import consolidate_all_units_stats, summarize_count_stats, diagnose, OAS, compare_csv_schemas
-from abbert2.oas.preprocessing import cache_units_meta, process_units, download_units
+from abbert2.oas.preprocessing import cache_units_meta, process_units, download_units, check_csv_parsing_corner_cases
 from antidoto.misc import envvar
 
 
@@ -73,10 +73,14 @@ def main():
 
         # Step 4: Convert the CSVs to more efficient representations (will take a lot of time)
         process_units,
+        # Step 4b: Run parse_all_anarci_status (see below) to detect ANARCI status parsing problems
+
         # Step 5: Run this again to populate unit metadata with processed sequences info
         # populate_metadata,
 
         # --- Maintenance commands
+        # This will show what columns are in different units and screams if there is a change on expected schema
+        compare_csv_schemas,
         # This allows to extract a copy of the processed units (e.g., to create tars)
         copy,
         # This prints reports on the units
@@ -85,8 +89,6 @@ def main():
         # parse_all_anarci_status,
 
         # --- Analysis commands
-        # This will show what columns are in different units
-        compare_csv_schemas,
         # This will consolidate stats for all units (e.g., frequences of amino acids on numbered sequences)
         consolidate_all_units_stats,
         # This will summarize and print count stats
