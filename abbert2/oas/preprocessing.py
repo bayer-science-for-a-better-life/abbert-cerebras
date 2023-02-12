@@ -852,6 +852,8 @@ def _process_sequences_df(df: pd.DataFrame,
                           verbose=False,
                           drop_anarci_status=True) -> Tuple[pd.DataFrame, dict]:
 
+    logs = {}
+
     # --- basic sanity checks
 
     if unit.oas_subset == 'paired' and ('locus_heavy' not in df.columns or 'locus_light' not in df.columns):
@@ -914,7 +916,7 @@ def _process_sequences_df(df: pd.DataFrame,
         'd_sequence_alignment_aa': None,
         'd_germline_alignment': None,
         'd_germline_alignment_aa': None,
-        'j_sequence_alignment': 'TTGACTACTGGGGCCAGGGAGCCCTGGTCACCGTCTCCTCAG',
+        'j_sequence_alignment': 'TTGACTACTGGGGCCAGGGAGCCCTGGTCACCGTCTCCTCAG',  # length 42
         'j_sequence_alignment_aa': 'DYWGQGALVTVSS',
         'j_germline_alignment': 'TTGACTACTGGGGCCAGGGAACCCTGGTCACCGTCTCCTCAG',
         'j_germline_alignment_aa': 'DYWGQGTLVTVSS',
@@ -930,7 +932,7 @@ def _process_sequences_df(df: pd.DataFrame,
         'fwr3_aa': 'HYNPSPKSRRTLAADTAKTQFSLRLSSVTPADTAVYYC',
         'fwr4': 'TGGGGCCAGGGAGCCCTGGTCACCGTCTCCTCA',
         'fwr4_aa': 'WGQGALVTVSS',
-        'cdr3': 'GCGAGACTAGACATGGCGCTTGACTAC',
+        'cdr3': 'GCGAGACTAGACATGGCGCTTGACTAC',  # len = 27 (see below start and end to understand their meaning)
         'cdr3_aa': 'ARLDMALDY',
         'junction': 'TGTGCGAGACTAGACATGGCGCTTGACTACTGG',
         'junction_length': 33.0,
@@ -999,7 +1001,10 @@ def _process_sequences_df(df: pd.DataFrame,
         'ANARCI_status': '|Deletions: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, '
                          '15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 39, 40, 41, '
                          '42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, '
-                         '73|||Shorter than IMGT defined: fw1|'
+                         '73|||Shorter than IMGT defined: fw1|',
+        # These only appear on paired units
+        'Isotype': 'Bulk',
+        'sequence_id': "AAACCTGAGCGATATA-1_contig_2"
     }
 
     start = time.time()
@@ -1007,18 +1012,10 @@ def _process_sequences_df(df: pd.DataFrame,
     dfs = []
 
     for chain_suffix in ('', '_heavy', '_light'):
-
         # Select chain columns - paired units have a subset of the columns of unpaired units, suffixed
         possible_columns = [f'{column}{chain_suffix}'
                             for column in SELECTED_UNPAIRED_RECORD_EXAMPLE
                             if f'{column}{chain_suffix}' in df.columns]
-        if not possible_columns:
-            continue
-        elif chain_suffix:
-            # In a subset of paired units, we have these two extra columns
-            possible_columns += [column
-                                 for column in (f'Isotype{chain_suffix}', 'sequence_id')
-                                 if column in df.columns]
         chain_df = df[possible_columns]
         if chain_df.empty:
             continue
@@ -1068,28 +1065,98 @@ def _process_sequences_df(df: pd.DataFrame,
     # Snake-casing more columns
     df = df.rename(columns={'Redundancy': 'redundancy', 'ANARCI_status': 'anarci_status'})
 
+    # Make start and end in 1-based, both inclusive, be 0-based and length based
+    REGIONS_WITH_STARTS_ENDS = (
+        'v_alignment', 'd_alignment', 'j_alignment',
+        'v_sequence', 'v_germline',
+        'd_sequence', 'd_germline',
+        'j_sequence', 'j_germline',
+        'fwr1', 'cdr1', 'fwr2', 'cdr2', 'fwr3', 'cdr3', 'fwr4'
+    )
+    ANARCI_ADDED_REGIONS = tuple(
+        f'{region}_aa_start' for region in ('fwr1', 'cdr1', 'fwr2', 'cdr2', 'fwr3', 'cdr3', 'fwr4')
+    )
+    for column in df.columns:
+        if column in ANARCI_ADDED_REGIONS:
+            continue
+        if column.endswith('_start') or column.endswith('_end'):
+            assert column.rpartition('_')[0] in REGIONS_WITH_STARTS_ENDS
+    for region in REGIONS_WITH_STARTS_ENDS:
+        has_start = f'{region}_start' in df.columns
+        has_end = f'{region}_end' in df.columns
+        if has_start ^ has_end:
+            raise ValueError(f'{region} has only on of _start or _end')
+        if has_start:
+            # capture length (since end is start and end are included, +1)
+            df[f'{region}_length'] = 1 + (df[f'{region}_end'] - df[f'{region}_start'])
+            if (df[f'{region}_length'] < 0).any():
+                print(f'WARNING: start is after end for region {region} in unit {unit.id_string}')
+                logs['inconsistent_start_end'] = True
+            # make 0-based
+            df[f'{region}_start'] = df[f'{region}_start'] - 1
+            # drop end
+            df = df.drop(columns=[f'{region}_end'])
+
     # Ensure good types
-    for column in ('junction_aa_length',
-                   'fwr1_start',
-                   'fwr1_length',
-                   'cdr1_start',
-                   'cdr1_length',
-                   'fwr2_start',
-                   'fwr2_length',
-                   'cdr2_start',
-                   'cdr2_length',
-                   'fwr3_start',
-                   'fwr3_length',
-                   'cdr3_start',
-                   'cdr3_length',
-                   'fwr4_start',
-                   'fwr4_length'):
+    for column in (
+        'v_alignment_start',
+        'v_alignment_length',
+        'd_alignment_start',
+        'd_alignment_length',
+        'j_alignment_start',
+        'j_alignment_length',
+        'junction_length',
+        'junction_aa_length',
+        'v_sequence_start',
+        'v_sequence_length',
+        'v_germline_start',
+        'v_germline_length',
+        'd_sequence_start',
+        'd_sequence_length',
+        'd_germline_start',
+        'd_germline_length',
+        'j_sequence_start',
+        'j_sequence_length',
+        'j_germline_start',
+        'j_germline_length',
+        'fwr1_start',
+        'fwr1_length',
+        'fwr1_aa_start',
+        'fwr1_aa_length',
+        'cdr1_start',
+        'cdr1_length',
+        'cdr1_aa_start',
+        'cdr1_aa_length',
+        'fwr2_start',
+        'fwr2_length',
+        'fwr2_aa_start',
+        'fwr2_aa_length',
+        'cdr2_start',
+        'cdr2_length',
+        'cdr2_aa_start',
+        'cdr2_aa_length',
+        'fwr3_start',
+        'fwr3_length',
+        'fwr3_aa_start',
+        'fwr3_aa_length',
+        'cdr3_start',
+        'cdr3_length',
+        'cdr3_aa_start',
+        'cdr3_aa_length',
+        'fwr4_start',
+        'fwr4_length'
+        'fwr4_aa_start',
+        'fwr4_aa_length',
+        'np1_length',
+        'np2_length',
+    ):
         if column not in df.columns:
             df[column] = None
-        df[column] = df[column].astype(pd.UInt16Dtype())
+        df[column] = df[column].astype(pd.Int32Dtype())
+        # should be pd.UInt16Dtype(), but there are negative lengths in d_germline
     if 'redundancy' not in df.columns:
         df['redundancy'] = None
-    df['redundancy'] = df['redundancy'].astype(pd.UInt32Dtype())
+    df['redundancy'] = df['redundancy'].astype(pd.UInt64Dtype())
     for column in ('index_in_unit',):
         df[column] = df[column].astype(pd.UInt64Dtype())
     for column in ('stop_codon',
@@ -1186,10 +1253,10 @@ def _process_sequences_df(df: pd.DataFrame,
         del df['anarci_status']
 
     # Done
-    logs = {
+    logs.update({
         'num_records': len(df),
         'taken_s': time.time() - start
-    }
+    })
 
     if verbose:
         print(f'DONE PARSING {len(df)} RECORDS IN {logs["taken_s"]:.2f} SECONDS')
