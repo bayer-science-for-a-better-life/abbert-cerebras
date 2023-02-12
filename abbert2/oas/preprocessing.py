@@ -730,20 +730,20 @@ def _preprocess_anarci_data(numbering_data_dict,
         'sequence_aa': [],
         'imgt_positions': [],
         'imgt_insertions': [],
-        'fwr1_start': None,
-        'fwr1_length': None,
-        'cdr1_start': None,
-        'cdr1_length': None,
-        'fwr2_start': None,
-        'fwr2_length': None,
-        'cdr2_start': None,
-        'fwr3_start': None,
-        'fwr3_length': None,
-        'cdr2_length': None,
-        'cdr3_start': None,
-        'cdr3_length': None,
-        'fwr4_start': None,
-        'fwr4_length': None,
+        'fwr1_aa_start': None,
+        'fwr1_aa_length': None,
+        'cdr1_aa_start': None,
+        'cdr1_aa_length': None,
+        'fwr2_aa_start': None,
+        'fwr2_aa_length': None,
+        'cdr2_aa_start': None,
+        'fwr3_aa_start': None,
+        'fwr3_aa_length': None,
+        'cdr2_aa_length': None,
+        'cdr3_aa_start': None,
+        'cdr3_aa_length': None,
+        'fwr4_aa_start': None,
+        'fwr4_aa_length': None,
         # flags
         'has_insertions': False,
         'has_unexpected_insertions': False,
@@ -771,8 +771,8 @@ def _preprocess_anarci_data(numbering_data_dict,
         aas_in_region = list(numbering_data_dict.get(region_key, {}).items())
 
         # Start and length (None and 0 for not present regions)
-        alignment_data[f'{region}_start'] = last_region_end if len(aas_in_region) else None
-        alignment_data[f'{region}_length'] = len(aas_in_region)
+        alignment_data[f'{region}_aa_start'] = last_region_end if len(aas_in_region) else None
+        alignment_data[f'{region}_aa_length'] = len(aas_in_region)
         last_region_end += len(aas_in_region)
 
         # Sort the region AAs
@@ -815,12 +815,11 @@ def _preprocess_anarci_data(numbering_data_dict,
 
     # Check expectations
     if expected_cdr3 is not None:
-        if alignment_data['cdr3_start'] is None:
+        if alignment_data['cdr3_aa_start'] is None:
             alignment_data['has_wrong_cdr3_reconstruction'] = True
         else:
-            cdr3_start = alignment_data['cdr3_start']
-            cdr3_end = (
-                    alignment_data['cdr3_start'] + alignment_data['cdr3_length'])
+            cdr3_start = alignment_data['cdr3_aa_start']
+            cdr3_end = alignment_data['cdr3_aa_start'] + alignment_data['cdr3_aa_length']
             # noinspection PyUnresolvedReferences
             anarci_cdr3 = (
                 alignment_data['sequence_aa'][cdr3_start:cdr3_end])
