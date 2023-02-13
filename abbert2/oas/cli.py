@@ -76,7 +76,7 @@ def main():
         process_units,
         # Step 4b: Run parse_all_anarci_status (see below) to detect ANARCI status parsing problems
 
-        # Step 5: Run this again to populate unit metadata with processed sequences info
+        # Step 5: Run this again, recomputing, to populate unit metadata with processed sequences info
         # populate_metadata,
 
         # --- Maintenance commands
@@ -109,7 +109,8 @@ def example_main():
             compare_csv_schemas()
             download_units(clean_not_in_meta=True)
             check_csv_parsing_corner_cases()
-            # process_units()
+            process_units()
+            populate_metadata(recompute=True)  # N.B. recompute now takes time, do once
 
 
 if __name__ == '__main__':
