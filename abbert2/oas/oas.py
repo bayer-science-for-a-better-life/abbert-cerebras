@@ -259,7 +259,7 @@ class OAS:
                            'theoretical_num_sequences_total',
                            'sequences_file_size',
                            'sequences_num_records',
-                           'heavy_cdr3_max_length'):
+                           'heavy_cdr3_aa_max_length'):
             df[int_column] = df[int_column].astype(pd.Int64Dtype())
 
         return df
