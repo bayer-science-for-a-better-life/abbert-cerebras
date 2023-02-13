@@ -769,8 +769,10 @@ class Unit:
         # we could also check sum(redundancy) == theoretical_num_sequences_total...
         return num_records < self.theoretical_num_sequences_unique
 
-    def region_max_length(self, region='cdr3', chain='heavy') -> Optional[int]:
+    def region_max_length(self, region='cdr3', chain='heavy', aa=True) -> Optional[int]:
         pq = self._pq()
+        if aa:
+            region = region + '_aa'
         if pq is not None:
             if chain is None:
                 # leverage parquet precomputed column stats
