@@ -533,7 +533,7 @@ class Unit:
             'theoretical_num_sequences_unique', 'theoretical_num_sequences_total',
             'original_url', 'has_original_csv', 'original_local_csv_mdate', 'download_error', 'needs_redownload',
             'sequences_file_size', 'has_broken_sequences_file', 'sequences_num_records', 'sequences_miss_processing',
-            'num_heavy_sequences', 'num_light_sequences', 'heavy_cdr3_max_length'
+            'num_heavy_sequences', 'num_light_sequences', 'heavy_cdr3_aa_max_length'
         )
         return {field: getattr(self, field) for field in fields}
 
@@ -787,27 +787,51 @@ class Unit:
 
     @property
     def heavy_cdr1_max_length(self):
-        return self.region_max_length(region='cdr1', chain='heavy')
+        return self.region_max_length(region='cdr1', chain='heavy', aa=False)
+
+    @property
+    def heavy_cdr1_aa_max_length(self):
+        return self.region_max_length(region='cdr1', chain='heavy', aa=True)
 
     @property
     def heavy_cdr2_max_length(self):
-        return self.region_max_length(region='cdr2', chain='heavy')
+        return self.region_max_length(region='cdr2', chain='heavy', aa=False)
+
+    @property
+    def heavy_cdr2_aa_max_length(self):
+        return self.region_max_length(region='cdr2', chain='heavy', aa=True)
 
     @property
     def heavy_cdr3_max_length(self):
-        return self.region_max_length(region='cdr3', chain='heavy')
+        return self.region_max_length(region='cdr3', chain='heavy', aa=False)
+
+    @property
+    def heavy_cdr3_aa_max_length(self):
+        return self.region_max_length(region='cdr3', chain='heavy', aa=True)
 
     @property
     def light_cdr1_max_length(self):
-        return self.region_max_length(region='cdr1', chain='light')
+        return self.region_max_length(region='cdr1', chain='light', aa=False)
+
+    @property
+    def light_cdr1_aa_max_length(self):
+        return self.region_max_length(region='cdr1', chain='light', aa=True)
 
     @property
     def light_cdr2_max_length(self):
-        return self.region_max_length(region='cdr2', chain='light')
+        return self.region_max_length(region='cdr2', chain='light', aa=False)
+
+    @property
+    def light_cdr2_aa_max_length(self):
+        return self.region_max_length(region='cdr2', chain='light', aa=True)
 
     @property
     def light_cdr3_max_length(self):
-        return self.region_max_length(region='cdr3', chain='light')
+        return self.region_max_length(region='cdr3', chain='light', aa=False)
+
+    @property
+    def light_cdr3_aa_max_length(self):
+        return self.region_max_length(region='cdr3', chain='light', aa=True)
 
     # --- Consolidated stats
 
@@ -846,10 +870,10 @@ class Unit:
                     aligned_position_counts[f'{position}{insertion}={aa}'] += 1
             stats[chain] = {
                 'aligned_position_counts': dict(aligned_position_counts),
-                'sequence_length_counts': df[f'sequence_aa'].str.len().value_counts().to_dict(),
+                'sequence_aa_length_counts': df[f'sequence_aa'].str.len().value_counts().to_dict(),
             }
             for region in ('fwr1', 'cdr1', 'fwr2', 'cdr2', 'fwr3', 'cdr3', 'fwr4'):
-                stats[chain][f'{region}_length_counts'] = df[f'{region}_length'].value_counts().to_dict()
+                stats[chain][f'{region}_aa_length_counts'] = df[f'{region}_aa_length'].value_counts().to_dict()
             # TODO: collect other stats for things like QA, germlines...
         pd.to_pickle(stats, cache_path)
         return stats
@@ -1038,10 +1062,10 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
     for chain in ('heavy', 'light'):
         summarized_stats[chain] = {
             'aligned_position_counts': None,
-            'sequence_length_counts': None,
+            'sequence_aa_length_counts': None,
         }
         for region in ('fwr1', 'cdr1', 'fwr2', 'cdr2', 'fwr3', 'cdr3', 'fwr4'):
-            summarized_stats[chain][f'{region}_length_counts'] = None
+            summarized_stats[chain][f'{region}_aa_length_counts'] = None
 
     # Aggregate stats
     for unit in oas.units_in_disk():
@@ -1059,23 +1083,25 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
                     )
 
                 # --- Length histograms: full sequences
-                sequence_length_counts = pd.Series(chain_stats['sequence_length_counts'])
-                if summarized_stats[chain]['sequence_length_counts'] is None:
+                sequence_length_counts = pd.Series(chain_stats['sequence_aa_length_counts'])
+                if summarized_stats[chain]['sequence_aa_length_counts'] is None:
                     # noinspection PyTypeChecker
-                    summarized_stats[chain]['sequence_length_counts'] = sequence_length_counts
+                    summarized_stats[chain]['sequence_aa_length_counts'] = sequence_length_counts
                 else:
-                    summarized_stats[chain]['sequence_length_counts'] = (
-                        sequence_length_counts.add(summarized_stats[chain]['sequence_length_counts'], fill_value=0)
+                    summarized_stats[chain]['sequence_aa_length_counts'] = (
+                        sequence_length_counts.add(summarized_stats[chain]['sequence_aa_length_counts'], fill_value=0)
                     )
                 # --- Length histograms: regions
                 for region in ('fwr1', 'cdr1', 'fwr2', 'cdr2', 'fwr3', 'cdr3', 'fwr4'):
-                    region_length_counts = pd.Series(chain_stats[f'{region}_length_counts'])
-                    if summarized_stats[chain][f'{region}_length_counts'] is None:
+                    region_length_counts = pd.Series(chain_stats[f'{region}_aa_length_counts'])
+                    if summarized_stats[chain][f'{region}_aa_length_counts'] is None:
                         # noinspection PyTypeChecker
-                        summarized_stats[chain][f'{region}_length_counts'] = region_length_counts
+                        summarized_stats[chain][f'{region}_aa_length_counts'] = region_length_counts
                     else:
-                        summarized_stats[chain][f'{region}_length_counts'] = (
-                            region_length_counts.add(summarized_stats[chain][f'{region}_length_counts'], fill_value=0)
+                        summarized_stats[chain][f'{region}_aa_length_counts'] = (
+                            region_length_counts.add(
+                                summarized_stats[chain][f'{region}_aa_length_counts'], fill_value=0
+                            )
                         )
 
     # Nice to have:
@@ -1105,8 +1131,8 @@ def summarize_count_stats(oas_path: Optional[Union[str, Path]] = None, recompute
             # Done
             chain_stats['aligned_position_counts'] = apc_df
         # Histograms sorted in ascending order
-        histograms = ['sequence_length_counts']
-        histograms += [f'{region}_length_counts'
+        histograms = ['sequence_aa_length_counts']
+        histograms += [f'{region}_aa_length_counts'
                        for region in ('fwr1', 'cdr1', 'fwr2', 'cdr2', 'fwr3', 'cdr3', 'fwr4')]
         for histogram in histograms:
             histogram_series: Optional[pd.Series] = chain_stats[histogram]
