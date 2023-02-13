@@ -268,7 +268,7 @@ class NoShortFWR1(Filter):
     def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         if self.threshold is None:
             return df.query(f'not anarci_fwr1_shorter_than_imgt_defined')
-        return df.query(f'fwr1_length >= {self.threshold}')
+        return df.query(f'fwr1_aa_length >= {self.threshold}')
 
 
 class NoShortFWR4(Filter):
@@ -287,7 +287,7 @@ class NoShortFWR4(Filter):
     def _filter(self, df: pd.DataFrame, unit: Unit = None) -> pd.DataFrame:
         if self.threshold is None:
             return df.query(f'not anarci_fwr4_shorter_than_imgt_defined')
-        return df.query(f'fwr4_length >= {self.threshold}')
+        return df.query(f'fwr4_aa_length >= {self.threshold}')
 
 
 class NoKappaGap21(Filter):
