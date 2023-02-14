@@ -51,6 +51,11 @@
 # + bsource and btype (from metadata)
 
 
+# TODO: check bug https://github.com/apache/arrow/issues/14229
+# storing and reading the columns 'imgt_positions' and 'imgt_insertions' in large dataframes causes error
+# these columns contain row=list and trigger an index overflow
+
+
 import json
 import os
 import random
@@ -95,7 +100,7 @@ def get_one_unit(i_UID, unit, species, chains, UID):
     return df
 
 
-def parallel_merge_OAS_df(oas_path, species, chains, save_path, n_jobs, n_break=-1):
+def parallel_merge_OAS_df(oas_path, species, chains, save_path, n_chunks, n_jobs, n_break=-1):
     OAS_PATHS = [RELATIVE_OAS_TEST_DATA_PATH,  # = 0 units in the conda env
                  "/project/biomols/antibodies/data/public/oas/20211114",  # the full, unfiltered dataset = 12695 units
                  "/project/biomols/antibodies/data/public/oas/20211114-filters=default"]  # the version we used with cerebras = 12695 units
@@ -113,11 +118,16 @@ def parallel_merge_OAS_df(oas_path, species, chains, save_path, n_jobs, n_break=
     all_df = [df for df in all_df if df is not None]
     print(f"\nfinished parsing {len(all_df)} non-empty valid df")
     merged_df = pd.concat(all_df)
-    merged_df.to_parquet(save_path)
+    merged_df.index = list(range(len(merged_df)))
+    print("min-max indexing", merged_df.index.min(), merged_df.index.max())
+    merged_df.drop(labels=['imgt_positions', 'imgt_insertions'], axis=1).to_parquet(save_path+".parquet", index=False)
+    # list_df = np.array_split(merged_df, n_chunks)
+    # for _i in range(n_chunks):
+    #     list_df[_i].to_parquet(save_path+f"_{_i}.parquet", index=False)
     return merged_df
 
 
-def merge_OAS_df(oas_path, species, chains, save_path, n_break=-1):
+def merge_OAS_df(oas_path, species, chains, save_path, n_chunks, n_break=-1):
     OAS_PATHS = [RELATIVE_OAS_TEST_DATA_PATH,  # = 0 units in the conda env
                  "/project/biomols/antibodies/data/public/oas/20211114",  # the full, unfiltered dataset = 12695 units
                  "/project/biomols/antibodies/data/public/oas/20211114-filters=default"]  # the version we used with cerebras = 12695 units
@@ -161,7 +171,12 @@ def merge_OAS_df(oas_path, species, chains, save_path, n_break=-1):
         if n_break > 0 and merged_df is not None and len(merged_df) > n_break:
             break
 
-    merged_df.to_parquet(save_path)
+    merged_df.index = list(range(len(merged_df)))
+    print("min-max indexing", merged_df.index.min(), merged_df.index.max())
+    merged_df.drop(labels=['imgt_positions', 'imgt_insertions'], axis=1).to_parquet(save_path+".parquet", index=False)
+    # list_df = np.array_split(merged_df, n_chunks)
+    # for _i in range(n_chunks):
+    #     list_df[_i].to_parquet(save_path+f"_{_i}.parquet", index=False)
     return merged_df
 
 
@@ -224,19 +239,20 @@ def indels_stats(merged_df):
     print(merged_df.imgt_insertions)  # list
     print(merged_df.anarci_deletions)  # list"""
     print("\n\nindels_stats")
-    for col in ["has_insertions", "has_unexpected_insertions", "anarci_insertions", "imgt_insertions", "anarci_deletions"]:
+    # for col in ["has_insertions", "has_unexpected_insertions", "anarci_insertions", "imgt_insertions", "anarci_deletions"]:
+    for col in ["has_insertions", "has_unexpected_insertions", "anarci_insertions", "anarci_deletions"]:
         print(col+".isnull", merged_df[col].isnull().sum())
         if col in ["has_insertions", "has_unexpected_insertions", "anarci_insertions"]:
             print(f"number of {col} {len(merged_df[merged_df[col] == True])} out of {len(merged_df)}")
-    n_imgt_insertions = []
-    for _imgt_in in merged_df.imgt_insertions.to_list():
-        try:
-            n_imgt_insertions.append(len("".join(_imgt_in)))
-        except:
-            n_imgt_insertions.append(0)
-    merged_df["n_imgt_insertions"] = n_imgt_insertions
-    print(merged_df.n_imgt_insertions.describe())
-    assert len(merged_df[merged_df["n_imgt_insertions"] > 0]) == len(merged_df[merged_df["has_insertions"] == True])
+    # n_imgt_insertions = []
+    # for _imgt_in in merged_df.imgt_insertions.to_list():
+    #     try:
+    #         n_imgt_insertions.append(len("".join(_imgt_in)))
+    #     except:
+    #         n_imgt_insertions.append(0)
+    # merged_df["n_imgt_insertions"] = n_imgt_insertions
+    # print(merged_df.n_imgt_insertions.describe())
+    # assert len(merged_df[merged_df["n_imgt_insertions"] > 0]) == len(merged_df[merged_df["has_insertions"] == True])
     n_anarci_deletions = []
     for _anarci_del in merged_df.anarci_deletions.to_list():
         try:
@@ -335,9 +351,10 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--oas_path', default=2, type=int)
     parser.add_argument('--species', default="all", type=str)  # "all", "whatever species"
-    parser.add_argument('--chains', default="all", type=str)  # "all", "heavy", "lig
+    parser.add_argument('--chains', default="all", type=str)  # "all", "heavy", "light"
     parser.add_argument('--save_path', default="/home/gnlzm/OAS_datasets/tmp/full_OAS_default_filter", type=str)
-    parser.add_argument('--save_tag', default="__cleaned.parquet", type=str)
+    parser.add_argument('--n_chunks', default=20, type=int)  # chunk the dataframe to avoid index overflow ...
+    parser.add_argument('--save_tag', default="__cleaned", type=str)
     parser.add_argument('--n_break', default=-1, type=int)
     parser.add_argument('--n_jobs', default=1, type=int)
     parser.add_argument('--strict_length_cutoffs', action='store_true')
@@ -355,16 +372,20 @@ if __name__ == '__main__':
     parser.add_argument('--fwr4_length_cutoffs', nargs='+', default=[10, 12])  # for CAIPY [10, 11]
     args = parser.parse_args()
 
+    # if not all(os.path.exists(args.save_path+f"_{_i}.parquet") for _i in range(args.n_chunks)):
     if not os.path.exists(args.save_path+".parquet"):
         if args.n_jobs > 1:
             print(f"\nrunning parallel_merge_OAS_df with {args.n_jobs} CPUs")
-            merged_df = parallel_merge_OAS_df(args.oas_path, args.species, args.chains, args.save_path+".parquet", args.n_jobs, n_break=args.n_break)
+            merged_df = parallel_merge_OAS_df(args.oas_path, args.species, args.chains, args.save_path, args.n_chunks, args.n_jobs, n_break=args.n_break)
         else:
             print("\nrunning merge_OAS_df")
-            merged_df = merge_OAS_df(args.oas_path, args.species, args.chains, args.save_path + ".parquet", n_break=args.n_break)
+            merged_df = merge_OAS_df(args.oas_path, args.species, args.chains, args.save_path, args.n_chunks, n_break=args.n_break)
+        print("\nfinished merging dataframe of shape", merged_df.shape)
     else:
         print("\nloading pre-computed merged_df")
         merged_df = pd.read_parquet(args.save_path+".parquet")
+        # merged_df = pd.concat([pd.read_parquet(args.save_path+f"_{_i}.parquet") for _i in range(args.n_chunks)])
+        # print("\nfinished loading dataframe of shape", merged_df.shape)
 
     merged_df = merged_df.reset_index(drop=True)
     merged_df.info()
@@ -418,10 +439,10 @@ if __name__ == '__main__':
 
     merged_df_plotting = merged_df*1
 
-    for _col in ["redundancy", "n_cdr3_replicas", "has_insertions", "has_unexpected_insertions", "n_imgt_insertions",
+    for _col in ["redundancy", "n_cdr3_replicas", "has_insertions", "has_unexpected_insertions",
             "n_anarci_deletions", "anarci_fwr1_shorter_than_imgt_defined", "anarci_fwr4_shorter_than_imgt_defined",
             "complete_vdj", "has_wrong_cdr3_reconstruction", "bulk_isotype", "is_naive_Bcell",
-            "cdr1_length", "cdr2_length", "cdr3_length", "fwr1_length", "fwr2_length", "fwr3_length", "fwr4_length"]:
+            "cdr1_length", "cdr2_length", "cdr3_length", "fwr1_length", "fwr2_length", "fwr3_length", "fwr4_length"]:  # , "n_imgt_insertions"
         print("\nplotting", _col, merged_df[_col].dtypes)
         plt.figure(figsize=(12, 12))
         plt.subplot(211)
@@ -461,5 +482,8 @@ if __name__ == '__main__':
             print(f"filtered dataset of size {len(merged_df)}")
 
     # --> store the filtered dataset
-    merged_df.to_parquet(args.save_path+args.save_tag)
+    merged_df.reset_index(drop=True).to_parquet(args.save_path+args.save_tag+".parquet")  # .drop(labels=['imgt_positions', 'imgt_insertions'], axis=1)
+    # list_df = np.array_split(merged_df, args.n_chunks)
+    # for _i in range(args.n_chunks):
+    #     list_df[_i].to_parquet(args.save_path+args.save_tag+f"_{_i}.parquet", index=False)
 
