@@ -18,7 +18,7 @@ OAS OPIG Blogposts:
   - https://www.blopig.com/blog/2020/07/observed-antibody-space-miairr/
   - https://www.blopig.com/blog/2020/09/adding-paired-bcr-data-to-oas/
 
-OAS is the baby of Aleksandr Kovaltsuk, whom I find useful to follow:
+OAS is the baby of Konrad Krawczyk, whom I find useful to follow:
   - Twitter: https://twitter.com/antibodymap?lang=en
   - Home: https://konradkrawczyk.github.io/
   - Company: https://naturalantibody.com/
